@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  color     String   @default("#3b82f6") // Couleur pour différencier visuellement
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactions  Transaction[]
+  budgets       Budget[]
+  recurrences   Recurrence[]
+
+  @@map("users")
+}
+
+model Category {
+  id    String      @id @default(cuid())
+  name  String
+  type  CategoryType
+  color String      @default("#6b7280")
+  icon  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  transactions Transaction[]
+  budgets      Budget[]
+  recurrences  Recurrence[]
+
+  @@map("categories")
+}
+
+model Transaction {
+  id          String      @id @default(cuid())
+  amount      Float       // Positif pour revenus, négatif pour dépenses
+  description String
+  date        DateTime    @default(now())
+  shared      Boolean     @default(false) // Pour les dépenses communes
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@map("transactions")
+}
+
+model Budget {
+  id           String   @id @default(cuid())
+  amount       Float    // Montant limite
+  period       Period   @default(MONTHLY)
+  startDate    DateTime @default(now())
+  shared       Boolean  @default(false) // Budget commun ou individuel
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  userId     String?  // null = budget commun
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@map("budgets")
+}
+
+model Recurrence {
+  id            String    @id @default(cuid())
+  amount        Float
+  frequency     Frequency @default(MONTHLY)
+  nextDue       DateTime
+  description   String
+  shared        Boolean   @default(false)
+  active        Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  userId     String?  // null = récurrence commune
+  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  @@map("recurrences")
+}
+
+enum CategoryType {
+  INCOME    // Revenus
+  EXPENSE   // Dépenses
+  FIXED     // Charges fixes
+}
+
+enum Period {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum Frequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
