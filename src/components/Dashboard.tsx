@@ -22,11 +22,12 @@ export default function Dashboard() {
     transactions,
     budgets,
     isLoading,
+    dateRange,
   } = useAppStore();
 
   useEffect(() => {
     loadDashboardOverview();
-  }, [loadDashboardOverview, selectedUser]);
+  }, [loadDashboardOverview, selectedUser, dateRange.startDate, dateRange.endDate]);
 
   if (isLoading || !dashboardData) {
     return (

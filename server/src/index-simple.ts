@@ -99,6 +99,117 @@ app.get('/api/budgets', async (req, res) => {
   }
 });
 
+// POST /api/transactions - Créer une nouvelle transaction
+app.post('/api/transactions', async (req, res) => {
+  try {
+    const { amount, description, date, shared, userId, categoryId } = req.body;
+    
+    if (!amount || !description || !userId || !categoryId) {
+      return res.status(400).json({ 
+        error: 'Amount, description, userId, and categoryId are required' 
+      });
+    }
+    
+    const transaction = await prisma.transaction.create({
+      data: {
+        amount: parseFloat(amount),
+        description,
+        date: date ? new Date(date) : new Date(),
+        shared: shared || false,
+        userId,
+        categoryId
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            color: true,
+            icon: true
+          }
+        }
+      }
+    });
+    
+    res.status(201).json(transaction);
+  } catch (error) {
+    console.error('Error creating transaction:', error);
+    res.status(500).json({ error: 'Failed to create transaction' });
+  }
+});
+
+// PUT /api/transactions/:id - Mettre à jour une transaction
+app.put('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, description, date, shared, categoryId } = req.body;
+    
+    const transaction = await prisma.transaction.update({
+      where: { id },
+      data: {
+        ...(amount && { amount: parseFloat(amount) }),
+        ...(description && { description }),
+        ...(date && { date: new Date(date) }),
+        ...(shared !== undefined && { shared }),
+        ...(categoryId && { categoryId })
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            color: true,
+            icon: true
+          }
+        }
+      }
+    });
+    
+    res.json(transaction);
+  } catch (error: any) {
+    console.error('Error updating transaction:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    res.status(500).json({ error: 'Failed to update transaction' });
+  }
+});
+
+// DELETE /api/transactions/:id - Supprimer une transaction
+app.delete('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.transaction.delete({
+      where: { id }
+    });
+    
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Error deleting transaction:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    res.status(500).json({ error: 'Failed to delete transaction' });
+  }
+});
+
 app.get('/api/recurrences', async (req, res) => {
   try {
     const recurrences = await prisma.recurrence.findMany({

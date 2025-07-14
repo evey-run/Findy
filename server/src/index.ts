@@ -5,11 +5,11 @@ import { PrismaClient } from '@prisma/client';
 
 // Routes
 import userRoutes from './routes/users-simple.js';
-// import categoryRoutes from './routes/categories.js';
-// import transactionRoutes from './routes/transactions.js';
-// import budgetRoutes from './routes/budgets.js';
-// import recurrenceRoutes from './routes/recurrences.js';
-// import dashboardRoutes from './routes/dashboard.js';
+import categoryRoutes from './routes/categories.js';
+import transactionRoutes from './routes/transactions.js';
+import budgetRoutes from './routes/budgets.js';
+import recurrenceRoutes from './routes/recurrences.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 dotenv.config();
 
@@ -26,11 +26,11 @@ app.use(express.json());
 
 // Routes
 app.use('/api/users', userRoutes);
-// app.use('/api/categories', categoryRoutes);
-// app.use('/api/transactions', transactionRoutes);
-// app.use('/api/budgets', budgetRoutes);
-// app.use('/api/recurrences', recurrenceRoutes);
-// app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/budgets', budgetRoutes);
+app.use('/api/recurrences', recurrenceRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

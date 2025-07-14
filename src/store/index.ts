@@ -133,8 +133,11 @@ export const useAppStore = create<AppState>()(
             if (state.selectedUserId) {
               params.append('userId', state.selectedUserId);
             }
-            const response = await fetch(`http://localhost:3001/api/transactions?${params}`);
+            const url = `http://localhost:3001/api/transactions?${params}`;
+            console.log('🔍 Loading transactions from:', url);
+            const response = await fetch(url);
             const transactions = await response.json();
+            console.log('📊 Loaded transactions:', transactions.length);
             set({ transactions });
           } catch (error) {
             console.error('Failed to load transactions:', error);
@@ -218,8 +221,11 @@ export const useAppStore = create<AppState>()(
             if (state.selectedUserId) {
               params.append('userId', state.selectedUserId);
             }
-            const response = await fetch(`http://localhost:3001/api/dashboard?${params}`);
+            const url = `http://localhost:3001/api/dashboard?${params}`;
+            console.log('🔍 Loading dashboard from:', url);
+            const response = await fetch(url);
             const dashboardData = await response.json();
+            console.log('📊 Loaded dashboard:', dashboardData);
             set({ dashboardData });
           } catch (error) {
             console.error('Failed to load dashboard overview:', error);
@@ -242,6 +248,7 @@ export const useAppStore = create<AppState>()(
       }),
       {
         name: 'finance-app-store',
+        version: 1,
         partialize: (state) => ({
           currentUser: state.currentUser,
           dateRange: state.dateRange,
