@@ -118,18 +118,6 @@ export default function Transactions() {
     }
   };
 
-  const handleEdit = (transaction: Transaction) => {
-    setEditingId(transaction.id);
-    setEditingTransaction({
-      id: transaction.id,
-      amount: transaction.amount,
-      description: transaction.description,
-      date: transaction.date.split('T')[0],
-      shared: transaction.shared,
-      categoryId: transaction.categoryId
-    });
-  };
-
   const handleSave = async () => {
     if (!editingTransaction) return;
 
@@ -529,7 +517,7 @@ export default function Transactions() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Partagé
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -738,15 +726,7 @@ export default function Transactions() {
                       </button>
                     </div>
                   ) : (
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(transaction)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
+                    <div className="flex justify-center">
                       <button
                         onClick={() => handleDelete(transaction.id)}
                         className="text-red-600 hover:text-red-900"
