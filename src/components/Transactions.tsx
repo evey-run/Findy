@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Transaction, Category, Bank } from '../types/index.js';
+import { useAppStore } from '../store';
 
 // CSS pour les cellules éditables
 const editableCellStyle = `
@@ -29,9 +29,25 @@ interface InlineEditCell {
 }
 
 export default function Transactions() {
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [banks, setBanks] = useState<Bank[]>([]);
+  const { 
+    transactions, 
+    categories, 
+    banks, 
+    loadTransactions, 
+    loadCategories, 
+    loadBanks,
+    selectedBank,
+    setSelectedBank,
+    updateTransaction,
+    removeTransaction 
+  } = useAppStore();
+  
+  // Log initial state
+  console.log('🔄 Transactions component rendered');
+  console.log('🏦 Current selectedBank:', selectedBank);
+  console.log('🏦 Available banks:', banks);
+  console.log('💳 Current transactions:', transactions);
+  
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
@@ -42,7 +58,6 @@ export default function Transactions() {
   const [inlineEditValue, setInlineEditValue] = useState<string>('');
   
   const [filters, setFilters] = useState({
-    bankId: '',
     categoryId: '',
     shared: '',
     startDate: '',
@@ -51,72 +66,34 @@ export default function Transactions() {
 
   // Fetch initial data
   useEffect(() => {
-    console.log('Transactions component mounted, filters:', filters);
-    fetchTransactions();
-    fetchCategories();
-    fetchBanks();
-  }, [filters]);
-
-  const fetchTransactions = async () => {
-    try {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
-      });
-      
-      console.log('Fetching transactions with params:', params.toString());
-      const response = await fetch(`/api/transactions?${params}`);
-      console.log('Response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+    const initializeData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([
+          loadTransactions(),
+          loadCategories(),
+          loadBanks()
+        ]);
+      } catch (error) {
+        console.error('Error initializing data:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      const data = await response.json();
-      console.log('Transactions data:', data);
-      setTransactions(data);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+    
+    initializeData();
+  }, []);
 
-  const fetchCategories = async () => {
-    try {
-      console.log('Fetching categories...');
-      const response = await fetch('/api/categories');
-      console.log('Categories response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Categories data:', data);
-      setCategories(data);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+  // Recharger les transactions quand la banque sélectionnée change
+  useEffect(() => {
+    console.log('🔄 selectedBank changed:', selectedBank);
+    if (selectedBank) {
+      console.log('Loading transactions for bank:', selectedBank.name);
+    } else {
+      console.log('Loading all transactions');
     }
-  };
-
-  const fetchBanks = async () => {
-    try {
-      console.log('Fetching banks...');
-      const response = await fetch('/api/banks');
-      console.log('Banks response status:', response.status);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Banks data:', data);
-      setBanks(data);
-    } catch (error) {
-      console.error('Error fetching banks:', error);
-    }
-  };
+    loadTransactions();
+  }, [selectedBank?.id]);
 
   const handleSave = async () => {
     if (!editingTransaction) return;
@@ -132,9 +109,7 @@ export default function Transactions() {
 
       if (response.ok) {
         const updatedTransaction = await response.json();
-        setTransactions(transactions.map(t => 
-          t.id === editingTransaction.id ? updatedTransaction : t
-        ));
+        updateTransaction(editingTransaction.id, updatedTransaction);
         setEditingId(null);
         setEditingTransaction(null);
       }
@@ -221,9 +196,7 @@ export default function Transactions() {
 
       if (response.ok) {
         const updatedTransaction = await response.json();
-        setTransactions(transactions.map(t => 
-          t.id === transactionId ? updatedTransaction : t
-        ));
+        updateTransaction(transactionId, updatedTransaction);
         handleInlineCancel();
       }
     } catch (error) {
@@ -253,7 +226,7 @@ export default function Transactions() {
       });
 
       if (response.ok) {
-        setTransactions(transactions.filter(t => t.id !== id));
+        removeTransaction(id);
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
@@ -277,8 +250,7 @@ export default function Transactions() {
       });
 
       if (response.ok) {
-        const newTransaction = await response.json();
-        setTransactions([newTransaction, ...transactions]);
+        await loadTransactions(); // Recharger les transactions
         setShowAddForm(false);
         setEditingTransaction(null);
       }
@@ -286,6 +258,39 @@ export default function Transactions() {
       console.error('Error creating transaction:', error);
     }
   };
+
+  // Filtrer les transactions selon la banque sélectionnée et autres filtres
+  const filteredTransactions = transactions.filter(transaction => {
+    // Filtre par banque sélectionnée
+    if (selectedBank && transaction.bankId !== selectedBank.id) {
+      return false;
+    }
+    
+    // Filtre par catégorie
+    if (filters.categoryId && transaction.categoryId !== filters.categoryId) {
+      return false;
+    }
+    
+    // Filtre par type partagé
+    if (filters.shared !== '' && transaction.shared.toString() !== filters.shared) {
+      return false;
+    }
+    
+    // Filtre par date de début
+    if (filters.startDate && transaction.date < filters.startDate) {
+      return false;
+    }
+    
+    // Filtre par date de fin
+    if (filters.endDate && transaction.date > filters.endDate) {
+      return false;
+    }
+    
+    return true;
+  });
+  
+  // Log filtered transactions
+  console.log('🔍 Filtered transactions:', filteredTransactions.length, 'out of', transactions.length);
 
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -345,11 +350,16 @@ export default function Transactions() {
           <div>
             <label className="block text-sm font-medium text-gray-700">Banque</label>
             <select
-              value={filters.bankId}
-              onChange={(e) => setFilters({...filters, bankId: e.target.value})}
+              value={selectedBank?.id || ''}
+              onChange={(e) => {
+                console.log('🏦 Bank selector changed:', e.target.value);
+                const bank = banks.find(b => b.id === e.target.value);
+                console.log('🏦 Found bank:', bank);
+                setSelectedBank(bank || null);
+              }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
-              <option value="">Toutes</option>
+              <option value="">Toutes les banques</option>
               {banks.map(bank => (
                 <option key={bank.id} value={bank.id}>{bank.name}</option>
               ))}
@@ -523,7 +533,7 @@ export default function Transactions() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {transactions.map((transaction) => (
+            {filteredTransactions.map((transaction) => (
               <tr key={transaction.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {editingId === transaction.id ? (
@@ -743,7 +753,7 @@ export default function Transactions() {
           </tbody>
         </table>
         
-        {transactions.length === 0 && (
+        {filteredTransactions.length === 0 && (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

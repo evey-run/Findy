@@ -7,7 +7,7 @@ interface AppState {
   currentBank: Bank | null;
   setCurrentBank: (bank: Bank | null) => void;
   
-  // Selected bank (computed from selectedBankId)
+  // Selected bank (now stored directly)
   selectedBank: Bank | null;
   setSelectedBank: (bank: Bank | null) => void;
 
@@ -60,9 +60,6 @@ interface AppState {
     endDate: string;
   };
   setDateRange: (range: { startDate: string; endDate: string }) => void;
-  
-  selectedBankId: string | null;
-  setSelectedBankId: (bankId: string | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -73,16 +70,17 @@ export const useAppStore = create<AppState>()(
         currentBank: null,
         setCurrentBank: (bank: Bank | null) => set({ currentBank: bank }),
         
-        // Selected bank (computed)
-        get selectedBank() {
-          const state = get();
-          return state.banks.find(b => b.id.toString() === state.selectedBankId) || null;
+        // Selected bank (stored directly)
+        selectedBank: null,
+        setSelectedBank: (bank: Bank | null) => {
+          set({ selectedBank: bank });
         },
-        setSelectedBank: (bank: Bank | null) => set({ selectedBankId: bank?.id.toString() || null }),
 
         // Banks
         banks: [],
-        setBanks: (banks: Bank[]) => set({ banks }),
+        setBanks: (banks: Bank[]) => {
+          set({ banks });
+        },
         loadBanks: async () => {
           try {
             const response = await fetch('/api/banks');
@@ -130,8 +128,8 @@ export const useAppStore = create<AppState>()(
               startDate: state.dateRange.startDate,
               endDate: state.dateRange.endDate,
             });
-            if (state.selectedBankId) {
-              params.append('bankId', state.selectedBankId);
+            if (state.selectedBank) {
+              params.append('bankId', state.selectedBank.id);
             }
             const response = await fetch(`/api/transactions?${params}`);
             const transactions = await response.json();
@@ -162,8 +160,8 @@ export const useAppStore = create<AppState>()(
           try {
             const state = get();
             const params = new URLSearchParams();
-            if (state.selectedBankId) {
-              params.append('bankId', state.selectedBankId);
+            if (state.selectedBank) {
+              params.append('bankId', state.selectedBank.id);
             }
             const response = await fetch(`/api/budgets?${params}`);
             const budgets = await response.json();
@@ -194,8 +192,8 @@ export const useAppStore = create<AppState>()(
           try {
             const state = get();
             const params = new URLSearchParams();
-            if (state.selectedBankId) {
-              params.append('bankId', state.selectedBankId);
+            if (state.selectedBank) {
+              params.append('bankId', state.selectedBank.id);
             }
             const response = await fetch(`/api/recurrences?${params}`);
             const recurrences = await response.json();
@@ -215,8 +213,8 @@ export const useAppStore = create<AppState>()(
               startDate: state.dateRange.startDate,
               endDate: state.dateRange.endDate,
             });
-            if (state.selectedBankId) {
-              params.append('bankId', state.selectedBankId);
+            if (state.selectedBank) {
+              params.append('bankId', state.selectedBank.id);
             }
             const response = await fetch(`/api/dashboard?${params}`);
             const dashboardData = await response.json();
@@ -236,16 +234,13 @@ export const useAppStore = create<AppState>()(
           endDate: new Date().toISOString().split('T')[0],
         },
         setDateRange: (range: { startDate: string; endDate: string }) => set({ dateRange: range }),
-        
-        selectedBankId: null,
-        setSelectedBankId: (bankId: string | null) => set({ selectedBankId: bankId }),
       }),
       {
         name: 'finance-app-store',
         partialize: (state) => ({
           currentBank: state.currentBank,
+          selectedBank: state.selectedBank,
           dateRange: state.dateRange,
-          selectedBankId: state.selectedBankId,
         }),
       }
     ),

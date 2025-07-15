@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Bank } from '../types/index.js';
 
 export default function Banks() {
-  const { banks, loadBanks } = useAppStore();
+  const { banks, loadBanks, setSelectedBank } = useAppStore();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -30,6 +32,13 @@ export default function Banks() {
     
     initBanks();
   }, [loadBanks]);
+
+  const handleBankClick = (bank: Bank) => {
+    console.log('🏦 Bank clicked:', bank.name);
+    setSelectedBank(bank);
+    console.log('🏦 Selected bank set, navigating to transactions...');
+    navigate('/transactions');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,6 +132,7 @@ export default function Banks() {
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
             Banques
           </h2>
+          <p className="text-sm text-gray-500 mt-1">Cliquez sur une banque pour voir ses transactions</p>
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4">
           <button
@@ -217,8 +227,11 @@ export default function Banks() {
       {/* Banks Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banks.map((bank) => (
-          <div key={bank.id} className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="p-6">
+          <div key={bank.id} className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+            <div 
+              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+              onClick={() => handleBankClick(bank)}
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div 
@@ -234,7 +247,10 @@ export default function Banks() {
                 </div>
                 <div className="flex space-x-2">
                   <button
-                    onClick={() => handleEdit(bank)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleEdit(bank);
+                    }}
                     className="text-blue-600 hover:text-blue-900"
                   >
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -242,7 +258,10 @@ export default function Banks() {
                     </svg>
                   </button>
                   <button
-                    onClick={() => handleDelete(bank.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(bank.id);
+                    }}
                     className="text-red-600 hover:text-red-900"
                   >
                     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -260,7 +279,10 @@ export default function Banks() {
                 </div>
               </div>
             </div>
-            <div className="bg-gray-50 px-6 py-3">
+            <div 
+              className="bg-gray-50 px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+              onClick={() => handleBankClick(bank)}
+            >
               <div className="text-sm text-gray-500">
                 Créé le {new Date(bank.createdAt).toLocaleDateString('fr-FR')}
               </div>
