@@ -148,7 +148,7 @@ app.post('/api/transactions', async (req, res) => {
 app.put('/api/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, description, date, shared, categoryId } = req.body;
+    const { amount, description, date, shared, categoryId, bankId } = req.body;
     
     const transaction = await prisma.transaction.update({
       where: { id },
@@ -157,7 +157,8 @@ app.put('/api/transactions/:id', async (req, res) => {
         ...(description && { description }),
         ...(date && { date: new Date(date) }),
         ...(shared !== undefined && { shared }),
-        ...(categoryId && { categoryId })
+        ...(categoryId && { categoryId }),
+        ...(bankId && { bankId })
       },
       include: {
         bank: {

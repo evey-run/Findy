@@ -1,6 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import type { Transaction, Category, Bank } from '../types/index.js';
 
+// CSS pour les cellules éditables
+const editableCellStyle = `
+  .editable-cell {
+    position: relative;
+    transition: background-color 0.15s ease-in-out;
+  }
+  
+  .editable-cell:hover {
+    background-color: #f3f4f6;
+  }
+`;
+
 interface EditingTransaction {
   id: string;
   amount: number;
@@ -11,6 +23,11 @@ interface EditingTransaction {
   bankId?: string;
 }
 
+interface InlineEditCell {
+  transactionId: string;
+  field: 'amount' | 'description' | 'date' | 'category' | 'bank' | 'shared';
+}
+
 export default function Transactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -19,6 +36,11 @@ export default function Transactions() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  
+  // Inline editing states
+  const [inlineEditCell, setInlineEditCell] = useState<InlineEditCell | null>(null);
+  const [inlineEditValue, setInlineEditValue] = useState<string>('');
+  
   const [filters, setFilters] = useState({
     bankId: '',
     categoryId: '',
@@ -138,6 +160,102 @@ export default function Transactions() {
     setEditingTransaction(null);
   };
 
+  // Inline editing functions
+  const handleInlineEdit = (transactionId: string, field: 'amount' | 'description' | 'date' | 'category' | 'bank' | 'shared') => {
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction) return;
+    
+    let value = '';
+    switch (field) {
+      case 'amount':
+        value = transaction.amount.toString();
+        break;
+      case 'description':
+        value = transaction.description;
+        break;
+      case 'date':
+        value = new Date(transaction.date).toISOString().split('T')[0];
+        break;
+      case 'category':
+        value = transaction.categoryId;
+        break;
+      case 'bank':
+        value = transaction.bankId;
+        break;
+      case 'shared':
+        value = transaction.shared.toString();
+        break;
+    }
+    
+    setInlineEditCell({ transactionId, field });
+    setInlineEditValue(value);
+  };
+
+  const handleInlineSave = async () => {
+    if (!inlineEditCell) return;
+    
+    const { transactionId, field } = inlineEditCell;
+    const transaction = transactions.find(t => t.id === transactionId);
+    if (!transaction) return;
+    
+    // Prepare the update data
+    let updateData: any = {};
+    switch (field) {
+      case 'amount':
+        updateData.amount = parseFloat(inlineEditValue);
+        if (isNaN(updateData.amount)) return; // Invalid number
+        break;
+      case 'description':
+        updateData.description = inlineEditValue;
+        break;
+      case 'date':
+        updateData.date = inlineEditValue;
+        break;
+      case 'category':
+        updateData.categoryId = inlineEditValue;
+        break;
+      case 'bank':
+        updateData.bankId = inlineEditValue;
+        break;
+      case 'shared':
+        updateData.shared = inlineEditValue === 'true';
+        break;
+    }
+    
+    try {
+      const response = await fetch(`/api/transactions/${transactionId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        const updatedTransaction = await response.json();
+        setTransactions(transactions.map(t => 
+          t.id === transactionId ? updatedTransaction : t
+        ));
+        handleInlineCancel();
+      }
+    } catch (error) {
+      console.error('Error updating transaction:', error);
+    }
+  };
+
+  const handleInlineCancel = () => {
+    setInlineEditCell(null);
+    setInlineEditValue('');
+  };
+
+  const handleInlineKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleInlineSave();
+    } else if (e.key === 'Escape') {
+      handleInlineCancel();
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) return;
 
@@ -202,6 +320,7 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6">
+      <style>{editableCellStyle}</style>
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
@@ -426,8 +545,24 @@ export default function Transactions() {
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     />
+                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'date' ? (
+                    <input
+                      type="date"
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
+                    />
                   ) : (
-                    formatDate(transaction.date)
+                    <span 
+                      onDoubleClick={() => handleInlineEdit(transaction.id, 'date')}
+                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      title="Double-cliquez pour éditer"
+                    >
+                      {formatDate(transaction.date)}
+                    </span>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -438,8 +573,24 @@ export default function Transactions() {
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     />
+                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'description' ? (
+                    <input
+                      type="text"
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
+                    />
                   ) : (
-                    transaction.description
+                    <span 
+                      onDoubleClick={() => handleInlineEdit(transaction.id, 'description')}
+                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      title="Double-cliquez pour éditer"
+                    >
+                      {transaction.description}
+                    </span>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -453,19 +604,56 @@ export default function Transactions() {
                         <option key={category.id} value={category.id}>{category.name}</option>
                       ))}
                     </select>
+                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'category' ? (
+                    <select
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
+                    >
+                      {categories.map(category => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
                   ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: transaction.category.color + '20', color: transaction.category.color }}>
+                    <span 
+                      onDoubleClick={() => handleInlineEdit(transaction.id, 'category')}
+                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
+                      style={{ backgroundColor: transaction.category.color + '20', color: transaction.category.color }}
+                      title="Double-cliquez pour éditer"
+                    >
                       {transaction.category.name}
                     </span>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  <div className="flex items-center">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.bank.color }}>
-                      {transaction.bank.shortName}
+                  {inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'bank' ? (
+                    <select
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
+                    >
+                      {banks.map(bank => (
+                        <option key={bank.id} value={bank.id}>{bank.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div 
+                      onDoubleClick={() => handleInlineEdit(transaction.id, 'bank')}
+                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell flex items-center"
+                      title="Double-cliquez pour éditer"
+                    >
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.bank.color }}>
+                        {transaction.bank.shortName}
+                      </div>
+                      <span className="ml-2">{transaction.bank.name}</span>
                     </div>
-                    <span className="ml-2">{transaction.bank.name}</span>
-                  </div>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {editingId === transaction.id ? (
@@ -476,8 +664,23 @@ export default function Transactions() {
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     />
+                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
+                    />
                   ) : (
-                    <span className={transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}>
+                    <span 
+                      onDoubleClick={() => handleInlineEdit(transaction.id, 'amount')}
+                      className={`cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                      title="Double-cliquez pour éditer"
+                    >
                       {formatAmount(transaction.amount)}
                     </span>
                   )}
@@ -490,10 +693,26 @@ export default function Transactions() {
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, shared: e.target.checked} : null)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
+                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'shared' ? (
+                    <select
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
+                    >
+                      <option value="true">Oui</option>
+                      <option value="false">Non</option>
+                    </select>
                   ) : (
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      transaction.shared ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span 
+                      onDoubleClick={() => handleInlineEdit(transaction.id, 'shared')}
+                      className={`cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        transaction.shared ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
+                      title="Double-cliquez pour éditer"
+                    >
                       {transaction.shared ? 'Oui' : 'Non'}
                     </span>
                   )}
