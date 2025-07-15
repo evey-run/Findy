@@ -26,6 +26,7 @@ app.get('/api/users', async (req, res) => {
         email: true,
         color: true,
         createdAt: true,
+        updatedAt: true,
       }
     });
     res.json(users);
@@ -47,7 +48,20 @@ app.get('/api/categories', async (req, res) => {
 
 app.get('/api/transactions', async (req, res) => {
   try {
+    const { userId, categoryId, shared, startDate, endDate } = req.query;
+    
+    const where: any = {};
+    if (userId) where.userId = userId;
+    if (categoryId) where.categoryId = categoryId;
+    if (shared !== undefined) where.shared = shared === 'true';
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) where.date.gte = new Date(startDate as string);
+      if (endDate) where.date.lte = new Date(endDate as string);
+    }
+    
     const transactions = await prisma.transaction.findMany({
+      where,
       include: {
         user: {
           select: {
@@ -74,6 +88,117 @@ app.get('/api/transactions', async (req, res) => {
   } catch (error) {
     console.error('Error fetching transactions:', error);
     res.status(500).json({ error: 'Failed to fetch transactions' });
+  }
+});
+
+// POST /api/transactions - Créer une nouvelle transaction
+app.post('/api/transactions', async (req, res) => {
+  try {
+    const { amount, description, date, shared, userId, categoryId } = req.body;
+    
+    if (!amount || !description || !userId || !categoryId) {
+      return res.status(400).json({ 
+        error: 'Amount, description, userId, and categoryId are required' 
+      });
+    }
+    
+    const transaction = await prisma.transaction.create({
+      data: {
+        amount: parseFloat(amount),
+        description,
+        date: date ? new Date(date) : new Date(),
+        shared: shared || false,
+        userId,
+        categoryId
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            color: true,
+            icon: true
+          }
+        }
+      }
+    });
+    
+    res.status(201).json(transaction);
+  } catch (error) {
+    console.error('Error creating transaction:', error);
+    res.status(500).json({ error: 'Failed to create transaction' });
+  }
+});
+
+// PUT /api/transactions/:id - Mettre à jour une transaction
+app.put('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, description, date, shared, categoryId } = req.body;
+    
+    const transaction = await prisma.transaction.update({
+      where: { id },
+      data: {
+        ...(amount !== undefined && { amount: parseFloat(amount) }),
+        ...(description && { description }),
+        ...(date && { date: new Date(date) }),
+        ...(shared !== undefined && { shared }),
+        ...(categoryId && { categoryId })
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            color: true,
+            icon: true
+          }
+        }
+      }
+    });
+    
+    res.json(transaction);
+  } catch (error: any) {
+    console.error('Error updating transaction:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    res.status(500).json({ error: 'Failed to update transaction' });
+  }
+});
+
+// DELETE /api/transactions/:id - Supprimer une transaction
+app.delete('/api/transactions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.transaction.delete({
+      where: { id }
+    });
+    
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Error deleting transaction:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+    res.status(500).json({ error: 'Failed to delete transaction' });
   }
 });
 
