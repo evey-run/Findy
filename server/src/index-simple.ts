@@ -23,9 +23,14 @@ app.get('/api/users', async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       include: {
-        banks: {
+        userBanks: {
+          include: {
+            bank: true
+          },
           orderBy: {
-            createdAt: 'desc'
+            bank: {
+              createdAt: 'desc'
+            }
           }
         }
       },
@@ -44,22 +49,65 @@ app.get('/api/banks', async (req, res) => {
   try {
     const { userId } = req.query;
     
-    const banks = await prisma.bank.findMany({
-      where: userId ? { userId: userId as string } : {},
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
+    let banks;
+    if (userId) {
+      // Get banks for a specific user
+      banks = await prisma.bank.findMany({
+        where: {
+          userBanks: {
+            some: {
+              userId: userId as string
+            }
           }
+        },
+        include: {
+          userBanks: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
-    res.json(banks);
+      });
+    } else {
+      // Get all banks
+      banks = await prisma.bank.findMany({
+        include: {
+          userBanks: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        }
+      });
+    }
+    
+    // Transform the data to include computed fields
+    const transformedBanks = banks.map(bank => ({
+      ...bank,
+      users: bank.userBanks.map(ub => ub.user),
+      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
+      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+    }));
+    
+    res.json(transformedBanks);
   } catch (error) {
     console.error('Error fetching banks:', error);
     res.status(500).json({ error: 'Failed to fetch banks' });
@@ -69,7 +117,7 @@ app.get('/api/banks', async (req, res) => {
 // POST - Créer une nouvelle banque
 app.post('/api/banks', async (req, res) => {
   try {
-    const { name, shortName, color, iban, balance, userId } = req.body;
+    const { name, shortName, color, iban, balance, userId, isShared, sharedUserIds } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
@@ -82,20 +130,47 @@ app.post('/api/banks', async (req, res) => {
         color: color || '#3b82f6',
         iban,
         balance: parseFloat(balance) || 0,
-        userId
+        isShared: isShared || false,
+        userBanks: {
+          create: [
+            // Owner
+            {
+              userId: userId,
+              role: 'OWNER'
+            },
+            // Shared users if any
+            ...(sharedUserIds && Array.isArray(sharedUserIds) ? 
+              sharedUserIds.map((id: string) => ({
+                userId: id,
+                role: 'SHARED' as const
+              })) : [])
+          ]
+        }
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true
+        userBanks: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
           }
         }
       }
     });
     
-    res.status(201).json(bank);
+    // Transform the data to include computed fields
+    const transformedBank = {
+      ...bank,
+      users: bank.userBanks.map(ub => ub.user),
+      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
+      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+    };
+    
+    res.status(201).json(transformedBank);
   } catch (error) {
     console.error('Error creating bank:', error);
     res.status(500).json({ error: 'Failed to create bank' });
@@ -421,6 +496,120 @@ app.get('/api/dashboard', async (req, res) => {
   } catch (error) {
     console.error('Error fetching dashboard overview:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard overview' });
+  }
+});
+
+// POST - Partager une banque avec un autre utilisateur
+app.post('/api/banks/:id/share', async (req, res) => {
+  try {
+    const bankId = req.params.id;
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    // Vérifier si l'utilisateur n'est pas déjà associé à cette banque
+    const existingUserBank = await prisma.userBank.findUnique({
+      where: {
+        userId_bankId: {
+          userId: userId,
+          bankId: bankId
+        }
+      }
+    });
+    
+    if (existingUserBank) {
+      return res.status(400).json({ error: 'User already has access to this bank' });
+    }
+    
+    // Créer la relation de partage
+    await prisma.userBank.create({
+      data: {
+        userId: userId,
+        bankId: bankId,
+        role: 'SHARED'
+      }
+    });
+    
+    // Marquer la banque comme partagée
+    await prisma.bank.update({
+      where: { id: bankId },
+      data: { isShared: true }
+    });
+    
+    // Retourner la banque mise à jour
+    const updatedBank = await prisma.bank.findUnique({
+      where: { id: bankId },
+      include: {
+        userBanks: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!updatedBank) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    
+    // Transform the data to include computed fields
+    const transformedBank = {
+      ...updatedBank,
+      users: updatedBank.userBanks.map(ub => ub.user),
+      owners: updatedBank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
+      sharedUsers: updatedBank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+    };
+    
+    res.json(transformedBank);
+  } catch (error) {
+    console.error('Error sharing bank:', error);
+    res.status(500).json({ error: 'Failed to share bank' });
+  }
+});
+
+// DELETE - Retirer l'accès partagé d'une banque
+app.delete('/api/banks/:id/share/:userId', async (req, res) => {
+  try {
+    const bankId = req.params.id;
+    const userId = req.params.userId;
+    
+    // Supprimer la relation de partage
+    await prisma.userBank.deleteMany({
+      where: {
+        userId: userId,
+        bankId: bankId,
+        role: 'SHARED'
+      }
+    });
+    
+    // Vérifier s'il reste des utilisateurs partagés
+    const remainingSharedUsers = await prisma.userBank.count({
+      where: {
+        bankId: bankId,
+        role: 'SHARED'
+      }
+    });
+    
+    // Si plus d'utilisateurs partagés, marquer la banque comme non partagée
+    if (remainingSharedUsers === 0) {
+      await prisma.bank.update({
+        where: { id: bankId },
+        data: { isShared: false }
+      });
+    }
+    
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error removing shared access:', error);
+    res.status(500).json({ error: 'Failed to remove shared access' });
   }
 });
 

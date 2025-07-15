@@ -3,18 +3,92 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Bank } from '../types/index.js';
 
+// Modal pour partager un compte
+interface ShareBankModalProps {
+  bank: Bank;
+  isOpen: boolean;
+  onClose: () => void;
+  onShare: (userId: string) => void;
+}
+
+function ShareBankModal({ bank, isOpen, onClose, onShare }: ShareBankModalProps) {
+  const { users } = useAppStore();
+  const [selectedUserId, setSelectedUserId] = useState('');
+  
+  if (!isOpen) return null;
+
+  const availableUsers = users.filter(user => 
+    !bank.users?.some(bankUser => bankUser.id === user.id)
+  );
+
+  return (
+    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="mt-3">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Partager le compte "{bank.name}"
+          </h3>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Sélectionner un utilisateur
+            </label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+            >
+              <option value="">Choisir un utilisateur</option>
+              {availableUsers.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => {
+                if (selectedUserId) {
+                  onShare(selectedUserId);
+                  setSelectedUserId('');
+                }
+              }}
+              disabled={!selectedUserId}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50"
+            >
+              Partager
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Banks() {
-  const { banks, loadBanks, setSelectedBank, selectedUser } = useAppStore();
+  const { banks, loadBanks, setSelectedBank, selectedUser, users } = useAppStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [bankToShare, setBankToShare] = useState<Bank | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     shortName: '',
     color: '#3b82f6',
     iban: '',
-    balance: 0
+    balance: 0,
+    isShared: false,
+    sharedUserIds: [] as string[]
   });
 
   useEffect(() => {
@@ -72,6 +146,50 @@ export default function Banks() {
     }
   };
 
+  const handleShare = async (userId: string) => {
+    if (!bankToShare) return;
+    
+    try {
+      const response = await fetch(`/api/banks/${bankToShare.id}/share`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (response.ok) {
+        await loadBanks();
+        setShowShareModal(false);
+        setBankToShare(null);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Erreur lors du partage');
+      }
+    } catch (error) {
+      console.error('Error sharing bank:', error);
+      alert('Erreur lors du partage');
+    }
+  };
+
+  const handleRemoveSharedAccess = async (bankId: string, userId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir retirer l\'accès à ce compte ?')) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(`/api/banks/${bankId}/share/${userId}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        await loadBanks();
+      }
+    } catch (error) {
+      console.error('Error removing shared access:', error);
+    }
+  };
+
   const handleEdit = (bank: Bank) => {
     setEditingBank(bank);
     setFormData({
@@ -79,7 +197,9 @@ export default function Banks() {
       shortName: bank.shortName || '',
       color: bank.color,
       iban: bank.iban || '',
-      balance: bank.balance
+      balance: bank.balance,
+      isShared: bank.isShared,
+      sharedUserIds: bank.sharedUsers?.map(u => u.id) || []
     });
     setShowAddForm(true);
   };
@@ -112,7 +232,9 @@ export default function Banks() {
       shortName: '',
       color: '#3b82f6',
       iban: '',
-      balance: 0
+      balance: 0,
+      isShared: false,
+      sharedUserIds: []
     });
     setEditingBank(null);
     setShowAddForm(false);
@@ -254,8 +376,11 @@ export default function Banks() {
                     <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
                     <p className="text-sm text-gray-500">
                       {bank.iban || 'Aucun IBAN'}
-                      {!selectedUser && bank.user && (
-                        <span className="ml-2 text-blue-600">• {bank.user.name}</span>
+                      {!selectedUser && bank.users && bank.users.length > 0 && (
+                        <span className="ml-2 text-blue-600">
+                          • {bank.users.map(u => u.name).join(', ')}
+                          {bank.isShared && <span className="ml-1 text-green-600">(Partagé)</span>}
+                        </span>
                       )}
                     </p>
                   </div>
@@ -268,6 +393,7 @@ export default function Banks() {
                         handleEdit(bank);
                       }}
                       className="text-blue-600 hover:text-blue-900"
+                      title="Modifier"
                     >
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -276,12 +402,38 @@ export default function Banks() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        setBankToShare(bank);
+                        setShowShareModal(true);
+                      }}
+                      className="text-green-600 hover:text-green-900"
+                      title="Partager"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleDelete(bank.id);
                       }}
                       className="text-red-600 hover:text-red-900"
+                      title="Supprimer"
                     >
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBankToShare(bank);
+                        setShowShareModal(true);
+                      }}
+                      className="text-green-600 hover:text-green-900"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8m-4-4v8m8-8v8m-4-4H4" />
                       </svg>
                     </button>
                   </div>
@@ -316,6 +468,19 @@ export default function Banks() {
           <h3 className="mt-2 text-sm font-medium text-gray-900">Aucune banque</h3>
           <p className="mt-1 text-sm text-gray-500">Commencez par ajouter une nouvelle banque.</p>
         </div>
+      )}
+
+      {/* Share Bank Modal */}
+      {showShareModal && bankToShare && (
+        <ShareBankModal
+          bank={bankToShare}
+          isOpen={showShareModal}
+          onClose={() => {
+            setShowShareModal(false);
+            setBankToShare(null);
+          }}
+          onShare={handleShare}
+        />
       )}
     </div>
   );

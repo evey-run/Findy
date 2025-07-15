@@ -18,8 +18,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  banks Bank[]
+  // Relations many-to-many avec les banques
+  userBanks UserBank[]
 
   @@map("users")
 }
@@ -31,17 +31,35 @@ model Bank {
   color     String   @default("#3b82f6") // Couleur pour différencier visuellement
   iban      String?  // IBAN du compte (optionnel)
   balance   Float    @default(0) // Solde actuel du compte
+  isShared  Boolean  @default(false) // Indique si le compte est partagé
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  userId       String
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userBanks    UserBank[]
   transactions Transaction[]
   budgets      Budget[]
   recurrences  Recurrence[]
 
   @@map("banks")
+}
+
+model UserBank {
+  id     String @id @default(cuid())
+  userId String
+  bankId String
+  role   UserBankRole @default(OWNER) // Rôle de l'utilisateur pour cette banque
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bank Bank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, bankId])
+  @@map("user_banks")
+}
+
+enum UserBankRole {
+  OWNER     // Propriétaire principal
+  SHARED    // Utilisateur avec accès partagé
 }
 
 model Category {

@@ -5,6 +5,16 @@ export interface User {
   avatar?: string;
   createdAt: string;
   updatedAt: string;
+  userBanks?: UserBank[];
+}
+
+export interface UserBank {
+  id: string;
+  userId: string;
+  bankId: string;
+  role: 'OWNER' | 'SHARED';
+  user?: User;
+  bank?: Bank;
 }
 
 export interface Bank {
@@ -14,10 +24,14 @@ export interface Bank {
   color: string;
   iban?: string;
   balance: number;
+  isShared: boolean;
   createdAt: string;
   updatedAt: string;
-  userId: string;
-  user?: User;
+  userBanks?: UserBank[];
+  // Computed fields for convenience
+  users?: User[];
+  owners?: User[];
+  sharedUsers?: User[];
 }
 
 export interface Category {
