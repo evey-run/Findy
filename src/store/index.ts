@@ -1,20 +1,20 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { User, Transaction, Category, Budget, Recurrence, DashboardOverview } from '../types';
+import type { Bank, Transaction, Category, Budget, Recurrence, DashboardOverview } from '../types';
 
 interface AppState {
-  // Current user
-  currentUser: User | null;
-  setCurrentUser: (user: User | null) => void;
+  // Current bank
+  currentBank: Bank | null;
+  setCurrentBank: (bank: Bank | null) => void;
   
-  // Selected user (computed from selectedUserId)
-  selectedUser: User | null;
-  setSelectedUser: (user: User | null) => void;
+  // Selected bank (computed from selectedBankId)
+  selectedBank: Bank | null;
+  setSelectedBank: (bank: Bank | null) => void;
 
-  // Users
-  users: User[];
-  setUsers: (users: User[]) => void;
-  loadUsers: () => Promise<void>;
+  // Banks
+  banks: Bank[];
+  setBanks: (banks: Bank[]) => void;
+  loadBanks: () => Promise<void>;
   
   // Categories
   categories: Category[];
@@ -61,41 +61,41 @@ interface AppState {
   };
   setDateRange: (range: { startDate: string; endDate: string }) => void;
   
-  selectedUserId: string | null;
-  setSelectedUserId: (userId: string | null) => void;
+  selectedBankId: string | null;
+  setSelectedBankId: (bankId: string | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
   devtools(
     persist(
       (set, get) => ({
-        // Current user
-        currentUser: null,
-        setCurrentUser: (user) => set({ currentUser: user }),
+        // Current bank
+        currentBank: null,
+        setCurrentBank: (bank: Bank | null) => set({ currentBank: bank }),
         
-        // Selected user (computed)
-        get selectedUser() {
+        // Selected bank (computed)
+        get selectedBank() {
           const state = get();
-          return state.users.find(u => u.id.toString() === state.selectedUserId) || null;
+          return state.banks.find(b => b.id.toString() === state.selectedBankId) || null;
         },
-        setSelectedUser: (user) => set({ selectedUserId: user?.id.toString() || null }),
+        setSelectedBank: (bank: Bank | null) => set({ selectedBankId: bank?.id.toString() || null }),
 
-        // Users
-        users: [],
-        setUsers: (users) => set({ users }),
-        loadUsers: async () => {
+        // Banks
+        banks: [],
+        setBanks: (banks: Bank[]) => set({ banks }),
+        loadBanks: async () => {
           try {
-            const response = await fetch('http://localhost:3001/api/users');
-            const users = await response.json();
-            set({ users });
+            const response = await fetch('http://localhost:3001/api/banks');
+            const banks = await response.json();
+            set({ banks });
           } catch (error) {
-            console.error('Failed to load users:', error);
+            console.error('Failed to load banks:', error);
           }
         },
         
         // Categories
         categories: [],
-        setCategories: (categories) => set({ categories }),
+        setCategories: (categories: Category[]) => set({ categories }),
         loadCategories: async () => {
           try {
             const response = await fetch('http://localhost:3001/api/categories');
@@ -108,18 +108,18 @@ export const useAppStore = create<AppState>()(
         
         // Transactions
         transactions: [],
-        setTransactions: (transactions) => set({ transactions }),
-        addTransaction: (transaction) => 
+        setTransactions: (transactions: Transaction[]) => set({ transactions }),
+        addTransaction: (transaction: Transaction) => 
           set((state) => ({ 
             transactions: [transaction, ...state.transactions] 
           })),
-        updateTransaction: (id, updatedTransaction) =>
+        updateTransaction: (id: string, updatedTransaction: Partial<Transaction>) =>
           set((state) => ({
             transactions: state.transactions.map((t) =>
               t.id === id ? { ...t, ...updatedTransaction } : t
             ),
           })),
-        removeTransaction: (id) =>
+        removeTransaction: (id: string) =>
           set((state) => ({
             transactions: state.transactions.filter((t) => t.id !== id),
           })),
@@ -130,8 +130,8 @@ export const useAppStore = create<AppState>()(
               startDate: state.dateRange.startDate,
               endDate: state.dateRange.endDate,
             });
-            if (state.selectedUserId) {
-              params.append('userId', state.selectedUserId);
+            if (state.selectedBankId) {
+              params.append('bankId', state.selectedBankId);
             }
             const response = await fetch(`http://localhost:3001/api/transactions?${params}`);
             const transactions = await response.json();
@@ -143,18 +143,18 @@ export const useAppStore = create<AppState>()(
         
         // Budgets
         budgets: [],
-        setBudgets: (budgets) => set({ budgets }),
-        addBudget: (budget) =>
+        setBudgets: (budgets: Budget[]) => set({ budgets }),
+        addBudget: (budget: Budget) =>
           set((state) => ({ 
             budgets: [budget, ...state.budgets] 
           })),
-        updateBudget: (id, updatedBudget) =>
+        updateBudget: (id: string, updatedBudget: Partial<Budget>) =>
           set((state) => ({
             budgets: state.budgets.map((b) =>
               b.id === id ? { ...b, ...updatedBudget } : b
             ),
           })),
-        removeBudget: (id) =>
+        removeBudget: (id: string) =>
           set((state) => ({
             budgets: state.budgets.filter((b) => b.id !== id),
           })),
@@ -162,8 +162,8 @@ export const useAppStore = create<AppState>()(
           try {
             const state = get();
             const params = new URLSearchParams();
-            if (state.selectedUserId) {
-              params.append('userId', state.selectedUserId);
+            if (state.selectedBankId) {
+              params.append('bankId', state.selectedBankId);
             }
             const response = await fetch(`http://localhost:3001/api/budgets?${params}`);
             const budgets = await response.json();
@@ -175,18 +175,18 @@ export const useAppStore = create<AppState>()(
         
         // Recurrences
         recurrences: [],
-        setRecurrences: (recurrences) => set({ recurrences }),
-        addRecurrence: (recurrence) =>
+        setRecurrences: (recurrences: Recurrence[]) => set({ recurrences }),
+        addRecurrence: (recurrence: Recurrence) =>
           set((state) => ({ 
             recurrences: [recurrence, ...state.recurrences] 
           })),
-        updateRecurrence: (id, updatedRecurrence) =>
+        updateRecurrence: (id: string, updatedRecurrence: Partial<Recurrence>) =>
           set((state) => ({
             recurrences: state.recurrences.map((r) =>
               r.id === id ? { ...r, ...updatedRecurrence } : r
             ),
           })),
-        removeRecurrence: (id) =>
+        removeRecurrence: (id: string) =>
           set((state) => ({
             recurrences: state.recurrences.filter((r) => r.id !== id),
           })),
@@ -194,8 +194,8 @@ export const useAppStore = create<AppState>()(
           try {
             const state = get();
             const params = new URLSearchParams();
-            if (state.selectedUserId) {
-              params.append('userId', state.selectedUserId);
+            if (state.selectedBankId) {
+              params.append('bankId', state.selectedBankId);
             }
             const response = await fetch(`http://localhost:3001/api/recurrences?${params}`);
             const recurrences = await response.json();
@@ -207,7 +207,7 @@ export const useAppStore = create<AppState>()(
         
         // Dashboard
         dashboardData: null,
-        setDashboardData: (data) => set({ dashboardData: data }),
+        setDashboardData: (data: DashboardOverview | null) => set({ dashboardData: data }),
         loadDashboardOverview: async () => {
           try {
             const state = get();
@@ -215,8 +215,8 @@ export const useAppStore = create<AppState>()(
               startDate: state.dateRange.startDate,
               endDate: state.dateRange.endDate,
             });
-            if (state.selectedUserId) {
-              params.append('userId', state.selectedUserId);
+            if (state.selectedBankId) {
+              params.append('bankId', state.selectedBankId);
             }
             const response = await fetch(`http://localhost:3001/api/dashboard?${params}`);
             const dashboardData = await response.json();
@@ -228,24 +228,24 @@ export const useAppStore = create<AppState>()(
         
         // UI State
         isLoading: false,
-        setIsLoading: (loading) => set({ isLoading: loading }),
+        setIsLoading: (loading: boolean) => set({ isLoading: loading }),
         
         // Filters
         dateRange: {
           startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
           endDate: new Date().toISOString().split('T')[0],
         },
-        setDateRange: (range) => set({ dateRange: range }),
+        setDateRange: (range: { startDate: string; endDate: string }) => set({ dateRange: range }),
         
-        selectedUserId: null,
-        setSelectedUserId: (userId) => set({ selectedUserId: userId }),
+        selectedBankId: null,
+        setSelectedBankId: (bankId: string | null) => set({ selectedBankId: bankId }),
       }),
       {
         name: 'finance-app-store',
         partialize: (state) => ({
-          currentUser: state.currentUser,
+          currentBank: state.currentBank,
           dateRange: state.dateRange,
-          selectedUserId: state.selectedUserId,
+          selectedBankId: state.selectedBankId,
         }),
       }
     ),

@@ -10,11 +10,13 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-model User {
+model Bank {
   id        String   @id @default(cuid())
-  name      String
-  email     String   @unique
+  name      String   // Nom de la banque (ex: "Crédit Agricole", "BNP Paribas")
+  shortName String?  // Nom court (ex: "CA", "BNP")
   color     String   @default("#3b82f6") // Couleur pour différencier visuellement
+  iban      String?  // IBAN du compte (optionnel)
+  balance   Float    @default(0) // Solde actuel du compte
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -23,7 +25,7 @@ model User {
   budgets       Budget[]
   recurrences   Recurrence[]
 
-  @@map("users")
+  @@map("banks")
 }
 
 model Category {
@@ -53,8 +55,8 @@ model Transaction {
   updatedAt   DateTime    @updatedAt
 
   // Relations
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankId     String
+  bank       Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
@@ -71,8 +73,8 @@ model Budget {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  userId     String?  // null = budget commun
-  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankId     String?  // null = budget commun
+  bank       Bank?    @relation(fields: [bankId], references: [id], onDelete: Cascade)
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
@@ -91,8 +93,8 @@ model Recurrence {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  userId     String?  // null = récurrence commune
-  user       User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankId     String?  // null = récurrence commune
+  bank       Bank?    @relation(fields: [bankId], references: [id], onDelete: Cascade)
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 

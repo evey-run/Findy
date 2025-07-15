@@ -1,8 +1,10 @@
-export interface User {
+export interface Bank {
   id: string;
   name: string;
-  email: string;
+  shortName?: string;
   color: string;
+  iban?: string;
+  balance: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -25,11 +27,13 @@ export interface Transaction {
   shared: boolean;
   createdAt: string;
   updatedAt: string;
-  userId: string;
-  user: {
+  bankId: string;
+  bank: {
     id: string;
     name: string;
+    shortName?: string;
     color: string;
+    balance: number;
   };
   categoryId: string;
   category: {
@@ -49,11 +53,13 @@ export interface Budget {
   shared: boolean;
   createdAt: string;
   updatedAt: string;
-  userId?: string;
-  user?: {
+  bankId?: string;
+  bank?: {
     id: string;
     name: string;
+    shortName?: string;
     color: string;
+    balance: number;
   };
   categoryId: string;
   category: {
@@ -75,11 +81,13 @@ export interface Recurrence {
   active: boolean;
   createdAt: string;
   updatedAt: string;
-  userId?: string;
-  user?: {
+  bankId?: string;
+  bank?: {
     id: string;
     name: string;
+    shortName?: string;
     color: string;
+    balance: number;
   };
   categoryId: string;
   category: {
@@ -120,7 +128,7 @@ export interface CreateTransactionData {
   description: string;
   date?: string;
   shared?: boolean;
-  userId: string;
+  bankId: string;
   categoryId: string;
 }
 
@@ -136,7 +144,7 @@ export interface CreateBudgetData {
   period?: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
   startDate?: string;
   shared?: boolean;
-  userId?: string;
+  bankId?: string;
   categoryId: string;
 }
 
@@ -147,6 +155,6 @@ export interface CreateRecurrenceData {
   description: string;
   shared?: boolean;
   active?: boolean;
-  userId?: string;
+  bankId?: string;
   categoryId: string;
 }

@@ -33,6 +33,15 @@ async function main() {
     }
   });
 
+  const bank3 = await prisma.bank.create({
+    data: {
+      name: 'Livret A',
+      shortName: 'LA',
+      color: '#f59e0b',
+      balance: 5000.00
+    }
+  });
+
   console.log('✅ Banks created');
 
   // Créer les catégories
@@ -66,36 +75,28 @@ async function main() {
     }),
     prisma.category.create({
       data: {
-        name: 'Électricité',
-        type: 'FIXED',
-        color: '#f59e0b',
-        icon: '⚡'
-      }
-    }),
-    prisma.category.create({
-      data: {
         name: 'Internet/Box',
         type: 'FIXED',
         color: '#6366f1',
         icon: '📶'
       }
     }),
+    prisma.category.create({
+      data: {
+        name: 'Électricité',
+        type: 'FIXED',
+        color: '#f59e0b',
+        icon: '⚡'
+      }
+    }),
     
-    // Dépenses
+    // Dépenses variables
     prisma.category.create({
       data: {
         name: 'Alimentation',
         type: 'EXPENSE',
         color: '#059669',
         icon: '🛒'
-      }
-    }),
-    prisma.category.create({
-      data: {
-        name: 'Transport',
-        type: 'EXPENSE',
-        color: '#0ea5e9',
-        icon: '🚗'
       }
     }),
     prisma.category.create({
@@ -121,27 +122,33 @@ async function main() {
         color: '#f97316',
         icon: '👕'
       }
+    }),
+    prisma.category.create({
+      data: {
+        name: 'Transport',
+        type: 'EXPENSE',
+        color: '#0ea5e9',
+        icon: '🚗'
+      }
     })
   ]);
 
-  const [salaire, freelance, loyer, electricite, box, alimentation, transport, loisirs, sante, vetements] = categories;
+  const [salaire, freelance, loyer, internet, electricite, alimentation, loisirs, sante, vetements, transport] = categories;
 
   console.log('✅ Categories created');
 
-  // Créer des récurrences (charges fixes et salaires)
-  const currentDate = new Date();
-  const nextMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-
-  await Promise.all([
-    // Salaires
+  // Créer des récurrences
+  const recurrences = await Promise.all([
+    // Revenus récurrents
     prisma.recurrence.create({
       data: {
         amount: 2800,
         frequency: 'MONTHLY',
-        nextDue: new Date(currentDate.getFullYear(), currentDate.getMonth(), 28),
-        description: 'Salaire Alex',
+        nextDue: new Date('2025-07-28'),
+        description: 'Salaire mensuel - Crédit Agricole',
         shared: false,
-        userId: user1.id,
+        active: true,
+        bankId: bank1.id,
         categoryId: salaire.id
       }
     }),
@@ -149,46 +156,50 @@ async function main() {
       data: {
         amount: 2500,
         frequency: 'MONTHLY',
-        nextDue: new Date(currentDate.getFullYear(), currentDate.getMonth(), 30),
-        description: 'Salaire Sam',
+        nextDue: new Date('2025-07-30'),
+        description: 'Salaire mensuel - BNP',
         shared: false,
-        userId: user2.id,
+        active: true,
+        bankId: bank2.id,
         categoryId: salaire.id
       }
     }),
-
-    // Charges fixes partagées
+    
+    // Charges fixes récurrentes
     prisma.recurrence.create({
       data: {
         amount: -1200,
         frequency: 'MONTHLY',
-        nextDue: new Date(currentDate.getFullYear(), currentDate.getMonth(), 5),
+        nextDue: new Date('2025-08-05'),
         description: 'Loyer appartement',
         shared: true,
-        userId: null,
+        active: true,
+        bankId: bank1.id,
         categoryId: loyer.id
-      }
-    }),
-    prisma.recurrence.create({
-      data: {
-        amount: -120,
-        frequency: 'MONTHLY',
-        nextDue: new Date(currentDate.getFullYear(), currentDate.getMonth(), 15),
-        description: 'Facture électricité',
-        shared: true,
-        userId: null,
-        categoryId: electricite.id
       }
     }),
     prisma.recurrence.create({
       data: {
         amount: -45,
         frequency: 'MONTHLY',
-        nextDue: new Date(currentDate.getFullYear(), currentDate.getMonth(), 10),
+        nextDue: new Date('2025-08-10'),
         description: 'Box internet',
         shared: true,
-        userId: null,
-        categoryId: box.id
+        active: true,
+        bankId: bank1.id,
+        categoryId: internet.id
+      }
+    }),
+    prisma.recurrence.create({
+      data: {
+        amount: -120,
+        frequency: 'MONTHLY',
+        nextDue: new Date('2025-08-15'),
+        description: 'Facture électricité',
+        shared: true,
+        active: true,
+        bankId: bank2.id,
+        categoryId: electricite.id
       }
     })
   ]);
@@ -196,13 +207,14 @@ async function main() {
   console.log('✅ Recurrences created');
 
   // Créer des budgets
-  await Promise.all([
+  const budgets = await Promise.all([
     prisma.budget.create({
       data: {
-        amount: 600,
+        amount: 500,
         period: 'MONTHLY',
-        shared: true,
-        userId: null,
+        startDate: new Date('2025-07-01'),
+        shared: false,
+        bankId: bank1.id,
         categoryId: alimentation.id
       }
     }),
@@ -210,8 +222,18 @@ async function main() {
       data: {
         amount: 200,
         period: 'MONTHLY',
+        startDate: new Date('2025-07-01'),
         shared: false,
-        userId: user1.id,
+        bankId: bank2.id,
+        categoryId: loisirs.id
+      }
+    }),
+    prisma.budget.create({
+      data: {
+        amount: 300,
+        period: 'MONTHLY',
+        startDate: new Date('2025-07-01'),
+        shared: true,
         categoryId: transport.id
       }
     }),
@@ -219,25 +241,17 @@ async function main() {
       data: {
         amount: 150,
         period: 'MONTHLY',
+        startDate: new Date('2025-07-01'),
         shared: false,
-        userId: user2.id,
-        categoryId: transport.id
-      }
-    }),
-    prisma.budget.create({
-      data: {
-        amount: 300,
-        period: 'MONTHLY',
-        shared: true,
-        userId: null,
-        categoryId: loisirs.id
+        bankId: bank1.id,
+        categoryId: vetements.id
       }
     })
   ]);
 
   console.log('✅ Budgets created');
 
-  // Créer des transactions d'exemple pour le mois actuel
+  // Créer des transactions d'exemple
   const transactions: any[] = [];
   
   // Quelques transactions récentes
@@ -245,97 +259,99 @@ async function main() {
     const date = new Date();
     date.setDate(date.getDate() - i);
     
-    const randomUser = Math.random() > 0.5 ? user1 : user2;
+    const randomBank = Math.random() > 0.5 ? bank1 : bank2;
     const randomCategory = [alimentation, transport, loisirs, sante, vetements][Math.floor(Math.random() * 5)];
     const amount = -(Math.random() * 100 + 10); // Dépenses entre 10 et 110
     
     transactions.push({
       amount: Math.round(amount * 100) / 100,
       description: `Achat ${randomCategory.name.toLowerCase()}`,
-      date,
-      shared: Math.random() > 0.7, // 30% de chance d'être partagé
-      userId: randomUser.id,
+      date: date,
+      shared: Math.random() > 0.6,
+      bankId: randomBank.id,
       categoryId: randomCategory.id
     });
   }
 
-  // Ajouter quelques revenus
+  // Quelques revenus
   transactions.push(
     {
       amount: 2800,
-      description: 'Salaire Alex - ' + new Date().toLocaleDateString('fr'),
-      date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 28),
+      description: 'Salaire CA - 15/07/2025',
+      date: new Date('2025-06-28'),
       shared: false,
-      userId: user1.id,
+      bankId: bank1.id,
       categoryId: salaire.id
     },
     {
       amount: 2500,
-      description: 'Salaire Sam - ' + new Date().toLocaleDateString('fr'),
-      date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 30),
+      description: 'Salaire BNP - 15/07/2025',
+      date: new Date('2025-06-30'),
       shared: false,
-      userId: user2.id,
+      bankId: bank2.id,
       categoryId: salaire.id
     },
     {
       amount: 500,
       description: 'Mission freelance',
-      date: new Date(currentDate.getFullYear(), currentDate.getMonth(), 15),
+      date: new Date('2025-07-15'),
       shared: false,
-      userId: user1.id,
+      bankId: bank1.id,
       categoryId: freelance.id
     }
   );
 
-  // Ajouter les charges fixes du mois dernier
+  // Charges fixes
   transactions.push(
     {
       amount: -1200,
       description: 'Loyer appartement',
-      date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 5),
+      date: new Date('2025-06-05'),
       shared: true,
-      userId: user1.id, // Payé par Alex mais partagé
+      bankId: bank1.id,
       categoryId: loyer.id
-    },
-    {
-      amount: -120,
-      description: 'Facture électricité',
-      date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 15),
-      shared: true,
-      userId: user2.id, // Payé par Sam mais partagé
-      categoryId: electricite.id
     },
     {
       amount: -45,
       description: 'Box internet',
-      date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 10),
+      date: new Date('2025-06-10'),
       shared: true,
-      userId: user1.id,
-      categoryId: box.id
+      bankId: bank1.id,
+      categoryId: internet.id
+    },
+    {
+      amount: -120,
+      description: 'Facture électricité',
+      date: new Date('2025-06-15'),
+      shared: true,
+      bankId: bank2.id,
+      categoryId: electricite.id
     }
   );
 
-  await Promise.all(
-    transactions.map(transaction => 
-      prisma.transaction.create({ data: transaction })
-    )
-  );
+  // Insérer toutes les transactions
+  await prisma.transaction.createMany({
+    data: transactions
+  });
 
   console.log('✅ Transactions created');
 
-  const userCount = await prisma.user.count();
-  const categoryCount = await prisma.category.count();
-  const transactionCount = await prisma.transaction.count();
-  const budgetCount = await prisma.budget.count();
-  const recurrenceCount = await prisma.recurrence.count();
+  // Statistiques finales
+  const finalStats = await Promise.all([
+    prisma.bank.count(),
+    prisma.category.count(),
+    prisma.transaction.count(),
+    prisma.budget.count(),
+    prisma.recurrence.count()
+  ]);
 
   console.log('🎉 Seeding completed!');
-  console.log(`📊 Created: ${userCount} users, ${categoryCount} categories, ${transactionCount} transactions, ${budgetCount} budgets, ${recurrenceCount} recurrences`);
+  console.log(`📊 Created: ${finalStats[0]} banks, ${finalStats[1]} categories, ${finalStats[2]} transactions, ${finalStats[3]} budgets, ${finalStats[4]} recurrences`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Error seeding database:', e);
+    console.error(e);
     process.exit(1);
   })
   .finally(async () => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { Transaction, Category, User } from '../types/index.js';
+import type { Transaction, Category, Bank } from '../types/index.js';
 
 interface EditingTransaction {
   id: string;
@@ -8,19 +8,19 @@ interface EditingTransaction {
   date: string;
   shared: boolean;
   categoryId: string;
-  userId?: string;
+  bankId?: string;
 }
 
 export default function Transactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [banks, setBanks] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [filters, setFilters] = useState({
-    userId: '',
+    bankId: '',
     categoryId: '',
     shared: '',
     startDate: '',
@@ -32,7 +32,7 @@ export default function Transactions() {
     console.log('Transactions component mounted, filters:', filters);
     fetchTransactions();
     fetchCategories();
-    fetchUsers();
+    fetchBanks();
   }, [filters]);
 
   const fetchTransactions = async () => {
@@ -78,21 +78,21 @@ export default function Transactions() {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchBanks = async () => {
     try {
-      console.log('Fetching users...');
-      const response = await fetch('/api/users');
-      console.log('Users response status:', response.status);
+      console.log('Fetching banks...');
+      const response = await fetch('/api/banks');
+      console.log('Banks response status:', response.status);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Users data:', data);
-      setUsers(data);
+      console.log('Banks data:', data);
+      setBanks(data);
     } catch (error) {
-      console.error('Error fetching users:', error);
+      console.error('Error fetching banks:', error);
     }
   };
 
@@ -166,7 +166,7 @@ export default function Transactions() {
         },
         body: JSON.stringify({
           ...editingTransaction,
-          userId: editingTransaction.userId || users[0]?.id || ''
+          bankId: editingTransaction.bankId || banks[0]?.id || ''
         }),
       });
 
@@ -219,7 +219,7 @@ export default function Transactions() {
                 date: new Date().toISOString().split('T')[0],
                 shared: false,
                 categoryId: categories[0]?.id || '',
-                userId: users[0]?.id || ''
+                bankId: banks[0]?.id || ''
               });
             }}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -236,15 +236,15 @@ export default function Transactions() {
       <div className="bg-white shadow rounded-lg p-6">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Utilisateur</label>
+            <label className="block text-sm font-medium text-gray-700">Banque</label>
             <select
-              value={filters.userId}
-              onChange={(e) => setFilters({...filters, userId: e.target.value})}
+              value={filters.bankId}
+              onChange={(e) => setFilters({...filters, bankId: e.target.value})}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
-              <option value="">Tous</option>
-              {users.map(user => (
-                <option key={user.id} value={user.id}>{user.name}</option>
+              <option value="">Toutes</option>
+              {banks.map(bank => (
+                <option key={bank.id} value={bank.id}>{bank.name}</option>
               ))}
             </select>
           </div>
@@ -300,15 +300,15 @@ export default function Transactions() {
           <h3 className="text-lg font-medium text-gray-900 mb-4">Ajouter une transaction</h3>
           <form onSubmit={handleAddTransaction} className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Utilisateur</label>
+              <label className="block text-sm font-medium text-gray-700">Banque</label>
               <select
-                value={editingTransaction?.userId || ''}
-                onChange={(e) => setEditingTransaction(prev => prev ? {...prev, userId: e.target.value} : null)}
+                value={editingTransaction?.bankId || ''}
+                onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 required
               >
-                {users.map(user => (
-                  <option key={user.id} value={user.id}>{user.name}</option>
+                {banks.map(bank => (
+                  <option key={bank.id} value={bank.id}>{bank.name}</option>
                 ))}
               </select>
             </div>
@@ -402,7 +402,7 @@ export default function Transactions() {
                 Catégorie
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Utilisateur
+                Banque
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Montant
@@ -461,10 +461,10 @@ export default function Transactions() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   <div className="flex items-center">
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.user.color }}>
-                      {transaction.user.name.split(' ').map(n => n[0]).join('')}
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.bank.color }}>
+                      {transaction.bank.shortName}
                     </div>
-                    <span className="ml-2">{transaction.user.name}</span>
+                    <span className="ml-2">{transaction.bank.name}</span>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

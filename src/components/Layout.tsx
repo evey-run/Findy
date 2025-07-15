@@ -27,7 +27,7 @@ function classNames(...classes: string[]) {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const { users, selectedUser, setSelectedUser } = useAppStore();
+  const { banks, selectedBank, setSelectedBank } = useAppStore();
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -38,22 +38,22 @@ export default function Layout({ children }: LayoutProps) {
             <h1 className="text-xl font-bold text-gray-900">💰 Finance Duo</h1>
           </div>
           
-          {/* User Selector */}
+          {/* Bank Selector */}
           <div className="px-4 mt-6">
             <label className="block text-sm font-medium text-gray-700">
-              Utilisateur actuel
+              Banque actuelle
             </label>
             <select
-              value={selectedUser?.id.toString() || ''}
+              value={selectedBank?.id.toString() || ''}
               onChange={(e) => {
-                const user = users.find(u => u.id.toString() === e.target.value);
-                if (user) setSelectedUser(user);
+                const bank = banks.find(b => b.id.toString() === e.target.value);
+                if (bank) setSelectedBank(bank);
               }}
               className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
             >
-              {users.map((user) => (
-                <option key={user.id} value={user.id.toString()}>
-                  {user.name}
+              {banks.map((bank) => (
+                <option key={bank.id} value={bank.id.toString()}>
+                  {bank.name}
                 </option>
               ))}
             </select>

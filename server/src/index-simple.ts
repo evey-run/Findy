@@ -17,22 +17,24 @@ app.use(cors({
 app.use(express.json());
 
 // API Routes simples pour tester
-app.get('/api/users', async (req, res) => {
+app.get('/api/banks', async (req, res) => {
   try {
-    const users = await prisma.user.findMany({
+    const banks = await prisma.bank.findMany({
       select: {
         id: true,
         name: true,
-        email: true,
+        shortName: true,
         color: true,
+        iban: true,
+        balance: true,
         createdAt: true,
         updatedAt: true,
       }
     });
-    res.json(users);
+    res.json(banks);
   } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ error: 'Failed to fetch users' });
+    console.error('Error fetching banks:', error);
+    res.status(500).json({ error: 'Failed to fetch banks' });
   }
 });
 
@@ -48,10 +50,10 @@ app.get('/api/categories', async (req, res) => {
 
 app.get('/api/transactions', async (req, res) => {
   try {
-    const { userId, categoryId, shared, startDate, endDate } = req.query;
+    const { bankId, categoryId, shared, startDate, endDate } = req.query;
     
     const where: any = {};
-    if (userId) where.userId = userId;
+    if (bankId) where.bankId = bankId;
     if (categoryId) where.categoryId = categoryId;
     if (shared !== undefined) where.shared = shared === 'true';
     if (startDate || endDate) {
@@ -63,11 +65,13 @@ app.get('/api/transactions', async (req, res) => {
     const transactions = await prisma.transaction.findMany({
       where,
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
-            color: true
+            shortName: true,
+            color: true,
+            balance: true
           }
         },
         category: {
@@ -94,11 +98,11 @@ app.get('/api/transactions', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { amount, description, date, shared, userId, categoryId } = req.body;
+    const { amount, description, date, shared, bankId, categoryId } = req.body;
     
-    if (!amount || !description || !userId || !categoryId) {
+    if (!amount || !description || !bankId || !categoryId) {
       return res.status(400).json({ 
-        error: 'Amount, description, userId, and categoryId are required' 
+        error: 'Amount, description, bankId, and categoryId are required' 
       });
     }
     
@@ -108,15 +112,17 @@ app.post('/api/transactions', async (req, res) => {
         description,
         date: date ? new Date(date) : new Date(),
         shared: shared || false,
-        userId,
+        bankId,
         categoryId
       },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
-            color: true
+            shortName: true,
+            color: true,
+            balance: true
           }
         },
         category: {
@@ -154,11 +160,13 @@ app.put('/api/transactions/:id', async (req, res) => {
         ...(categoryId && { categoryId })
       },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
-            color: true
+            shortName: true,
+            color: true,
+            balance: true
           }
         },
         category: {
@@ -254,18 +262,20 @@ app.get('/api/dashboard', async (req, res) => {
       totalExpenses: 1800.50,
       balance: 699.50,
       transactionCount: 15,
-      totalUsers: 2,
+      totalBanks: 3,
       totalCategories: 10
     };
 
     const recentTransactions = await prisma.transaction.findMany({
       take: 5,
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
-            color: true
+            shortName: true,
+            color: true,
+            balance: true
           }
         },
         category: {
