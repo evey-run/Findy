@@ -1,3 +1,12 @@
+export interface User {
+  id: string;
+  name: string;
+  email?: string;
+  avatar?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Bank {
   id: string;
   name: string;
@@ -7,6 +16,8 @@ export interface Bank {
   balance: number;
   createdAt: string;
   updatedAt: string;
+  userId: string;
+  user?: User;
 }
 
 export interface Category {

@@ -10,6 +10,20 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+model User {
+  id        String   @id @default(cuid())
+  name      String   // Nom de l'utilisateur
+  email     String?  // Email optionnel
+  avatar    String?  // URL de l'avatar optionnel
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  banks Bank[]
+
+  @@map("users")
+}
+
 model Bank {
   id        String   @id @default(cuid())
   name      String   // Nom de la banque (ex: "Crédit Agricole", "BNP Paribas")
@@ -21,9 +35,11 @@ model Bank {
   updatedAt DateTime @updatedAt
 
   // Relations
-  transactions  Transaction[]
-  budgets       Budget[]
-  recurrences   Recurrence[]
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets      Budget[]
+  recurrences  Recurrence[]
 
   @@map("banks")
 }

@@ -1,8 +1,15 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { Bank, Transaction, Category, Budget, Recurrence, DashboardOverview } from '../types';
+import type { User, Bank, Transaction, Category, Budget, Recurrence, DashboardOverview } from '../types';
 
 interface AppState {
+  // Users
+  users: User[];
+  selectedUser: User | null;
+  setUsers: (users: User[]) => void;
+  setSelectedUser: (user: User | null) => void;
+  loadUsers: () => Promise<void>;
+  
   // Current bank
   currentBank: Bank | null;
   setCurrentBank: (bank: Bank | null) => void;
@@ -11,7 +18,7 @@ interface AppState {
   selectedBank: Bank | null;
   setSelectedBank: (bank: Bank | null) => void;
 
-  // Banks
+  // Banks (filtered by selected user)
   banks: Bank[];
   setBanks: (banks: Bank[]) => void;
   loadBanks: () => Promise<void>;
@@ -66,6 +73,27 @@ export const useAppStore = create<AppState>()(
   devtools(
     persist(
       (set, get) => ({
+        // Users
+        users: [],
+        selectedUser: null,
+        setUsers: (users: User[]) => set({ users }),
+        setSelectedUser: (user: User | null) => {
+          set({ selectedUser: user, selectedBank: null });
+          // Reload banks when user changes
+          get().loadBanks();
+        },
+        loadUsers: async () => {
+          try {
+            const response = await fetch('/api/users');
+            const users = await response.json();
+            set({ users });
+            // Load all banks by default (no user selected)
+            get().loadBanks();
+          } catch (error) {
+            console.error('Failed to load users:', error);
+          }
+        },
+        
         // Current bank
         currentBank: null,
         setCurrentBank: (bank: Bank | null) => set({ currentBank: bank }),
@@ -83,7 +111,12 @@ export const useAppStore = create<AppState>()(
         },
         loadBanks: async () => {
           try {
-            const response = await fetch('/api/banks');
+            const selectedUser = get().selectedUser;
+            const url = selectedUser 
+              ? `/api/banks?userId=${selectedUser.id}`
+              : '/api/banks';
+            
+            const response = await fetch(url);
             const banks = await response.json();
             set({ banks });
           } catch (error) {

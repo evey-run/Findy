@@ -4,7 +4,7 @@ import { useAppStore } from '../store';
 import type { Bank } from '../types/index.js';
 
 export default function Banks() {
-  const { banks, loadBanks, setSelectedBank } = useAppStore();
+  const { banks, loadBanks, setSelectedBank, selectedUser } = useAppStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -43,6 +43,11 @@ export default function Banks() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!selectedUser) {
+      alert('Veuillez sélectionner un utilisateur');
+      return;
+    }
+    
     try {
       const url = editingBank ? `/api/banks/${editingBank.id}` : '/api/banks';
       const method = editingBank ? 'PUT' : 'POST';
@@ -52,7 +57,10 @@ export default function Banks() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          userId: selectedUser.id
+        }),
       });
 
       if (response.ok) {
@@ -130,20 +138,22 @@ export default function Banks() {
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
-            Banques
+            {selectedUser ? `Banques de ${selectedUser.name}` : 'Toutes les banques'}
           </h2>
           <p className="text-sm text-gray-500 mt-1">Cliquez sur une banque pour voir ses transactions</p>
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4">
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Ajouter une banque
-          </button>
+          {selectedUser && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Ajouter une banque
+            </button>
+          )}
         </div>
       </div>
 
@@ -242,33 +252,40 @@ export default function Banks() {
                   </div>
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
-                    <p className="text-sm text-gray-500">{bank.iban || 'Aucun IBAN'}</p>
+                    <p className="text-sm text-gray-500">
+                      {bank.iban || 'Aucun IBAN'}
+                      {!selectedUser && bank.user && (
+                        <span className="ml-2 text-blue-600">• {bank.user.name}</span>
+                      )}
+                    </p>
                   </div>
                 </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleEdit(bank);
-                    }}
-                    className="text-blue-600 hover:text-blue-900"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(bank.id);
-                    }}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                </div>
+                {selectedUser && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEdit(bank);
+                      }}
+                      className="text-blue-600 hover:text-blue-900"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(bank.id);
+                      }}
+                      className="text-red-600 hover:text-red-900"
+                    >
+                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
               <div className="mt-4">
                 <div className="text-2xl font-bold text-gray-900">

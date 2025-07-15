@@ -12,34 +12,27 @@ import { Toaster } from 'react-hot-toast';
 
 function App() {
   const { 
-    loadBanks, 
+    loadUsers,
     loadCategories, 
     loadTransactions, 
     loadBudgets, 
     loadRecurrences, 
-    loadDashboardOverview,
-    setSelectedBank 
+    loadDashboardOverview
   } = useAppStore();
 
   useEffect(() => {
     // Charger toutes les données au démarrage
     const initializeApp = async () => {
-      await loadBanks();
+      await loadUsers();
       await loadCategories();
       await loadTransactions();
       await loadBudgets();
       await loadRecurrences();
       await loadDashboardOverview();
-      
-      // Sélectionner la première banque par défaut
-      const banks = useAppStore.getState().banks;
-      if (banks.length > 0) {
-        setSelectedBank(banks[0]);
-      }
     };
 
     initializeApp();
-  }, [loadBanks, loadCategories, loadTransactions, loadBudgets, loadRecurrences, loadDashboardOverview, setSelectedBank]);
+  }, [loadUsers, loadCategories, loadTransactions, loadBudgets, loadRecurrences, loadDashboardOverview]);
 
   return (
     <Router>

@@ -17,18 +17,46 @@ app.use(cors({
 app.use(express.json());
 
 // API Routes simples pour tester
+
+// Users routes
+app.get('/api/users', async (req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      include: {
+        banks: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
 app.get('/api/banks', async (req, res) => {
   try {
+    const { userId } = req.query;
+    
     const banks = await prisma.bank.findMany({
-      select: {
-        id: true,
-        name: true,
-        shortName: true,
-        color: true,
-        iban: true,
-        balance: true,
-        createdAt: true,
-        updatedAt: true,
+      where: userId ? { userId: userId as string } : {},
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
       }
     });
     res.json(banks);
@@ -41,15 +69,29 @@ app.get('/api/banks', async (req, res) => {
 // POST - Créer une nouvelle banque
 app.post('/api/banks', async (req, res) => {
   try {
-    const { name, shortName, color, iban, balance } = req.body;
+    const { name, shortName, color, iban, balance, userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
     
     const bank = await prisma.bank.create({
       data: {
         name,
         shortName,
-        color,
+        color: color || '#3b82f6',
         iban,
-        balance: parseFloat(balance) || 0
+        balance: parseFloat(balance) || 0,
+        userId
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        }
       }
     });
     
