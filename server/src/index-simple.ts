@@ -38,6 +38,79 @@ app.get('/api/banks', async (req, res) => {
   }
 });
 
+// POST - Créer une nouvelle banque
+app.post('/api/banks', async (req, res) => {
+  try {
+    const { name, shortName, color, iban, balance } = req.body;
+    
+    const bank = await prisma.bank.create({
+      data: {
+        name,
+        shortName,
+        color,
+        iban,
+        balance: parseFloat(balance) || 0
+      }
+    });
+    
+    res.status(201).json(bank);
+  } catch (error) {
+    console.error('Error creating bank:', error);
+    res.status(500).json({ error: 'Failed to create bank' });
+  }
+});
+
+// PUT - Modifier une banque existante
+app.put('/api/banks/:id', async (req, res) => {
+  try {
+    const bankId = req.params.id;
+    const { name, shortName, color, iban, balance } = req.body;
+    
+    const bank = await prisma.bank.update({
+      where: { id: bankId },
+      data: {
+        name,
+        shortName,
+        color,
+        iban,
+        balance: parseFloat(balance)
+      }
+    });
+    
+    res.json(bank);
+  } catch (error) {
+    console.error('Error updating bank:', error);
+    res.status(500).json({ error: 'Failed to update bank' });
+  }
+});
+
+// DELETE - Supprimer une banque
+app.delete('/api/banks/:id', async (req, res) => {
+  try {
+    const bankId = req.params.id;
+    
+    // Vérifier s'il y a des transactions liées à cette banque
+    const transactionCount = await prisma.transaction.count({
+      where: { bankId }
+    });
+    
+    if (transactionCount > 0) {
+      return res.status(400).json({ 
+        error: 'Cannot delete bank with existing transactions' 
+      });
+    }
+    
+    await prisma.bank.delete({
+      where: { id: bankId }
+    });
+    
+    res.json({ message: 'Bank deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting bank:', error);
+    res.status(500).json({ error: 'Failed to delete bank' });
+  }
+});
+
 app.get('/api/categories', async (req, res) => {
   try {
     const categories = await prisma.category.findMany();

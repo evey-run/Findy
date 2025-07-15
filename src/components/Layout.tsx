@@ -7,6 +7,7 @@ import {
   TagIcon,
   ChartBarIcon,
   ArrowPathIcon,
+  BuildingLibraryIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -19,6 +20,7 @@ const navigation = [
   { name: 'Catégories', href: '/categories', icon: TagIcon },
   { name: 'Budgets', href: '/budgets', icon: ChartBarIcon },
   { name: 'Récurrences', href: '/recurrences', icon: ArrowPathIcon },
+  { name: 'Banques', href: '/banks', icon: BuildingLibraryIcon },
 ];
 
 function classNames(...classes: string[]) {

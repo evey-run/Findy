@@ -7,38 +7,39 @@ import Transactions from './components/Transactions';
 import Categories from './components/Categories';
 import Budgets from './components/Budgets';
 import Recurrences from './components/Recurrences';
+import Banks from './components/Banks';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
   const { 
-    loadUsers, 
+    loadBanks, 
     loadCategories, 
     loadTransactions, 
     loadBudgets, 
     loadRecurrences, 
     loadDashboardOverview,
-    setSelectedUser 
+    setSelectedBank 
   } = useAppStore();
 
   useEffect(() => {
     // Charger toutes les données au démarrage
     const initializeApp = async () => {
-      await loadUsers();
+      await loadBanks();
       await loadCategories();
       await loadTransactions();
       await loadBudgets();
       await loadRecurrences();
       await loadDashboardOverview();
       
-      // Sélectionner le premier utilisateur par défaut
-      const users = useAppStore.getState().users;
-      if (users.length > 0) {
-        setSelectedUser(users[0]);
+      // Sélectionner la première banque par défaut
+      const banks = useAppStore.getState().banks;
+      if (banks.length > 0) {
+        setSelectedBank(banks[0]);
       }
     };
 
     initializeApp();
-  }, [loadUsers, loadCategories, loadTransactions, loadBudgets, loadRecurrences, loadDashboardOverview, setSelectedUser]);
+  }, [loadBanks, loadCategories, loadTransactions, loadBudgets, loadRecurrences, loadDashboardOverview, setSelectedBank]);
 
   return (
     <Router>
@@ -51,6 +52,7 @@ function App() {
             <Route path="/categories" element={<Categories />} />
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/recurrences" element={<Recurrences />} />
+            <Route path="/banks" element={<Banks />} />
           </Routes>
         </Layout>
         <Toaster 

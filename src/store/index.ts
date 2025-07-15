@@ -85,7 +85,7 @@ export const useAppStore = create<AppState>()(
         setBanks: (banks: Bank[]) => set({ banks }),
         loadBanks: async () => {
           try {
-            const response = await fetch('http://localhost:3001/api/banks');
+            const response = await fetch('/api/banks');
             const banks = await response.json();
             set({ banks });
           } catch (error) {
@@ -98,7 +98,7 @@ export const useAppStore = create<AppState>()(
         setCategories: (categories: Category[]) => set({ categories }),
         loadCategories: async () => {
           try {
-            const response = await fetch('http://localhost:3001/api/categories');
+            const response = await fetch('/api/categories');
             const categories = await response.json();
             set({ categories });
           } catch (error) {
@@ -133,7 +133,7 @@ export const useAppStore = create<AppState>()(
             if (state.selectedBankId) {
               params.append('bankId', state.selectedBankId);
             }
-            const response = await fetch(`http://localhost:3001/api/transactions?${params}`);
+            const response = await fetch(`/api/transactions?${params}`);
             const transactions = await response.json();
             set({ transactions });
           } catch (error) {
@@ -165,7 +165,7 @@ export const useAppStore = create<AppState>()(
             if (state.selectedBankId) {
               params.append('bankId', state.selectedBankId);
             }
-            const response = await fetch(`http://localhost:3001/api/budgets?${params}`);
+            const response = await fetch(`/api/budgets?${params}`);
             const budgets = await response.json();
             set({ budgets });
           } catch (error) {
@@ -197,7 +197,7 @@ export const useAppStore = create<AppState>()(
             if (state.selectedBankId) {
               params.append('bankId', state.selectedBankId);
             }
-            const response = await fetch(`http://localhost:3001/api/recurrences?${params}`);
+            const response = await fetch(`/api/recurrences?${params}`);
             const recurrences = await response.json();
             set({ recurrences });
           } catch (error) {
@@ -218,7 +218,7 @@ export const useAppStore = create<AppState>()(
             if (state.selectedBankId) {
               params.append('bankId', state.selectedBankId);
             }
-            const response = await fetch(`http://localhost:3001/api/dashboard?${params}`);
+            const response = await fetch(`/api/dashboard?${params}`);
             const dashboardData = await response.json();
             set({ dashboardData });
           } catch (error) {
