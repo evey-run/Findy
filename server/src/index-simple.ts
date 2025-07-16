@@ -40,6 +40,36 @@ const upload = multer({
   }
 });
 
+// Configuration multer pour l'upload d'avatars
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadsDir = path.join(process.cwd(), 'public/uploads/avatars');
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Seuls les fichiers images sont autorisés'));
+    }
+  }
+});
+
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
@@ -79,16 +109,54 @@ app.get('/api/users', async (req, res) => {
   }
 });
 
+app.get('/api/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        userBanks: {
+          include: {
+            bank: true
+          },
+          orderBy: {
+            bank: {
+              createdAt: 'desc'
+            }
+          }
+        }
+      }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
+
 app.get('/api/banks', async (req, res) => {
   try {
     const { userId, archived } = req.query;
+    
+    // Construire le where clause
+    const whereClause: any = {};
+    
+    // Filtre par archived seulement si spécifié
+    if (archived !== undefined) {
+      whereClause.archived = archived === 'true';
+    }
     
     let banks;
     if (userId) {
       // Get banks for a specific user
       banks = await prisma.bank.findMany({
         where: {
-          archived: archived === 'true',
+          ...whereClause,
           userBanks: {
             some: {
               userId: userId as string
@@ -101,8 +169,7 @@ app.get('/api/banks', async (req, res) => {
               user: {
                 select: {
                   id: true,
-                  name: true,
-                  email: true
+                  name: true
                 }
               }
             }
@@ -115,17 +182,14 @@ app.get('/api/banks', async (req, res) => {
     } else {
       // Get all banks
       banks = await prisma.bank.findMany({
-        where: {
-          archived: archived === 'true'
-        },
+        where: whereClause,
         include: {
           userBanks: {
             include: {
               user: {
                 select: {
                   id: true,
-                  name: true,
-                  email: true
+                  name: true
                 }
               }
             }
@@ -764,6 +828,58 @@ app.delete('/api/banks/:id/permanent', async (req, res) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// PUT /api/users/:id - Update a user
+app.put('/api/users/:id', uploadAvatar.single('avatar'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    
+    // Préparer les données de mise à jour
+    const updateData: any = {
+      name
+    };
+    
+    // Si un nouvel avatar est uploadé
+    if (req.file) {
+      updateData.avatar = `/uploads/avatars/${req.file.filename}`;
+      
+      // Supprimer l'ancien avatar si il existe
+      const existingUser = await prisma.user.findUnique({
+        where: { id },
+        select: { avatar: true }
+      });
+      
+      if (existingUser?.avatar) {
+        const oldAvatarPath = path.join(process.cwd(), 'public', existingUser.avatar);
+        try {
+          if (require('fs').existsSync(oldAvatarPath)) {
+            require('fs').unlinkSync(oldAvatarPath);
+          }
+        } catch (error) {
+          console.error('Error deleting old avatar:', error);
+        }
+      }
+    }
+    
+    const user = await prisma.user.update({
+      where: { id },
+      data: updateData,
+      include: {
+        userBanks: {
+          include: {
+            bank: true
+          }
+        }
+      }
+    });
+    
+    res.json(user);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
 });
 
 app.listen(PORT, () => {

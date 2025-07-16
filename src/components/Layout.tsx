@@ -22,6 +22,7 @@ const navigation = [
   { name: 'Budgets', href: '/budgets', icon: ChartBarIcon },
   { name: 'Récurrences', href: '/recurrences', icon: ArrowPathIcon },
   { name: 'Banques', href: '/banks', icon: BuildingLibraryIcon },
+  { name: 'Utilisateurs', href: '/users', icon: UserIcon },
 ];
 
 function classNames(...classes: string[]) {
@@ -85,7 +86,7 @@ export default function Layout({ children }: LayoutProps) {
               <option value="">Toutes les banques</option>
               {banks.map((bank) => (
                 <option key={bank.id} value={bank.id}>
-                  {bank.name} {bank.user && !selectedUser ? `(${bank.user.name})` : ''}
+                  {bank.name}
                 </option>
               ))}
             </select>

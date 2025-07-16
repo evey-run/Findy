@@ -1,17 +1,47 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 const prisma = new PrismaClient();
+
+// Configuration multer pour upload d'avatar
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadsDir = path.join(process.cwd(), 'public/uploads/avatars');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'avatar-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 // GET /api/users - Get all users
 router.get('/', async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       include: {
-        banks: {
-          orderBy: {
-            createdAt: 'desc'
+        userBanks: {
+          include: {
+            bank: true
           }
         }
       },
@@ -33,9 +63,9 @@ router.get('/:id', async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
-        banks: {
-          orderBy: {
-            createdAt: 'desc'
+        userBanks: {
+          include: {
+            bank: true
           }
         }
       }
@@ -80,20 +110,44 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/users/:id - Update a user
-router.put('/:id', async (req, res) => {
+router.put('/:id', upload.single('avatar'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, avatar } = req.body;
+    const { name, email } = req.body;
+    
+    // Préparer les données de mise à jour
+    const updateData: any = {
+      name,
+      email: email || null
+    };
+    
+    // Si un nouvel avatar est uploadé
+    if (req.file) {
+      updateData.avatar = `/uploads/avatars/${req.file.filename}`;
+      
+      // Supprimer l'ancien avatar si il existe
+      const existingUser = await prisma.user.findUnique({
+        where: { id },
+        select: { avatar: true }
+      });
+      
+      if (existingUser?.avatar) {
+        const oldAvatarPath = path.join(process.cwd(), 'public', existingUser.avatar);
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+    }
     
     const user = await prisma.user.update({
       where: { id },
-      data: {
-        name,
-        email,
-        avatar
-      },
+      data: updateData,
       include: {
-        banks: true
+        userBanks: {
+          include: {
+            bank: true
+          }
+        }
       }
     });
     
@@ -108,6 +162,19 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // Supprimer l'avatar si il existe
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+      select: { avatar: true }
+    });
+    
+    if (existingUser?.avatar) {
+      const avatarPath = path.join(process.cwd(), 'public', existingUser.avatar);
+      if (fs.existsSync(avatarPath)) {
+        fs.unlinkSync(avatarPath);
+      }
+    }
     
     await prisma.user.delete({
       where: { id }

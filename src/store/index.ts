@@ -86,6 +86,7 @@ export const useAppStore = create<AppState>()(
           try {
             const response = await fetch('/api/users');
             const users = await response.json();
+            console.log('Users loaded:', users);
             set({ users });
             // Load all banks by default (no user selected)
             get().loadBanks();

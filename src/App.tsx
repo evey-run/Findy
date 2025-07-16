@@ -8,6 +8,7 @@ import Categories from './components/Categories';
 import Budgets from './components/Budgets';
 import Recurrences from './components/Recurrences';
 import Banks from './components/Banks';
+import Users from './components/Users';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -46,6 +47,7 @@ function App() {
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/recurrences" element={<Recurrences />} />
             <Route path="/banks" element={<Banks />} />
+            <Route path="/users" element={<Users />} />
           </Routes>
         </Layout>
         <Toaster 

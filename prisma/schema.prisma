@@ -13,7 +13,6 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   name      String   // Nom de l'utilisateur
-  email     String?  // Email optionnel
   avatar    String?  // URL de l'avatar optionnel
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

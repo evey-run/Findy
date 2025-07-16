@@ -9,8 +9,27 @@ async function main() {
   await prisma.transaction.deleteMany();
   await prisma.budget.deleteMany();
   await prisma.recurrence.deleteMany();
+  await prisma.userBank.deleteMany();
   await prisma.category.deleteMany();
   await prisma.bank.deleteMany();
+  await prisma.user.deleteMany();
+
+  // Créer les utilisateurs
+  const user1 = await prisma.user.create({
+    data: {
+      id: 'user1',
+      name: 'Utilisateur 1'
+    }
+  });
+
+  const user2 = await prisma.user.create({
+    data: {
+      id: 'user2',
+      name: 'Utilisateur 2'
+    }
+  });
+
+  console.log('✅ Users created');
 
   // Créer les banques
   const bank1 = await prisma.bank.create({
@@ -30,6 +49,32 @@ async function main() {
       color: '#3b82f6',
       iban: 'FR76 9876 5432 1098 7654 321',
       balance: 1800.50
+    }
+  });
+
+  // Créer les relations utilisateur-banque
+  await prisma.userBank.create({
+    data: {
+      userId: user1.id,
+      bankId: bank1.id,
+      role: 'OWNER'
+    }
+  });
+
+  await prisma.userBank.create({
+    data: {
+      userId: user2.id,
+      bankId: bank2.id,
+      role: 'OWNER'
+    }
+  });
+
+  // Partager bank1 avec user2
+  await prisma.userBank.create({
+    data: {
+      userId: user2.id,
+      bankId: bank1.id,
+      role: 'SHARED'
     }
   });
 
