@@ -81,15 +81,18 @@ export default function Banks() {
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [bankToShare, setBankToShare] = useState<Bank | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedBanks, setArchivedBanks] = useState<Bank[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     shortName: '',
-    color: '#3b82f6',
     iban: '',
     balance: 0,
     isShared: false,
     sharedUserIds: [] as string[]
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
     // Forcer le rechargement des banques
@@ -97,6 +100,9 @@ export default function Banks() {
       setLoading(true);
       try {
         await loadBanks();
+        if (showArchived) {
+          await loadArchivedBanks();
+        }
       } catch (error) {
         console.error('Error loading banks:', error);
       } finally {
@@ -105,7 +111,38 @@ export default function Banks() {
     };
     
     initBanks();
-  }, [loadBanks]);
+  }, [loadBanks, showArchived]);
+
+  const loadArchivedBanks = async () => {
+    try {
+      const url = selectedUser 
+        ? `/api/banks?userId=${selectedUser.id}&archived=true`
+        : '/api/banks?archived=true';
+      
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        setArchivedBanks(data);
+      }
+    } catch (error) {
+      console.error('Error loading archived banks:', error);
+    }
+  };
+
+  const handleRestore = async (bankId: string) => {
+    try {
+      const response = await fetch(`/api/banks/${bankId}/restore`, {
+        method: 'PUT',
+      });
+
+      if (response.ok) {
+        await loadBanks();
+        await loadArchivedBanks();
+      }
+    } catch (error) {
+      console.error('Error restoring bank:', error);
+    }
+  };
 
   const handleBankClick = (bank: Bank) => {
     console.log('🏦 Bank clicked:', bank.name);
@@ -126,15 +163,20 @@ export default function Banks() {
       const url = editingBank ? `/api/banks/${editingBank.id}` : '/api/banks';
       const method = editingBank ? 'PUT' : 'POST';
       
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('shortName', formData.shortName);
+      formDataToSend.append('iban', formData.iban);
+      formDataToSend.append('balance', formData.balance.toString());
+      formDataToSend.append('userId', selectedUser.id);
+      
+      if (imageFile) {
+        formDataToSend.append('image', imageFile);
+      }
+      
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          userId: selectedUser.id
-        }),
+        body: formDataToSend,
       });
 
       if (response.ok) {
@@ -195,12 +237,20 @@ export default function Banks() {
     setFormData({
       name: bank.name,
       shortName: bank.shortName || '',
-      color: bank.color,
       iban: bank.iban || '',
       balance: bank.balance,
       isShared: bank.isShared,
       sharedUserIds: bank.sharedUsers?.map(u => u.id) || []
     });
+    
+    // Set image preview if bank has an image
+    if (bank.image) {
+      setImagePreview(`http://localhost:3001${bank.image}`);
+    } else {
+      setImagePreview(null);
+    }
+    setImageFile(null);
+    
     setShowAddForm(true);
   };
 
@@ -215,7 +265,16 @@ export default function Banks() {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        
+        if (result.archived) {
+          alert(`Banque archivée car elle contient ${result.transactionCount} transaction(s). Vous pouvez la restaurer depuis les archives.`);
+        } else {
+          alert('Banque supprimée définitivement.');
+        }
+        
         await loadBanks(); // Recharger les données depuis le store
+        await loadArchivedBanks(); // Recharger les archives
       } else {
         const error = await response.json();
         alert(error.error || 'Erreur lors de la suppression');
@@ -226,16 +285,42 @@ export default function Banks() {
     }
   };
 
+  const handlePermanentDelete = async (bankId: string, bankName: string) => {
+    if (!confirm(`⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir supprimer définitivement la banque "${bankName}" ?\n\nCette action supprimera :\n- La banque elle-même\n- TOUTES ses transactions\n- Tous ses budgets associés\n- Toutes ses récurrences associées\n\nCette action est IRRÉVERSIBLE !`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/banks/${bankId}/permanent`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`✅ Banque "${result.bankName}" supprimée définitivement.\n\n${result.deletedTransactions} transaction(s) supprimée(s).`);
+        
+        await loadArchivedBanks(); // Recharger les archives
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Erreur lors de la suppression définitive');
+      }
+    } catch (error) {
+      console.error('Error permanently deleting bank:', error);
+      alert('Erreur lors de la suppression définitive');
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       name: '',
       shortName: '',
-      color: '#3b82f6',
       iban: '',
       balance: 0,
       isShared: false,
       sharedUserIds: []
     });
+    setImageFile(null);
+    setImagePreview(null);
     setEditingBank(null);
     setShowAddForm(false);
   };
@@ -245,6 +330,37 @@ export default function Banks() {
       style: 'currency',
       currency: 'EUR'
     }).format(amount);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Vérifier le type de fichier
+      if (!file.type.startsWith('image/')) {
+        alert('Veuillez sélectionner un fichier image');
+        return;
+      }
+      
+      // Vérifier la taille (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('L\'image doit faire moins de 5MB');
+        return;
+      }
+      
+      setImageFile(file);
+      
+      // Créer une prévisualisation
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
   };
 
   if (loading) {
@@ -262,19 +378,40 @@ export default function Banks() {
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
             {selectedUser ? `Banques de ${selectedUser.name}` : 'Toutes les banques'}
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Cliquez sur une banque pour voir ses transactions</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {showArchived 
+              ? 'Gérer les banques archivées - Cliquez sur "Restaurer" pour remettre une banque en service'
+              : 'Cliquez sur une banque pour voir ses transactions'
+            }
+          </p>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
+        <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
           {selectedUser && (
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-            >
-              <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              Ajouter une banque
-            </button>
+            <>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Ajouter une banque
+              </button>
+              <button
+                onClick={() => {
+                  setShowArchived(!showArchived);
+                  if (!showArchived) {
+                    loadArchivedBanks();
+                  }
+                }}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8l6 6m0 0l6-6m-6 6V3" />
+                </svg>
+                {showArchived ? 'Masquer les archives' : 'Voir les archives'}
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -308,15 +445,6 @@ export default function Banks() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Couleur</label>
-              <input
-                type="color"
-                value={formData.color}
-                onChange={(e) => setFormData({...formData, color: e.target.value})}
-                className="mt-1 block w-full h-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700">Solde</label>
               <input
                 type="number"
@@ -337,6 +465,36 @@ export default function Banks() {
                 placeholder="Ex: FR76 1234 5678 9012 3456 789"
               />
             </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Logo de la banque</label>
+              {imagePreview && (
+                <div className="mb-4">
+                  <div className="relative inline-block">
+                    <img
+                      src={imagePreview}
+                      alt="Prévisualisation"
+                      className="h-20 w-20 object-cover rounded-lg border border-gray-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveImage}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Formats acceptés: PNG, JPG, GIF, WebP. Taille max: 5MB
+              </p>
+            </div>
             <div className="md:col-span-2 flex justify-end space-x-3">
               <button
                 type="button"
@@ -356,7 +514,102 @@ export default function Banks() {
         </div>
       )}
 
-      {/* Banks Grid */}
+      {/* Archived Banks */}
+      {showArchived && (
+        <div className="space-y-4">
+          <div className="border-t pt-6">
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    <strong>Attention :</strong> La suppression définitive d'une banque archivée effacera également toutes ses transactions, budgets et récurrences associés. Cette action est irréversible.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <h3 className="text-lg font-medium text-gray-900 mb-4">
+              Banques archivées ({archivedBanks.length})
+            </h3>
+            
+            {archivedBanks.length === 0 ? (
+              <div className="text-center py-8">
+                <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8l6 6m0 0l6-6m-6 6V3" />
+                </svg>
+                <p className="mt-2 text-sm text-gray-500">Aucune banque archivée</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {archivedBanks.map((bank) => (
+                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {bank.image ? (
+                            <img
+                              src={`http://localhost:3001${bank.image}`}
+                              alt={bank.name}
+                              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 opacity-50"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold bg-gray-400">
+                              {bank.shortName}
+                            </div>
+                          )}
+                          <div className="ml-3">
+                            <h4 className="text-sm font-medium text-gray-900">{bank.name}</h4>
+                            <p className="text-xs text-gray-500">
+                              Archivé le {bank.archivedAt ? new Date(bank.archivedAt).toLocaleDateString('fr-FR') : 'N/A'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleRestore(bank.id)}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            title="Restaurer cette banque"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Restaurer
+                          </button>
+                          <button
+                            onClick={() => handlePermanentDelete(bank.id, bank.name)}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            title="Supprimer définitivement cette banque et toutes ses données"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <div className="text-sm font-medium text-gray-900">
+                          {formatAmount(bank.balance)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Solde lors de l'archivage
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Regular Banks Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banks.map((bank) => (
           <div key={bank.id} className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
@@ -366,12 +619,19 @@ export default function Banks() {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <div 
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold"
-                    style={{ backgroundColor: bank.color }}
-                  >
-                    {bank.shortName}
-                  </div>
+                  {bank.image ? (
+                    <img
+                      src={`http://localhost:3001${bank.image}`}
+                      alt={bank.name}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                    />
+                  ) : (
+                    <div 
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold bg-blue-600"
+                    >
+                      {bank.shortName}
+                    </div>
+                  )}
                   <div className="ml-4">
                     <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
                     <p className="text-sm text-gray-500">
@@ -422,18 +682,6 @@ export default function Banks() {
                     >
                       <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setBankToShare(bank);
-                        setShowShareModal(true);
-                      }}
-                      className="text-green-600 hover:text-green-900"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h8m-4-4v8m8-8v8m-4-4H4" />
                       </svg>
                     </button>
                   </div>

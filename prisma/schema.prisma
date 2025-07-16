@@ -29,9 +29,12 @@ model Bank {
   name      String   // Nom de la banque (ex: "Crédit Agricole", "BNP Paribas")
   shortName String?  // Nom court (ex: "CA", "BNP")
   color     String   @default("#3b82f6") // Couleur pour différencier visuellement
+  image     String?  // URL de l'image/logo de la banque
   iban      String?  // IBAN du compte (optionnel)
   balance   Float    @default(0) // Solde actuel du compte
   isShared  Boolean  @default(false) // Indique si le compte est partagé
+  archived  Boolean  @default(false) // Indique si le compte est archivé
+  archivedAt DateTime? // Date d'archivage
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

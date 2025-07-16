@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import { PrismaClient } from '@prisma/client';
 
 // Routes
@@ -24,6 +25,9 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Serve static files (images)
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
 // Routes
 app.use('/api/users', userRoutes);

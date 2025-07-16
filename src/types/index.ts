@@ -22,9 +22,12 @@ export interface Bank {
   name: string;
   shortName?: string;
   color: string;
+  image?: string;
   iban?: string;
   balance: number;
   isShared: boolean;
+  archived: boolean;
+  archivedAt?: string;
   createdAt: string;
   updatedAt: string;
   userBanks?: UserBank[];

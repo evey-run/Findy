@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import multer from 'multer';
 import { PrismaClient } from '@prisma/client';
 
 dotenv.config();
@@ -9,12 +11,44 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
+// Configuration multer pour l'upload d'images
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(process.cwd(), 'public/uploads'));
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'bank-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Seuls les fichiers images sont autorisés'));
+    }
+  }
+});
+
 // Middleware
 app.use(cors({
   origin: process.env.FRONTEND_URL || 'http://localhost:5173',
   credentials: true
 }));
 app.use(express.json());
+
+// Serve static files (images)
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
 // API Routes simples pour tester
 
@@ -47,13 +81,14 @@ app.get('/api/users', async (req, res) => {
 
 app.get('/api/banks', async (req, res) => {
   try {
-    const { userId } = req.query;
+    const { userId, archived } = req.query;
     
     let banks;
     if (userId) {
       // Get banks for a specific user
       banks = await prisma.bank.findMany({
         where: {
+          archived: archived === 'true',
           userBanks: {
             some: {
               userId: userId as string
@@ -80,6 +115,9 @@ app.get('/api/banks', async (req, res) => {
     } else {
       // Get all banks
       banks = await prisma.bank.findMany({
+        where: {
+          archived: archived === 'true'
+        },
         include: {
           userBanks: {
             include: {
@@ -115,7 +153,7 @@ app.get('/api/banks', async (req, res) => {
 });
 
 // POST - Créer une nouvelle banque
-app.post('/api/banks', async (req, res) => {
+app.post('/api/banks', upload.single('image'), async (req, res) => {
   try {
     const { name, shortName, color, iban, balance, userId, isShared, sharedUserIds } = req.body;
     
@@ -123,11 +161,14 @@ app.post('/api/banks', async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
     
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    
     const bank = await prisma.bank.create({
       data: {
         name,
         shortName,
-        color: color || '#3b82f6',
+        color: '#3b82f6', // Couleur par défaut
+        image: imageUrl,
         iban,
         balance: parseFloat(balance) || 0,
         isShared: isShared || false,
@@ -178,30 +219,57 @@ app.post('/api/banks', async (req, res) => {
 });
 
 // PUT - Modifier une banque existante
-app.put('/api/banks/:id', async (req, res) => {
+app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
   try {
     const bankId = req.params.id;
-    const { name, shortName, color, iban, balance } = req.body;
+    const { name, shortName, iban, balance } = req.body;
+    
+    const updateData: any = {
+      name,
+      shortName,
+      iban,
+      balance: parseFloat(balance)
+    };
+    
+    // Add image if uploaded
+    if (req.file) {
+      updateData.image = `/uploads/${req.file.filename}`;
+    }
     
     const bank = await prisma.bank.update({
       where: { id: bankId },
-      data: {
-        name,
-        shortName,
-        color,
-        iban,
-        balance: parseFloat(balance)
+      data: updateData,
+      include: {
+        userBanks: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
       }
     });
     
-    res.json(bank);
+    // Transform the data to include computed fields
+    const transformedBank = {
+      ...bank,
+      users: bank.userBanks.map(ub => ub.user),
+      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
+      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+    };
+    
+    res.json(transformedBank);
   } catch (error) {
     console.error('Error updating bank:', error);
     res.status(500).json({ error: 'Failed to update bank' });
   }
 });
 
-// DELETE - Supprimer une banque
+// DELETE - Supprimer ou archiver une banque
 app.delete('/api/banks/:id', async (req, res) => {
   try {
     const bankId = req.params.id;
@@ -212,19 +280,75 @@ app.delete('/api/banks/:id', async (req, res) => {
     });
     
     if (transactionCount > 0) {
-      return res.status(400).json({ 
-        error: 'Cannot delete bank with existing transactions' 
+      // Si des transactions existent, archiver la banque
+      await prisma.bank.update({
+        where: { id: bankId },
+        data: { 
+          archived: true,
+          archivedAt: new Date()
+        }
+      });
+      
+      res.json({ 
+        message: 'Bank archived successfully',
+        archived: true,
+        transactionCount 
+      });
+    } else {
+      // Si aucune transaction, supprimer définitivement
+      await prisma.bank.delete({
+        where: { id: bankId }
+      });
+      
+      res.json({ 
+        message: 'Bank deleted successfully',
+        archived: false 
       });
     }
+  } catch (error) {
+    console.error('Error deleting/archiving bank:', error);
+    res.status(500).json({ error: 'Failed to delete/archive bank' });
+  }
+});
+
+// PUT - Restaurer une banque archivée
+app.put('/api/banks/:id/restore', async (req, res) => {
+  try {
+    const bankId = req.params.id;
     
-    await prisma.bank.delete({
-      where: { id: bankId }
+    const bank = await prisma.bank.update({
+      where: { id: bankId },
+      data: { 
+        archived: false,
+        archivedAt: null
+      },
+      include: {
+        userBanks: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true
+              }
+            }
+          }
+        }
+      }
     });
     
-    res.json({ message: 'Bank deleted successfully' });
+    // Transform the data to include computed fields
+    const transformedBank = {
+      ...bank,
+      users: bank.userBanks.map(ub => ub.user),
+      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
+      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+    };
+    
+    res.json(transformedBank);
   } catch (error) {
-    console.error('Error deleting bank:', error);
-    res.status(500).json({ error: 'Failed to delete bank' });
+    console.error('Error restoring bank:', error);
+    res.status(500).json({ error: 'Failed to restore bank' });
   }
 });
 
@@ -499,109 +623,78 @@ app.get('/api/dashboard', async (req, res) => {
   }
 });
 
-// POST - Partager une banque avec un autre utilisateur
+// POST - Partager une banque avec un utilisateur
 app.post('/api/banks/:id/share', async (req, res) => {
   try {
-    const bankId = req.params.id;
+    const { id } = req.params;
     const { userId } = req.body;
     
     if (!userId) {
       return res.status(400).json({ error: 'userId is required' });
     }
     
-    // Vérifier si l'utilisateur n'est pas déjà associé à cette banque
-    const existingUserBank = await prisma.userBank.findUnique({
+    // Check if user already has access to this bank
+    const existingAccess = await prisma.userBank.findUnique({
       where: {
         userId_bankId: {
-          userId: userId,
-          bankId: bankId
+          userId,
+          bankId: id
         }
       }
     });
     
-    if (existingUserBank) {
+    if (existingAccess) {
       return res.status(400).json({ error: 'User already has access to this bank' });
     }
     
-    // Créer la relation de partage
+    // Add shared access
     await prisma.userBank.create({
       data: {
-        userId: userId,
-        bankId: bankId,
+        userId,
+        bankId: id,
         role: 'SHARED'
       }
     });
     
-    // Marquer la banque comme partagée
+    // Update bank to mark as shared
     await prisma.bank.update({
-      where: { id: bankId },
+      where: { id },
       data: { isShared: true }
     });
     
-    // Retourner la banque mise à jour
-    const updatedBank = await prisma.bank.findUnique({
-      where: { id: bankId },
-      include: {
-        userBanks: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          }
-        }
-      }
-    });
-    
-    if (!updatedBank) {
-      return res.status(404).json({ error: 'Bank not found' });
-    }
-    
-    // Transform the data to include computed fields
-    const transformedBank = {
-      ...updatedBank,
-      users: updatedBank.userBanks.map(ub => ub.user),
-      owners: updatedBank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
-      sharedUsers: updatedBank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
-    };
-    
-    res.json(transformedBank);
+    res.status(201).json({ message: 'Bank shared successfully' });
   } catch (error) {
     console.error('Error sharing bank:', error);
     res.status(500).json({ error: 'Failed to share bank' });
   }
 });
 
-// DELETE - Retirer l'accès partagé d'une banque
+// DELETE - Retirer l'accès partagé
 app.delete('/api/banks/:id/share/:userId', async (req, res) => {
   try {
-    const bankId = req.params.id;
-    const userId = req.params.userId;
+    const { id, userId } = req.params;
     
-    // Supprimer la relation de partage
-    await prisma.userBank.deleteMany({
+    await prisma.userBank.delete({
       where: {
-        userId: userId,
-        bankId: bankId,
+        userId_bankId: {
+          userId,
+          bankId: id
+        }
+      }
+    });
+    
+    // Check if bank still has any shared users
+    const sharedUsers = await prisma.userBank.findMany({
+      where: {
+        bankId: id,
         role: 'SHARED'
       }
     });
     
-    // Vérifier s'il reste des utilisateurs partagés
-    const remainingSharedUsers = await prisma.userBank.count({
-      where: {
-        bankId: bankId,
-        role: 'SHARED'
-      }
-    });
-    
-    // Si plus d'utilisateurs partagés, marquer la banque comme non partagée
-    if (remainingSharedUsers === 0) {
+    // Update bank shared status
+    if (sharedUsers.length === 0) {
       await prisma.bank.update({
-        where: { id: bankId },
+        where: { id },
         data: { isShared: false }
       });
     }
@@ -610,6 +703,61 @@ app.delete('/api/banks/:id/share/:userId', async (req, res) => {
   } catch (error) {
     console.error('Error removing shared access:', error);
     res.status(500).json({ error: 'Failed to remove shared access' });
+  }
+});
+
+// DELETE - Supprimer définitivement une banque archivée et toutes ses transactions
+app.delete('/api/banks/:id/permanent', async (req, res) => {
+  try {
+    const bankId = req.params.id;
+    
+    // Vérifier que la banque est bien archivée
+    const bank = await prisma.bank.findUnique({
+      where: { id: bankId },
+      select: { archived: true, name: true }
+    });
+    
+    if (!bank) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    
+    if (!bank.archived) {
+      return res.status(400).json({ error: 'Only archived banks can be permanently deleted' });
+    }
+    
+    // Compter les transactions qui seront supprimées
+    const transactionCount = await prisma.transaction.count({
+      where: { bankId }
+    });
+    
+    // Supprimer toutes les transactions associées
+    await prisma.transaction.deleteMany({
+      where: { bankId }
+    });
+    
+    // Supprimer tous les budgets associés
+    await prisma.budget.deleteMany({
+      where: { bankId }
+    });
+    
+    // Supprimer toutes les récurrences associées
+    await prisma.recurrence.deleteMany({
+      where: { bankId }
+    });
+    
+    // Supprimer la banque elle-même
+    await prisma.bank.delete({
+      where: { id: bankId }
+    });
+    
+    res.json({ 
+      message: 'Bank and all associated data permanently deleted',
+      deletedTransactions: transactionCount,
+      bankName: bank.name
+    });
+  } catch (error) {
+    console.error('Error permanently deleting bank:', error);
+    res.status(500).json({ error: 'Failed to permanently delete bank' });
   }
 });
 
