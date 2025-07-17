@@ -624,7 +624,7 @@ app.get('/api/transactions', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { amount, description, date, shared, bankId, categoryId } = req.body;
+    const { amount, description, date, checked, bankId, categoryId } = req.body;
     
     if (!amount || !description || !bankId) {
       return res.status(400).json({ 
@@ -651,7 +651,7 @@ app.post('/api/transactions', async (req, res) => {
         amount: parseFloat(amount),
         description,
         date: date ? new Date(date) : new Date(),
-        shared: shared || false,
+        checked: checked || false,
         bankId,
         categoryId: categoryId || null
       },
@@ -689,7 +689,7 @@ app.post('/api/transactions', async (req, res) => {
 app.put('/api/transactions/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, description, date, shared, categoryId, bankId } = req.body;
+    const { amount, description, date, checked, categoryId, bankId } = req.body;
     
     // Vérifier que la catégorie existe si elle est fournie
     if (categoryId && categoryId !== '') {
@@ -705,7 +705,7 @@ app.put('/api/transactions/:id', async (req, res) => {
         ...(amount !== undefined && { amount: parseFloat(amount) }),
         ...(description && { description }),
         ...(date && { date: new Date(date) }),
-        ...(shared !== undefined && { shared }),
+        ...(checked !== undefined && { checked }),
         ...(categoryId !== undefined && { categoryId: categoryId || null }),
         ...(bankId && { bankId })
       },

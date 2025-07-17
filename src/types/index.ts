@@ -49,7 +49,7 @@ export interface Transaction {
   amount: number;
   description: string;
   date: string;
-  shared: boolean;
+  checked: boolean;
   createdAt: string;
   updatedAt: string;
   bankId: string;

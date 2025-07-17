@@ -18,14 +18,14 @@ interface EditingTransaction {
   amount: number;
   description: string;
   date: string;
-  shared: boolean;
+  checked: boolean;
   categoryId: string;
   bankId?: string;
 }
 
 interface InlineEditCell {
   transactionId: string;
-  field: 'amount' | 'description' | 'date' | 'category' | 'bank' | 'shared';
+  field: 'amount' | 'description' | 'date' | 'category' | 'bank' | 'checked';
 }
 
 export default function Transactions() {
@@ -52,7 +52,7 @@ export default function Transactions() {
   
   const [filters, setFilters] = useState({
     categoryId: '',
-    shared: '',
+    checked: '',
     startDate: '',
     endDate: ''
   });
@@ -72,7 +72,7 @@ export default function Transactions() {
           amount: 0,
           description: '',
           date: new Date().toISOString().split('T')[0],
-          shared: false,
+          checked: false,
           categoryId: categories[0]?.id || '',
           bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
         });
@@ -125,7 +125,7 @@ export default function Transactions() {
   };
 
   // Inline editing functions
-  const handleInlineEdit = (transactionId: string, field: 'amount' | 'description' | 'date' | 'category' | 'bank' | 'shared') => {
+  const handleInlineEdit = (transactionId: string, field: 'amount' | 'description' | 'date' | 'category' | 'bank' | 'checked') => {
     const transaction = transactions.find(t => t.id === transactionId);
     if (!transaction) return;
     
@@ -146,8 +146,8 @@ export default function Transactions() {
       case 'bank':
         value = transaction.bankId;
         break;
-      case 'shared':
-        value = transaction.shared.toString();
+      case 'checked':
+        value = transaction.checked.toString();
         break;
     }
     
@@ -181,8 +181,8 @@ export default function Transactions() {
       case 'bank':
         updateData.bankId = inlineEditValue;
         break;
-      case 'shared':
-        updateData.shared = inlineEditValue === 'true';
+      case 'checked':
+        updateData.checked = inlineEditValue === 'true';
         break;
     }
     
@@ -266,7 +266,7 @@ export default function Transactions() {
           amount: 0,
           description: '',
           date: new Date().toISOString().split('T')[0],
-          shared: false,
+          checked: false,
           categoryId: categories[0]?.id || '',
           bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
         });
@@ -294,8 +294,8 @@ export default function Transactions() {
       }
     }
     
-    // Filtre par type partagé
-    if (filters.shared !== '' && transaction.shared.toString() !== filters.shared) {
+    // Filtre par statut pointé
+    if (filters.checked !== '' && transaction.checked.toString() !== filters.checked) {
       return false;
     }
     
@@ -394,10 +394,10 @@ export default function Transactions() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Partagé</label>
+            <label className="block text-sm font-medium text-gray-700">Pointé</label>
             <select
-              value={filters.shared}
-              onChange={(e) => setFilters({...filters, shared: e.target.value})}
+              value={filters.checked}
+              onChange={(e) => setFilters({...filters, checked: e.target.value})}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="">Tous</option>
@@ -429,7 +429,7 @@ export default function Transactions() {
                 Montant
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
-                Partagé
+                Pointé
               </th>
               <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                 Actions
@@ -498,11 +498,11 @@ export default function Transactions() {
                 <label className="flex items-center text-xs">
                   <input
                     type="checkbox"
-                    checked={editingTransaction?.shared || false}
-                    onChange={(e) => setEditingTransaction(prev => prev ? {...prev, shared: e.target.checked} : null)}
+                    checked={editingTransaction?.checked || false}
+                    onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
                     className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                   />
-                  <span className="ml-1 text-gray-700">Partagé</span>
+                  <span className="ml-1 text-gray-700">Pointé</span>
                 </label>
               </td>
               <td className="px-6 py-4">
@@ -526,7 +526,7 @@ export default function Transactions() {
                         amount: 0,
                         description: '',
                         date: new Date().toISOString().split('T')[0],
-                        shared: false,
+                        checked: false,
                         categoryId: categories[0]?.id || '',
                         bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
                       });
@@ -705,11 +705,11 @@ export default function Transactions() {
                   {editingId === transaction.id ? (
                     <input
                       type="checkbox"
-                      checked={editingTransaction?.shared || false}
-                      onChange={(e) => setEditingTransaction(prev => prev ? {...prev, shared: e.target.checked} : null)}
+                      checked={editingTransaction?.checked || false}
+                      onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'shared' ? (
+                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'checked' ? (
                     <select
                       value={inlineEditValue}
                       onChange={(e) => setInlineEditValue(e.target.value)}
@@ -723,13 +723,13 @@ export default function Transactions() {
                     </select>
                   ) : (
                     <span 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'shared')}
+                      onDoubleClick={() => handleInlineEdit(transaction.id, 'checked')}
                       className={`cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        transaction.shared ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        transaction.checked ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                       }`}
                       title="Double-cliquez pour éditer"
                     >
-                      {transaction.shared ? 'Oui' : 'Non'}
+                      {transaction.checked ? 'Oui' : 'Non'}
                     </span>
                   )}
                 </td>
