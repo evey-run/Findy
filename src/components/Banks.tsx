@@ -474,7 +474,7 @@ export default function Banks() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
                 {archivedBanks.slice().reverse().map((bank) => (
-                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75 flex flex-col h-full min-h-[300px]">
+                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75 flex flex-col h-full min-h-[240px]">
                     <div className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -542,16 +542,16 @@ export default function Banks() {
           <div key={bank.id}>
             {/* Si la banque est en cours d'édition, afficher le formulaire d'édition */}
             {editingBank?.id === bank.id ? (
-              <div className="bg-white shadow rounded-lg border-2 border-blue-300 flex flex-col h-full min-h-[400px]">
+              <div className="bg-white shadow rounded-lg border-2 border-blue-300 flex flex-col h-full min-h-[365px]">
                 <div className="flex flex-col h-full">
                   <form onSubmit={handleSubmit} className="flex flex-col h-full">
                     {/* Section principale - même structure qu'une vraie carte */}
-                    <div className="p-6 flex-1">
-                      <div className="flex items-center justify-between mb-4">
+                    <div className="p-4 flex-1">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center">
                           {/* Logo/Image ou nom court - cliquable pour choisir photo */}
                           <div 
-                            className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                            className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
                             onClick={() => document.getElementById('imageInput-edit')?.click()}
                             title="Cliquez pour choisir une image"
                           >
@@ -660,7 +660,7 @@ export default function Banks() {
                     </div>
                     
                     {/* Footer - même structure qu'une vraie carte */}
-                    <div className="bg-gray-50 px-6 py-3">
+                    <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
                           Modification
@@ -687,7 +687,7 @@ export default function Banks() {
               </div>
             ) : (
               /* Carte normale de banque */
-              <div className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full min-h-[400px]">
+              <div className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full min-h-[365px]">
                 <div 
                   className={`p-6 transition-colors flex-1 ${
                     bank.accountType === 'CURRENT' 
@@ -821,7 +821,7 @@ export default function Banks() {
         
         {/* Carte d'ajout de banque */}
         {selectedUser && (
-          <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[400px]">
+          <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[365px]">
             {!showAddForm ? (
               <div 
                 className="cursor-pointer flex flex-col items-center justify-center h-full p-6"
@@ -843,8 +843,8 @@ export default function Banks() {
               <div className="flex flex-col h-full">
                 <form onSubmit={handleSubmit} className="flex flex-col h-full">
                   {/* Section principale - même structure qu'une vraie carte */}
-                  <div className="p-6 flex-1">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="p-4 flex-1">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
                         {/* Logo/Image ou nom court - cliquable pour choisir photo */}
                         <div 
@@ -957,7 +957,7 @@ export default function Banks() {
                   </div>
                   
                   {/* Footer - même structure qu'une vraie carte */}
-                  <div className="bg-gray-50 px-6 py-3">
+                  <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-500">
                         Nouveau compte
@@ -998,7 +998,7 @@ export default function Banks() {
       
       {banks.length === 0 && selectedUser && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">                {/* Carte d'ajout de banque quand il n'y a pas de banques */}
-                <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[400px]">
+                <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[365px]">
                   {!showAddForm ? (
                     <div 
                       className="cursor-pointer flex flex-col items-center justify-center h-full p-6"
@@ -1020,12 +1020,12 @@ export default function Banks() {
                     <div className="flex flex-col h-full">
                       <form onSubmit={handleSubmit} className="flex flex-col h-full">
                         {/* Section principale - même structure qu'une vraie carte */}
-                        <div className="p-6 flex-1">
-                          <div className="flex items-center justify-between mb-4">
+                        <div className="p-4 flex-1">
+                          <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center">
                               {/* Logo/Image ou nom court - cliquable pour choisir photo */}
                               <div 
-                                className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                                className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
                                 onClick={() => document.getElementById('imageInput-3')?.click()}
                                 title="Cliquez pour choisir une image"
                               >
@@ -1134,7 +1134,7 @@ export default function Banks() {
                         </div>
                         
                         {/* Footer - même structure qu'une vraie carte */}
-                        <div className="bg-gray-50 px-6 py-3">
+                        <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
                           <div className="flex justify-between items-center">
                             <div className="text-sm text-gray-500">
                               Première banque
