@@ -343,7 +343,7 @@ export default function Recurrences() {
                 </div>
               </td>
               <td className="px-6 py-4">
-                <div className="flex space-x-1">
+                <div className="flex justify-center">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -354,25 +354,6 @@ export default function Recurrences() {
                     title="Sauvegarder"
                   >
                     ✓
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingRecurrence({
-                        id: '',
-                        amount: 0,
-                        frequency: 'MONTHLY',
-                        nextDue: new Date().toISOString().split('T')[0],
-                        description: '',
-                        active: true,
-                        bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
-                        categoryId: categories[0]?.id || ''
-                      });
-                    }}
-                    className="px-2 py-1 text-xs border border-gray-300 rounded text-gray-700 bg-white hover:bg-gray-50"
-                    title="Effacer"
-                  >
-                    🗑️
                   </button>
                 </div>
               </td>
