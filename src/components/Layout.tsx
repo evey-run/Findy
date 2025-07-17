@@ -19,7 +19,7 @@ const navigation = [
   { name: 'Tableau de bord', href: '/dashboard', icon: HomeIcon },
   { name: 'Transactions', href: '/transactions', icon: CreditCardIcon },
   { name: 'Catégories', href: '/categories', icon: TagIcon },
-  { name: 'Budgets', href: '/budgets', icon: ChartBarIcon },
+  { name: 'Objectifs', href: '/budgets', icon: ChartBarIcon },
   { name: 'Récurrences', href: '/recurrences', icon: ArrowPathIcon },
   { name: 'Banques', href: '/banks', icon: BuildingLibraryIcon },
   { name: 'Utilisateurs', href: '/users', icon: UserIcon },

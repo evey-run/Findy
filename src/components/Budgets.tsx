@@ -30,7 +30,8 @@ export default function Budgets() {
   
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: ObjectiveProgress }>({});
-  const [showModal, setShowModal] = useState(false);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -86,7 +87,60 @@ export default function Budgets() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleEdit = (objective: Objective) => {
+    setEditingId(objective.id);
+    setEditingObjective(objective);
+    setFormData({
+      title: objective.title,
+      description: objective.description || '',
+      targetAmount: objective.targetAmount.toString(),
+      deadline: objective.deadline ? objective.deadline.split('T')[0] : ''
+    });
+  };
+
+  const handleSave = async () => {
+    if (!editingObjective || !formData.title || !formData.targetAmount) {
+      toast.error('Veuillez remplir tous les champs requis');
+      return;
+    }
+
+    try {
+      const objectiveData = {
+        ...formData,
+        targetAmount: parseFloat(formData.targetAmount),
+        deadline: formData.deadline || null
+      };
+
+      const response = await fetch(`/api/objectives/${editingObjective.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(objectiveData)
+      });
+
+      if (response.ok) {
+        const updatedObjective = await response.json();
+        setObjectives(prev => prev.map(obj => 
+          obj.id === editingObjective.id ? updatedObjective : obj
+        ));
+        toast.success('Objectif mis à jour avec succès');
+        handleCancel();
+      } else {
+        throw new Error('Erreur lors de la mise à jour');
+      }
+    } catch (error) {
+      console.error('Error updating objective:', error);
+      toast.error('Erreur lors de la sauvegarde de l\'objectif');
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditingObjective(null);
+    setShowAddForm(false);
+    resetForm();
+  };
+
+  const handleAddObjective = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.title || !formData.targetAmount) {
@@ -101,55 +155,24 @@ export default function Budgets() {
         deadline: formData.deadline || null
       };
 
-      if (editingObjective) {
-        const response = await fetch(`/api/objectives/${editingObjective.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(objectiveData)
-        });
+      const response = await fetch('/api/objectives', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(objectiveData)
+      });
 
-        if (response.ok) {
-          const updatedObjective = await response.json();
-          setObjectives(prev => prev.map(obj => 
-            obj.id === editingObjective.id ? updatedObjective : obj
-          ));
-          toast.success('Objectif mis à jour avec succès');
-        } else {
-          throw new Error('Erreur lors de la mise à jour');
-        }
+      if (response.ok) {
+        const newObjective = await response.json();
+        setObjectives(prev => [newObjective, ...prev]);
+        toast.success('Objectif créé avec succès');
+        handleCancel();
       } else {
-        const response = await fetch('/api/objectives', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(objectiveData)
-        });
-
-        if (response.ok) {
-          const newObjective = await response.json();
-          setObjectives(prev => [newObjective, ...prev]);
-          toast.success('Objectif créé avec succès');
-        } else {
-          throw new Error('Erreur lors de la création');
-        }
+        throw new Error('Erreur lors de la création');
       }
-
-      resetForm();
-      setShowModal(false);
     } catch (error) {
-      console.error('Error saving objective:', error);
-      toast.error('Erreur lors de la sauvegarde de l\'objectif');
+      console.error('Error creating objective:', error);
+      toast.error('Erreur lors de la création de l\'objectif');
     }
-  };
-
-  const handleEdit = (objective: Objective) => {
-    setEditingObjective(objective);
-    setFormData({
-      title: objective.title,
-      description: objective.description || '',
-      targetAmount: objective.targetAmount.toString(),
-      deadline: objective.deadline ? objective.deadline.split('T')[0] : ''
-    });
-    setShowModal(true);
   };
 
   const handleDelete = async (objectiveId: string) => {
@@ -232,15 +255,6 @@ export default function Budgets() {
             Créez et suivez vos objectifs d'épargne. Ajoutez des transactions "Économie [NomObjectif]" pour les alimenter automatiquement.
           </p>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <PlusIcon className="h-4 w-4 mr-2" />
-            Nouvel Objectif
-          </button>
-        </div>
       </div>
 
       {/* Statistiques */}
@@ -319,7 +333,7 @@ export default function Budgets() {
       </div>
 
       {/* Liste des objectifs */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
         {objectives.map(objective => {
           const progress = objectiveProgress[objective.id];
           const percentage = progress ? progress.percentage : 0;
@@ -328,123 +342,276 @@ export default function Budgets() {
           const overdueClass = deadline && isOverdue(deadline) && !isCompleted ? 'ring-2 ring-red-500' : '';
           
           return (
-            <div key={objective.id} className={`bg-white rounded-lg shadow-lg p-6 ${overdueClass}`}>
-              {/* Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                  {getStatusIcon(percentage, isCompleted)}
-                  <div className="ml-3">
-                    <h3 className="text-lg font-medium text-gray-900">
-                      {objective.title}
-                    </h3>
-                    {objective.description && (
-                      <p className="text-sm text-gray-500">
-                        {objective.description}
-                      </p>
+            <div key={objective.id} className={`bg-white rounded-lg shadow p-6 flex flex-col h-full min-h-[280px] ${overdueClass}`}>
+              {editingId === objective.id ? (
+                <div className="flex flex-col h-[280px]">
+                  <form id="edit-objective-form" onSubmit={handleSave} className="space-y-2">
+                    <h3 className="text-md font-medium text-gray-900">Modifier l'objectif</h3>
+                    
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        value={formData.title}
+                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                        placeholder="Titre"
+                        required
+                      />
+                      
+                      <textarea
+                        value={formData.description}
+                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                        rows={2}
+                        placeholder="Description..."
+                      />
+                      
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.targetAmount}
+                        onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                        placeholder="Montant cible (€)"
+                        required
+                      />
+                      
+                      <input
+                        type="date"
+                        value={formData.deadline}
+                        onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                      />
+
+                      <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+                        <p className="text-xs text-blue-800">
+                          <strong>💡 Astuce:</strong> Créez des transactions "Économie {formData.title || '[Titre]'}" pour alimenter cet objectif.
+                        </p>
+                      </div>
+                    </div>
+                  </form>
+
+                  <div className="flex space-x-2 mt-auto">
+                    <button
+                      type="button"
+                      onClick={handleCancel}
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="submit"
+                      form="edit-objective-form"
+                      className="flex-1 px-2 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+                    >
+                      Sauvegarder
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col h-full">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      {getStatusIcon(percentage, isCompleted)}
+                      <div className="ml-3">
+                        <h3 className="text-lg font-medium text-gray-900">
+                          {objective.title}
+                        </h3>
+                        {objective.description && (
+                          <p className="text-sm text-gray-500">
+                            {objective.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => handleEdit(objective)}
+                        className="text-gray-400 hover:text-indigo-600"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(objective.id)}
+                        className="text-gray-400 hover:text-red-600"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Progression */}
+                  <div className="mb-4 flex-1">
+                    <div className="flex justify-between text-sm text-gray-600 mb-2">
+                      <span>Économisé</span>
+                      <span>Objectif</span>
+                    </div>
+                    <div className="flex justify-between text-lg font-semibold mb-2">
+                      <span className="text-green-600">
+                        {progress ? progress.totalSaved.toLocaleString('fr-FR') : '0'} €
+                      </span>
+                      <span className="text-gray-900">
+                        {objective.targetAmount.toLocaleString('fr-FR')} €
+                      </span>
+                    </div>
+                    
+                    {/* Barre de progression */}
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div 
+                        className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(percentage, isCompleted)}`}
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                    </div>
+                    
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>{percentage.toFixed(1)}%</span>
+                      <span>
+                        {progress ? 
+                          (progress.remaining > 0 ? 
+                            `${progress.remaining.toLocaleString('fr-FR')} € restant` : 
+                            'Objectif atteint ! 🎉'
+                          ) : 
+                          `${objective.targetAmount.toLocaleString('fr-FR')} € restant`
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Détails */}
+                  <div className="border-t pt-3 mt-auto">
+                    {deadline && (
+                      <div className={`flex items-center text-sm mb-2 ${
+                        isOverdue(deadline) && !isCompleted ? 'text-red-600' : 'text-gray-500'
+                      }`}>
+                        <ClockIcon className="h-4 w-4 mr-2" />
+                        <span>
+                          Échéance: {new Date(deadline).toLocaleDateString('fr-FR')}
+                          {isOverdue(deadline) && !isCompleted && ' (en retard)'}
+                        </span>
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center text-sm text-gray-500 mb-2">
+                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      <span>
+                        Créé le {new Date(objective.createdAt).toLocaleDateString('fr-FR')}
+                      </span>
+                    </div>
+
+                    {progress && progress.transactions.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Dernières contributions:
+                        </p>
+                        <div className="space-y-1">
+                          {progress.transactions.slice(0, 3).map((transaction, index) => (
+                            <div key={index} className="flex justify-between text-xs">
+                              <span className="text-gray-600 truncate">
+                                {transaction.description}
+                              </span>
+                              <span className="text-green-600 font-medium">
+                                +{transaction.amount.toLocaleString('fr-FR')} €
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
-                <div className="flex space-x-1">
-                  <button
-                    onClick={() => handleEdit(objective)}
-                    className="text-gray-400 hover:text-indigo-600"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(objective.id)}
-                    className="text-gray-400 hover:text-red-600"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Progression */}
-              <div className="mb-4">
-                <div className="flex justify-between text-sm text-gray-600 mb-2">
-                  <span>Économisé</span>
-                  <span>Objectif</span>
-                </div>
-                <div className="flex justify-between text-lg font-semibold mb-2">
-                  <span className="text-green-600">
-                    {progress ? progress.totalSaved.toLocaleString('fr-FR') : '0'} €
-                  </span>
-                  <span className="text-gray-900">
-                    {objective.targetAmount.toLocaleString('fr-FR')} €
-                  </span>
-                </div>
-                
-                {/* Barre de progression */}
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div 
-                    className={`h-3 rounded-full transition-all duration-300 ${getProgressColor(percentage, isCompleted)}`}
-                    style={{ width: `${Math.min(percentage, 100)}%` }}
-                  />
-                </div>
-                
-                <div className="flex justify-between text-xs text-gray-500 mt-1">
-                  <span>{percentage.toFixed(1)}%</span>
-                  <span>
-                    {progress ? 
-                      (progress.remaining > 0 ? 
-                        `${progress.remaining.toLocaleString('fr-FR')} € restant` : 
-                        'Objectif atteint ! 🎉'
-                      ) : 
-                      `${objective.targetAmount.toLocaleString('fr-FR')} € restant`
-                    }
-                  </span>
-                </div>
-              </div>
-
-              {/* Détails */}
-              <div className="border-t pt-4">
-                {deadline && (
-                  <div className={`flex items-center text-sm mb-2 ${
-                    isOverdue(deadline) && !isCompleted ? 'text-red-600' : 'text-gray-500'
-                  }`}>
-                    <ClockIcon className="h-4 w-4 mr-2" />
-                    <span>
-                      Échéance: {new Date(deadline).toLocaleDateString('fr-FR')}
-                      {isOverdue(deadline) && !isCompleted && ' (en retard)'}
-                    </span>
-                  </div>
-                )}
-                
-                <div className="flex items-center text-sm text-gray-500">
-                  <CalendarIcon className="h-4 w-4 mr-2" />
-                  <span>
-                    Créé le {new Date(objective.createdAt).toLocaleDateString('fr-FR')}
-                  </span>
-                </div>
-
-                {progress && progress.transactions.length > 0 && (
-                  <div className="mt-3">
-                    <p className="text-xs text-gray-500 mb-1">
-                      Dernières contributions:
-                    </p>
-                    <div className="space-y-1">
-                      {progress.transactions.slice(0, 3).map((transaction, index) => (
-                        <div key={index} className="flex justify-between text-xs">
-                          <span className="text-gray-600 truncate">
-                            {transaction.description}
-                          </span>
-                          <span className="text-green-600 font-medium">
-                            +{transaction.amount.toLocaleString('fr-FR')} €
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           );
         })}
+
+        {/* Add Objective Form Card */}
+        {showAddForm ? (
+          <div className="bg-white shadow rounded-lg p-6 flex flex-col h-full min-h-[280px]">
+            <form id="add-objective-form" onSubmit={handleAddObjective} className="flex flex-col h-full space-y-2">
+              <h3 className="text-md font-medium text-gray-900">Nouvel objectif</h3>
+              
+              <div className="space-y-2 flex-1">
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                  placeholder="Titre"
+                  required
+                />
+                
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                  rows={2}
+                  placeholder="Description..."
+                />
+                
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.targetAmount}
+                  onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                  placeholder="Montant cible (€)"
+                  required
+                />
+                
+                <input
+                  type="date"
+                  value={formData.deadline}
+                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                />
+
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
+                  <p className="text-xs text-blue-800">
+                    <strong>💡 Astuce:</strong> Créez des transactions "Économie {formData.title || '[Titre]'}" pour alimenter cet objectif.
+                  </p>
+                </div>
+              </div>
+            </form>
+
+            <div className="flex space-x-2 mt-auto">
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                form="add-objective-form"
+                className="flex-1 px-2 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+              >
+                Créer
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            onClick={() => {
+              setShowAddForm(true);
+              setFormData({
+                title: '',
+                description: '',
+                targetAmount: '',
+                deadline: ''
+              });
+            }}
+            className="bg-white shadow rounded-lg p-6 flex flex-col items-center justify-center h-full min-h-[280px] cursor-pointer hover:bg-gray-50 transition-colors border-2 border-dashed border-gray-300 hover:border-gray-400"
+          >
+            <PlusIcon className="h-12 w-12 text-gray-400 mb-2" />
+            <p className="text-gray-500 text-sm font-medium">Ajouter un objectif</p>
+          </div>
+        )}
       </div>
 
       {/* Message si aucun objectif */}
-      {objectives.length === 0 && (
+      {objectives.length === 0 && !showAddForm && (
         <div className="text-center py-12">
           <TrophyIcon className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-2 text-sm font-medium text-gray-900">Aucun objectif</h3>
@@ -453,106 +620,20 @@ export default function Budgets() {
           </p>
           <div className="mt-6">
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => {
+                setShowAddForm(true);
+                setFormData({
+                  title: '',
+                  description: '',
+                  targetAmount: '',
+                  deadline: ''
+                });
+              }}
               className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <PlusIcon className="h-4 w-4 mr-2" />
               Nouvel Objectif
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {editingObjective ? 'Modifier l\'Objectif' : 'Nouvel Objectif'}
-              </h3>
-              
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Titre de l'objectif *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="ex: Moto, Vacances, Ordinateur..."
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    rows={2}
-                    placeholder="Description de votre objectif..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Montant cible *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={formData.targetAmount}
-                    onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date limite (optionnel)
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.deadline}
-                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  />
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                  <p className="text-sm text-blue-800">
-                    <strong>💡 Astuce:</strong> Pour alimenter cet objectif, créez des transactions avec la description "Économie {formData.title || '[Titre]'}" dans vos transactions.
-                  </p>
-                </div>
-
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                      resetForm();
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    {editingObjective ? 'Mettre à jour' : 'Créer'}
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         </div>
       )}
