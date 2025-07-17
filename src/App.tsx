@@ -18,7 +18,8 @@ function App() {
     loadTransactions, 
     loadBudgets, 
     loadRecurrences, 
-    loadDashboardOverview
+    loadDashboardOverview,
+    processRecurrences
   } = useAppStore();
 
   useEffect(() => {
@@ -30,10 +31,17 @@ function App() {
       await loadBudgets();
       await loadRecurrences();
       await loadDashboardOverview();
+      
+      // Traiter automatiquement les récurrences dues aujourd'hui
+      try {
+        await processRecurrences();
+      } catch (error) {
+        console.error('Failed to process recurrences on startup:', error);
+      }
     };
 
     initializeApp();
-  }, [loadUsers, loadCategories, loadTransactions, loadBudgets, loadRecurrences, loadDashboardOverview]);
+  }, [loadUsers, loadCategories, loadTransactions, loadBudgets, loadRecurrences, loadDashboardOverview, processRecurrences]);
 
   return (
     <Router>

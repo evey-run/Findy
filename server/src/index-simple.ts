@@ -760,40 +760,16 @@ app.get('/api/budgets', async (req, res) => {
 
 app.get('/api/recurrences', async (req, res) => {
   try {
+    const { bankId, categoryId, active, shared } = req.query;
+    
+    const where: any = {};
+    if (bankId) where.bankId = bankId;
+    if (categoryId) where.categoryId = categoryId;
+    if (active !== undefined) where.active = active === 'true';
+    if (shared !== undefined) where.shared = shared === 'true';
+    
     const recurrences = await prisma.recurrence.findMany({
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            color: true,
-            icon: true
-          }
-        }
-      }
-    });
-    res.json(recurrences);
-  } catch (error) {
-    console.error('Error fetching recurrences:', error);
-    res.status(500).json({ error: 'Failed to fetch recurrences' });
-  }
-});
-
-app.get('/api/dashboard', async (req, res) => {
-  try {
-    // Données mockup pour le dashboard
-    const summary = {
-      totalIncome: 2500.00,
-      totalExpenses: 1800.50,
-      balance: 699.50,
-      transactionCount: 15,
-      totalBanks: 3,
-      totalCategories: 10
-    };
-
-    const recentTransactions = await prisma.transaction.findMany({
-      take: 5,
+      where,
       include: {
         bank: {
           select: {
@@ -815,160 +791,133 @@ app.get('/api/dashboard', async (req, res) => {
         }
       },
       orderBy: {
-        date: 'desc'
+        nextDue: 'asc'
       }
     });
-
-    const expensesByCategory = [];
-    const upcomingRecurrences = [];
-
-    res.json({
-      summary,
-      recentTransactions,
-      expensesByCategory,
-      upcomingRecurrences
-    });
+    res.json(recurrences);
   } catch (error) {
-    console.error('Error fetching dashboard overview:', error);
-    res.status(500).json({ error: 'Failed to fetch dashboard overview' });
+    console.error('Error fetching recurrences:', error);
+    res.status(500).json({ error: 'Failed to fetch recurrences' });
   }
 });
 
-// POST - Partager une banque avec un utilisateur
-app.post('/api/banks/:id/share', async (req, res) => {
+// POST /api/recurrences - Créer une nouvelle récurrence
+app.post('/api/recurrences', async (req, res) => {
   try {
-    const { id } = req.params;
-    const { userId } = req.body;
+    const { amount, frequency, nextDue, description, shared, bankId, categoryId, active } = req.body;
     
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-    
-    // Check if user already has access to this bank
-    const existingAccess = await prisma.userBank.findUnique({
-      where: {
-        userId_bankId: {
-          userId,
-          bankId: id
-        }
-      }
-    });
-    
-    if (existingAccess) {
-      return res.status(400).json({ error: 'User already has access to this bank' });
-    }
-    
-    // Add shared access
-    await prisma.userBank.create({
-      data: {
-        userId,
-        bankId: id,
-        role: 'SHARED'
-      }
-    });
-    
-    // Update bank to mark as shared
-    await prisma.bank.update({
-      where: { id },
-      data: { isShared: true }
-    });
-    
-    res.status(201).json({ message: 'Bank shared successfully' });
-  } catch (error) {
-    console.error('Error sharing bank:', error);
-    res.status(500).json({ error: 'Failed to share bank' });
-  }
-});
-
-// DELETE - Retirer l'accès partagé
-app.delete('/api/banks/:id/share/:userId', async (req, res) => {
-  try {
-    const { id, userId } = req.params;
-    
-    await prisma.userBank.delete({
-      where: {
-        userId_bankId: {
-          userId,
-          bankId: id
-        }
-      }
-    });
-    
-    // Check if bank still has any shared users
-    const sharedUsers = await prisma.userBank.findMany({
-      where: {
-        bankId: id,
-        role: 'SHARED'
-      }
-    });
-    
-    // Update bank shared status
-    if (sharedUsers.length === 0) {
-      await prisma.bank.update({
-        where: { id },
-        data: { isShared: false }
+    if (!amount || !nextDue || !description || !categoryId) {
+      return res.status(400).json({ 
+        error: 'Amount, nextDue, description, and categoryId are required' 
       });
     }
     
-    res.status(204).send();
+    const recurrence = await prisma.recurrence.create({
+      data: {
+        amount: parseFloat(amount),
+        frequency: frequency || 'MONTHLY',
+        nextDue: new Date(nextDue),
+        description,
+        shared: shared || false,
+        active: active !== false,
+        bankId: bankId || null,
+        categoryId
+      },
+      include: {
+        bank: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+            color: true,
+            balance: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            color: true,
+            icon: true
+          }
+        }
+      }
+    });
+    
+    res.status(201).json(recurrence);
   } catch (error) {
-    console.error('Error removing shared access:', error);
-    res.status(500).json({ error: 'Failed to remove shared access' });
+    console.error('Error creating recurrence:', error);
+    res.status(500).json({ error: 'Failed to create recurrence' });
   }
 });
 
-// DELETE - Supprimer définitivement une banque archivée et toutes ses transactions
-app.delete('/api/banks/:id/permanent', async (req, res) => {
+// PUT /api/recurrences/:id - Mettre à jour une récurrence
+app.put('/api/recurrences/:id', async (req, res) => {
   try {
-    const bankId = req.params.id;
+    const { id } = req.params;
+    const { amount, frequency, nextDue, description, shared, active, bankId, categoryId } = req.body;
     
-    // Vérifier que la banque est bien archivée
-    const bank = await prisma.bank.findUnique({
-      where: { id: bankId },
-      select: { archived: true, name: true }
+    const recurrence = await prisma.recurrence.update({
+      where: { id },
+      data: {
+        ...(amount && { amount: parseFloat(amount) }),
+        ...(frequency && { frequency }),
+        ...(nextDue && { nextDue: new Date(nextDue) }),
+        ...(description && { description }),
+        ...(shared !== undefined && { shared }),
+        ...(active !== undefined && { active }),
+        ...(bankId !== undefined && { bankId }),
+        ...(categoryId && { categoryId })
+      },
+      include: {
+        bank: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+            color: true,
+            balance: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            color: true,
+            icon: true
+          }
+        }
+      }
     });
     
-    if (!bank) {
-      return res.status(404).json({ error: 'Bank not found' });
+    res.json(recurrence);
+  } catch (error: any) {
+    console.error('Error updating recurrence:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Recurrence not found' });
     }
+    res.status(500).json({ error: 'Failed to update recurrence' });
+  }
+});
+
+// DELETE /api/recurrences/:id - Supprimer une récurrence
+app.delete('/api/recurrences/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
     
-    if (!bank.archived) {
-      return res.status(400).json({ error: 'Only archived banks can be permanently deleted' });
+    await prisma.recurrence.delete({
+      where: { id }
+    });
+    
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Error deleting recurrence:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Recurrence not found' });
     }
-    
-    // Compter les transactions qui seront supprimées
-    const transactionCount = await prisma.transaction.count({
-      where: { bankId }
-    });
-    
-    // Supprimer toutes les transactions associées
-    await prisma.transaction.deleteMany({
-      where: { bankId }
-    });
-    
-    // Supprimer tous les budgets associés
-    await prisma.budget.deleteMany({
-      where: { bankId }
-    });
-    
-    // Supprimer toutes les récurrences associées
-    await prisma.recurrence.deleteMany({
-      where: { bankId }
-    });
-    
-    // Supprimer la banque elle-même
-    await prisma.bank.delete({
-      where: { id: bankId }
-    });
-    
-    res.json({ 
-      message: 'Bank and all associated data permanently deleted',
-      deletedTransactions: transactionCount,
-      bankName: bank.name
-    });
-  } catch (error) {
-    console.error('Error permanently deleting bank:', error);
-    res.status(500).json({ error: 'Failed to permanently delete bank' });
+    res.status(500).json({ error: 'Failed to delete recurrence' });
   }
 });
 
@@ -1026,6 +975,128 @@ app.put('/api/users/:id', uploadAvatar.single('avatar'), async (req, res) => {
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// POST /api/recurrences/process - Traiter les récurrences dues
+app.post('/api/recurrences/process', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // Fin de la journée pour inclure toutes les heures
+    
+    // Trouver toutes les récurrences actives dues aujourd'hui ou avant
+    const dueRecurrences = await prisma.recurrence.findMany({
+      where: {
+        active: true,
+        nextDue: {
+          lte: today
+        }
+      },
+      include: {
+        bank: true,
+        category: true
+      }
+    });
+    
+    let processedCount = 0;
+    const results: any[] = [];
+    
+    for (const recurrence of dueRecurrences) {
+      try {
+        // Vérifier que la récurrence a une banque associée
+        if (!recurrence.bankId) {
+          console.warn(`Skipping recurrence ${recurrence.id} - no bank associated`);
+          continue;
+        }
+        
+        // Créer une transaction pour cette récurrence
+        const transaction = await prisma.transaction.create({
+          data: {
+            amount: recurrence.amount,
+            description: `${recurrence.description} (récurrence)`,
+            date: recurrence.nextDue,
+            shared: recurrence.shared,
+            bankId: recurrence.bankId,
+            categoryId: recurrence.categoryId
+          },
+          include: {
+            bank: {
+              select: {
+                id: true,
+                name: true,
+                shortName: true,
+                color: true,
+                balance: true
+              }
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                color: true,
+                icon: true
+              }
+            }
+          }
+        });
+        
+        // Calculer la prochaine échéance
+        const nextDue = new Date(recurrence.nextDue);
+        switch (recurrence.frequency) {
+          case 'DAILY':
+            nextDue.setDate(nextDue.getDate() + 1);
+            break;
+          case 'WEEKLY':
+            nextDue.setDate(nextDue.getDate() + 7);
+            break;
+          case 'MONTHLY':
+            nextDue.setMonth(nextDue.getMonth() + 1);
+            break;
+          case 'QUARTERLY':
+            nextDue.setMonth(nextDue.getMonth() + 3);
+            break;
+          case 'YEARLY':
+            nextDue.setFullYear(nextDue.getFullYear() + 1);
+            break;
+        }
+        
+        // Mettre à jour la récurrence avec la prochaine échéance
+        await prisma.recurrence.update({
+          where: { id: recurrence.id },
+          data: { nextDue }
+        });
+        
+        results.push({
+          recurrenceId: recurrence.id,
+          transactionId: transaction.id,
+          description: recurrence.description,
+          amount: recurrence.amount,
+          nextDue: nextDue.toISOString(),
+          transaction
+        });
+        
+        processedCount++;
+        
+      } catch (error) {
+        console.error(`Error processing recurrence ${recurrence.id}:`, error);
+        results.push({
+          recurrenceId: recurrence.id,
+          error: 'Failed to process recurrence',
+          description: recurrence.description
+        });
+      }
+    }
+    
+    res.json({
+      message: `Processed ${processedCount} recurrences`,
+      processedCount,
+      results
+    });
+    
+  } catch (error) {
+    console.error('Error processing recurrences:', error);
+    res.status(500).json({ error: 'Failed to process recurrences' });
   }
 });
 

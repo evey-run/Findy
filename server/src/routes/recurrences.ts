@@ -7,10 +7,10 @@ const prisma = new PrismaClient();
 // GET /api/recurrences - Récupérer toutes les récurrences
 router.get('/', async (req, res) => {
   try {
-    const { userId, categoryId, active, shared } = req.query;
+    const { bankId, categoryId, active, shared } = req.query;
     
     const where: any = {};
-    if (userId) where.userId = userId;
+    if (bankId) where.bankId = bankId;
     if (categoryId) where.categoryId = categoryId;
     if (active !== undefined) where.active = active === 'true';
     if (shared !== undefined) where.shared = shared === 'true';
@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
     const recurrences = await prisma.recurrence.findMany({
       where,
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
@@ -50,7 +50,7 @@ router.get('/', async (req, res) => {
 // POST /api/recurrences - Créer une nouvelle récurrence
 router.post('/', async (req, res) => {
   try {
-    const { amount, frequency, nextDue, description, shared, userId, categoryId, active } = req.body;
+    const { amount, frequency, nextDue, description, shared, bankId, categoryId, active } = req.body;
     
     if (!amount || !nextDue || !description || !categoryId) {
       return res.status(400).json({ 
@@ -66,11 +66,11 @@ router.post('/', async (req, res) => {
         description,
         shared: shared || false,
         active: active !== false,
-        userId: userId || null,
+        bankId: bankId || null,
         categoryId
       },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
@@ -113,7 +113,7 @@ router.put('/:id', async (req, res) => {
         ...(active !== undefined && { active })
       },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
@@ -186,7 +186,7 @@ router.post('/:id/execute', async (req, res) => {
         description: `${recurrence.description} (Récurrence automatique)`,
         date: new Date(),
         shared: recurrence.shared,
-        userId: recurrence.userId!,
+        bankId: recurrence.bankId!,
         categoryId: recurrence.categoryId
       }
     });
@@ -216,7 +216,7 @@ router.post('/:id/execute', async (req, res) => {
       where: { id },
       data: { nextDue },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
@@ -242,6 +242,130 @@ router.post('/:id/execute', async (req, res) => {
   } catch (error) {
     console.error('Error executing recurrence:', error);
     res.status(500).json({ error: 'Failed to execute recurrence' });
+  }
+});
+
+// POST /api/recurrences/process - Traiter automatiquement les récurrences dues aujourd'hui
+router.post('/process', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+    
+    // Récupérer toutes les récurrences dues aujourd'hui
+    const dueRecurrences = await prisma.recurrence.findMany({
+      where: {
+        active: true,
+        nextDue: {
+          gte: today,
+          lt: tomorrow
+        }
+      },
+      include: {
+        category: true,
+        bank: {
+          select: {
+            id: true,
+            name: true,
+            color: true
+          }
+        }
+      }
+    });
+    
+    const results: any[] = [];
+    
+    for (const recurrence of dueRecurrences) {
+      try {
+        // Vérifier que la récurrence a une banque associée
+        if (!recurrence.bankId) {
+          console.warn(`Skipping recurrence ${recurrence.id} - no bank associated`);
+          continue;
+        }
+        
+        // Créer la transaction
+        const transaction = await prisma.transaction.create({
+          data: {
+            amount: recurrence.amount,
+            description: `${recurrence.description} (Récurrence automatique)`,
+            date: new Date(),
+            shared: recurrence.shared,
+            bankId: recurrence.bankId,
+            categoryId: recurrence.categoryId
+          }
+        });
+        
+        // Calculer la prochaine échéance
+        const nextDue = new Date(recurrence.nextDue);
+        switch (recurrence.frequency) {
+          case 'DAILY':
+            nextDue.setDate(nextDue.getDate() + 1);
+            break;
+          case 'WEEKLY':
+            nextDue.setDate(nextDue.getDate() + 7);
+            break;
+          case 'MONTHLY':
+            nextDue.setMonth(nextDue.getMonth() + 1);
+            break;
+          case 'QUARTERLY':
+            nextDue.setMonth(nextDue.getMonth() + 3);
+            break;
+          case 'YEARLY':
+            nextDue.setFullYear(nextDue.getFullYear() + 1);
+            break;
+        }
+        
+        // Mettre à jour la récurrence
+        const updatedRecurrence = await prisma.recurrence.update({
+          where: { id: recurrence.id },
+          data: { nextDue },
+          include: {
+            bank: {
+              select: {
+                id: true,
+                name: true,
+                color: true
+              }
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                color: true,
+                icon: true
+              }
+            }
+          }
+        });
+        
+        results.push({
+          recurrence: updatedRecurrence,
+          transaction,
+          success: true
+        });
+      } catch (error) {
+        console.error(`Error processing recurrence ${recurrence.id}:`, error);
+        results.push({
+          recurrence,
+          transaction: null,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
+        });
+      }
+    }
+    
+    res.json({
+      processed: results.length,
+      success: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results
+    });
+  } catch (error) {
+    console.error('Error processing recurrences:', error);
+    res.status(500).json({ error: 'Failed to process recurrences' });
   }
 });
 

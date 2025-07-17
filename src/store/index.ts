@@ -54,6 +54,7 @@ interface AppState {
   updateRecurrence: (id: string, recurrence: Partial<Recurrence>) => void;
   removeRecurrence: (id: string) => void;
   loadRecurrences: () => Promise<void>;
+  processRecurrences: () => Promise<void>;
   
   // Dashboard
   dashboardData: DashboardOverview | null;
@@ -260,6 +261,37 @@ export const useAppStore = create<AppState>()(
           set({ recurrences });
         } catch (error) {
           console.error('Failed to load recurrences:', error);
+        }
+      },
+      processRecurrences: async () => {
+        try {
+          const response = await fetch('/api/recurrences/process', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to process recurrences');
+          }
+          
+          const result = await response.json();
+          console.log('Recurrences processed:', result);
+          
+          // Recharger les récurrences et transactions si des changements ont été effectués
+          if (result.success > 0) {
+            await Promise.all([
+              get().loadRecurrences(),
+              get().loadTransactions(),
+              get().loadDashboardOverview()
+            ]);
+          }
+          
+          return result;
+        } catch (error) {
+          console.error('Failed to process recurrences:', error);
+          throw error;
         }
       },
       
