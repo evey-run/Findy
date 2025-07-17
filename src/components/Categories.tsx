@@ -271,6 +271,7 @@ export default function Categories() {
   const handleCancel = () => {
     setEditingId(null);
     setEditingCategory(null);
+    setShowAddForm(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -386,183 +387,17 @@ export default function Categories() {
             Catégories & Budgets
           </h2>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
-          <button
-            onClick={() => {
-              setShowAddForm(true);
-              setEditingCategory({
-                id: '',
-                name: '',
-                type: 'EXPENSE',
-                color: predefinedColors[0],
-                icon: '',
-                budget: {
-                  amount: '',
-                  period: 'MONTHLY',
-                  startDate: new Date().toISOString().split('T')[0]
-                }
-              });
-            }}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            Ajouter une catégorie
-          </button>
-        </div>
       </div>
 
-      {/* Add Category Form */}
-      {showAddForm && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Ajouter une catégorie</h3>
-          <form onSubmit={handleAddCategory} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Nom</label>
-                <input
-                  type="text"
-                  value={editingCategory?.name || ''}
-                  onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Type</label>
-                <select
-                  value={editingCategory?.type || ''}
-                  onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                >
-                  {categoryTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Icône (optionnel)</label>
-                <input
-                  type="text"
-                  value={editingCategory?.icon || ''}
-                  onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="🛒"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Couleur</label>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {predefinedColors.map(color => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
-                      className={`w-8 h-8 rounded-full border-2 ${
-                        editingCategory?.color === color ? 'border-gray-900' : 'border-gray-300'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Budget section - Only for EXPENSE categories */}
-            {editingCategory?.type === 'EXPENSE' && (
-              <div className="border-t pt-4 mt-4">
-                <h4 className="text-md font-medium text-gray-900 mb-3">Budget (optionnel)</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Montant (€)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editingCategory?.budget?.amount || ''}
-                      onChange={(e) => setEditingCategory(prev => prev ? {
-                        ...prev,
-                        budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
-                          amount: e.target.value,
-                          period: 'MONTHLY',
-                          startDate: new Date().toISOString().split('T')[0]
-                        }
-                      } : null)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Période</label>
-                    <select
-                      value={editingCategory?.budget?.period || 'MONTHLY'}
-                      onChange={(e) => setEditingCategory(prev => prev ? {
-                        ...prev,
-                        budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
-                          amount: '',
-                          period: e.target.value as any,
-                          startDate: new Date().toISOString().split('T')[0]
-                        }
-                      } : null)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    >
-                      <option value="WEEKLY">Hebdomadaire</option>
-                      <option value="MONTHLY">Mensuel</option>
-                      <option value="QUARTERLY">Trimestriel</option>
-                      <option value="YEARLY">Annuel</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Date de début</label>
-                    <input
-                      type="date"
-                      value={editingCategory?.budget?.startDate || ''}
-                      onChange={(e) => setEditingCategory(prev => prev ? {
-                        ...prev,
-                        budget: prev.budget ? {...prev.budget, startDate: e.target.value} : {
-                          amount: '',
-                          period: 'MONTHLY',
-                          startDate: e.target.value
-                        }
-                      } : null)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddForm(false);
-                  setEditingCategory(null);
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-              >
-                Ajouter
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {/* Categories List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {categories.map((category) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">{categories.map((category) => {
           const categorySpending = getCategorySpending(category.id);
           const categoryBudget = getCategoryBudget(category.id);
           
           return (
-            <div key={category.id} className="bg-white shadow rounded-lg p-6">
+            <div key={category.id} className="bg-white shadow rounded-lg p-6 flex flex-col h-full min-h-[280px]">
               {editingId === category.id ? (
-                <div className="space-y-3">
+                <div className="space-y-3 flex-1 flex flex-col">
                   <input
                     type="text"
                     value={editingCategory?.name || ''}
@@ -601,7 +436,7 @@ export default function Categories() {
 
                   {/* Budget editing - Only for EXPENSE categories */}
                   {editingCategory?.type === 'EXPENSE' && (
-                    <div className="border-t pt-3 mt-3">
+                    <div className="border-t pt-3 mt-3 flex-1">
                       <h5 className="text-sm font-medium text-gray-900 mb-2">Budget</h5>
                       <div className="space-y-2">
                         <input
@@ -653,7 +488,7 @@ export default function Categories() {
                     </div>
                   )}
 
-                  <div className="flex space-x-2">
+                  <div className="flex space-x-2 mt-auto">
                     <button
                       onClick={handleSave}
                       className="flex-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
@@ -669,7 +504,7 @@ export default function Categories() {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 flex-1 flex flex-col">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       {category.icon && (
@@ -713,49 +548,87 @@ export default function Categories() {
                     </span>
                   </div>
 
-                  {/* Budget progress for EXPENSE categories */}
-                  {category.type === 'EXPENSE' && categoryBudget && categorySpending && (
-                    <div className="mt-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Budget {categoryBudget.period === 'MONTHLY' ? 'Mensuel' : 
-                         categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
-                         categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}</span>
-                      </div>
-                      
-                      <div className="flex justify-between text-sm text-gray-600 mb-2">
-                        <span>Dépensé</span>
-                        <span>Budget</span>
-                      </div>
-                      <div className="flex justify-between text-lg font-semibold mb-2">
-                        <span className="text-red-600">
-                          {formatCurrency(categorySpending.totalSpent)}
-                        </span>
-                        <span className="text-gray-900">
-                          {formatCurrency(categoryBudget.amount)}
-                        </span>
-                      </div>
-                      
-                      <div className="w-full bg-gray-200 rounded-full h-3">
-                        <div
-                          className={`h-3 rounded-full transition-all duration-300 ${
-                            categorySpending.isOverBudget
-                              ? 'bg-red-500'
-                              : categorySpending.percentage > 80
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500'
-                          }`}
-                          style={{ width: `${Math.min(categorySpending.percentage, 100)}%` }}
-                        />
-                      </div>
-                      
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>{categorySpending.percentage.toFixed(1)}%</span>
-                        <span className={categorySpending.isOverBudget ? 'text-red-600' : 'text-green-600'}>
-                          {categorySpending.isOverBudget ? 'Budget dépassé !' : `${formatCurrency(categorySpending.remaining)} restant`}
-                        </span>
-                      </div>
+                  <div className="flex-1">
+                    {/* Budget progress for EXPENSE categories */}
+                    {category.type === 'EXPENSE' && categoryBudget && categorySpending && (
+                      <div className="mt-4">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium text-gray-700">Budget {categoryBudget.period === 'MONTHLY' ? 'Mensuel' : 
+                           categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
+                           categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}</span>
+                        </div>
+                        
+                        <div className="flex justify-between text-sm text-gray-600 mb-2">
+                          <span>Dépensé</span>
+                          <span>Budget</span>
+                        </div>
+                        <div className="flex justify-between text-lg font-semibold mb-2">
+                          <span className="text-red-600">
+                            {formatCurrency(categorySpending.totalSpent)}
+                          </span>
+                          <span className="text-gray-900">
+                            {formatCurrency(categoryBudget.amount)}
+                          </span>
+                        </div>
+                        
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div
+                            className={`h-3 rounded-full transition-all duration-300 ${
+                              categorySpending.isOverBudget
+                                ? 'bg-red-500'
+                                : categorySpending.percentage > 80
+                                ? 'bg-yellow-500'
+                                : 'bg-green-500'
+                            }`}
+                            style={{ width: `${Math.min(categorySpending.percentage, 100)}%` }}
+                          />
+                        </div>
+                        
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>{categorySpending.percentage.toFixed(1)}%</span>
+                          <span className={categorySpending.isOverBudget ? 'text-red-600' : 'text-green-600'}>
+                            {categorySpending.isOverBudget ? 'Budget dépassé !' : `${formatCurrency(categorySpending.remaining)} restant`}
+                          </span>
+                        </div>
 
-                      <div className="border-t pt-3 mt-3">
+                        <div className="border-t pt-3 mt-3">
+                          {/* Afficher les 3 dernières transactions de cette catégorie */}
+                          {transactions.filter(t => t.categoryId === category.id).length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-xs text-gray-500 mb-1">
+                                Dernières transactions:
+                              </p>
+                              <div className="space-y-1">
+                                {transactions
+                                  .filter(t => t.categoryId === category.id)
+                                  .slice(0, 3)
+                                  .map((transaction) => (
+                                    <div key={transaction.id} className="flex justify-between text-xs">
+                                      <span className="text-gray-600 truncate">
+                                        {transaction.description}
+                                      </span>
+                                      <span className={`font-medium ${
+                                        transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                                      }`}>
+                                        {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* No budget - show recent transactions */}
+                    {category.type === 'EXPENSE' && !categoryBudget && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                        <div className="flex items-center justify-center text-gray-500 mb-2">
+                          <ChartBarIcon className="h-4 w-4 mr-1" />
+                          <span className="text-sm">Pas de budget défini</span>
+                        </div>
+                        
                         {/* Afficher les 3 dernières transactions de cette catégorie */}
                         {transactions.filter(t => t.categoryId === category.id).length > 0 && (
                           <div className="mt-3">
@@ -782,80 +655,177 @@ export default function Categories() {
                           </div>
                         )}
                       </div>
-                    </div>
-                  )}
-
-                  {/* No budget - show recent transactions */}
-                  {category.type === 'EXPENSE' && !categoryBudget && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                      <div className="flex items-center justify-center text-gray-500 mb-2">
-                        <ChartBarIcon className="h-4 w-4 mr-1" />
-                        <span className="text-sm">Pas de budget défini</span>
+                    )}
+                    
+                    {/* For INCOME and FIXED categories, show recent transactions */}
+                    {(category.type === 'INCOME' || category.type === 'FIXED') && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                        {/* Afficher les 3 dernières transactions de cette catégorie */}
+                        {transactions.filter(t => t.categoryId === category.id).length > 0 && (
+                          <div>
+                            <p className="text-xs text-gray-500 mb-1">
+                              Dernières transactions:
+                            </p>
+                            <div className="space-y-1">
+                              {transactions
+                                .filter(t => t.categoryId === category.id)
+                                .slice(0, 3)
+                                .map((transaction) => (
+                                  <div key={transaction.id} className="flex justify-between text-xs">
+                                    <span className="text-gray-600 truncate">
+                                      {transaction.description}
+                                    </span>
+                                    <span className={`font-medium ${
+                                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                                    }`}>
+                                      {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
+                                    </span>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      
-                      {/* Afficher les 3 dernières transactions de cette catégorie */}
-                      {transactions.filter(t => t.categoryId === category.id).length > 0 && (
-                        <div className="mt-3">
-                          <p className="text-xs text-gray-500 mb-1">
-                            Dernières transactions:
-                          </p>
-                          <div className="space-y-1">
-                            {transactions
-                              .filter(t => t.categoryId === category.id)
-                              .slice(0, 3)
-                              .map((transaction) => (
-                                <div key={transaction.id} className="flex justify-between text-xs">
-                                  <span className="text-gray-600 truncate">
-                                    {transaction.description}
-                                  </span>
-                                  <span className={`font-medium ${
-                                    transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
-                                  }`}>
-                                    {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                                  </span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* For INCOME and FIXED categories, show recent transactions */}
-                  {(category.type === 'INCOME' || category.type === 'FIXED') && (
-                    <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                      {/* Afficher les 3 dernières transactions de cette catégorie */}
-                      {transactions.filter(t => t.categoryId === category.id).length > 0 && (
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">
-                            Dernières transactions:
-                          </p>
-                          <div className="space-y-1">
-                            {transactions
-                              .filter(t => t.categoryId === category.id)
-                              .slice(0, 3)
-                              .map((transaction) => (
-                                <div key={transaction.id} className="flex justify-between text-xs">
-                                  <span className="text-gray-600 truncate">
-                                    {transaction.description}
-                                  </span>
-                                  <span className={`font-medium ${
-                                    transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
-                                  }`}>
-                                    {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                                  </span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           );
         })}
+
+        {/* Add Category Form Card */}
+        {showAddForm ? (
+          <div className="bg-white shadow rounded-lg p-4 flex flex-col h-full min-h-[280px] max-h-[280px]">
+            <form onSubmit={handleAddCategory} className="flex flex-col h-full space-y-2">
+              <h3 className="text-md font-medium text-gray-900">Ajouter une catégorie</h3>
+              
+              <div className="space-y-2 flex-1">
+                <input
+                  type="text"
+                  value={editingCategory?.name || ''}
+                  onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+                  placeholder="Nom"
+                  required
+                />
+                
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={editingCategory?.icon || ''}
+                    onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+                    placeholder="🛒"
+                  />
+                  
+                  <select
+                    value={editingCategory?.type || ''}
+                    onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+                    required
+                  >
+                    {categoryTypes.map(type => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="flex flex-wrap gap-1">
+                  {predefinedColors.slice(0, 16).map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
+                      className={`w-4 h-4 rounded-full border ${
+                        editingCategory?.color === color ? 'border-gray-900' : 'border-gray-300'
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+
+                {/* Budget section - Only for EXPENSE categories */}
+                {editingCategory?.type === 'EXPENSE' && (
+                  <div className="border-t pt-2">
+                    <p className="text-xs font-medium text-gray-700 mb-1">Budget</p>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingCategory?.budget?.amount || ''}
+                      onChange={(e) => setEditingCategory(prev => prev ? {
+                        ...prev,
+                        budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
+                          amount: e.target.value,
+                          period: 'MONTHLY',
+                          startDate: new Date().toISOString().split('T')[0]
+                        }
+                      } : null)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1 mb-1"
+                      placeholder="Montant (€)"
+                    />
+                    
+                    <select
+                      value={editingCategory?.budget?.period || 'MONTHLY'}
+                      onChange={(e) => setEditingCategory(prev => prev ? {
+                        ...prev,
+                        budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
+                          amount: '',
+                          period: e.target.value as any,
+                          startDate: new Date().toISOString().split('T')[0]
+                        }
+                      } : null)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+                    >
+                      <option value="MONTHLY">Mensuel</option>
+                      <option value="WEEKLY">Hebdo</option>
+                      <option value="QUARTERLY">Trimestre</option>
+                      <option value="YEARLY">Annuel</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex space-x-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-2 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  Ajouter
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div 
+            onClick={() => {
+              setShowAddForm(true);
+              setEditingCategory({
+                id: '',
+                name: '',
+                type: 'EXPENSE',
+                color: predefinedColors[0],
+                icon: '',
+                budget: {
+                  amount: '',
+                  period: 'MONTHLY',
+                  startDate: new Date().toISOString().split('T')[0]
+                }
+              });
+            }}
+            className="bg-white shadow rounded-lg p-6 flex flex-col items-center justify-center h-full min-h-[280px] cursor-pointer hover:bg-gray-50 transition-colors border-2 border-dashed border-gray-300 hover:border-gray-400"
+          >
+            <PlusIcon className="h-12 w-12 text-gray-400 mb-2" />
+            <p className="text-gray-500 text-sm font-medium">Ajouter une catégorie</p>
+          </div>
+        )}
       </div>
     </div>
   );

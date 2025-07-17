@@ -824,28 +824,20 @@ export default function Banks() {
           <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[400px]">
             {!showAddForm ? (
               <div 
-                className="cursor-pointer"
+                className="cursor-pointer flex flex-col items-center justify-center h-full p-6"
                 onClick={() => {
                   setShowAddForm(true);
                   setEditingBank(null); // Annuler l'édition si en cours
                 }}
               >
-                <div className="p-6 text-center">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-                    <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Ajouter une banque</h3>
-                  <p className="text-sm text-gray-500">
-                    Cliquez pour ajouter un nouveau compte bancaire
-                  </p>
+                <div className="text-gray-400 mb-4">
+                  <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
                 </div>
-                <div className="bg-gray-50 px-6 py-3 text-center">
-                  <div className="text-sm text-gray-500">
-                    Nouveau compte
-                  </div>
-                </div>
+                <p className="text-gray-500 text-center">
+                  Ajouter un compte
+                </p>
               </div>
             ) : (
               <div className="flex flex-col h-full">
@@ -1009,28 +1001,20 @@ export default function Banks() {
                 <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[400px]">
                   {!showAddForm ? (
                     <div 
-                      className="cursor-pointer"
+                      className="cursor-pointer flex flex-col items-center justify-center h-full p-6"
                       onClick={() => {
                         setShowAddForm(true);
                         setEditingBank(null); // Annuler l'édition si en cours
                       }}
                     >
-                      <div className="p-6 text-center">
-                        <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-                          <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                          </svg>
-                        </div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">Ajouter une banque</h3>
-                        <p className="text-sm text-gray-500">
-                          Commencez par ajouter votre première banque
-                        </p>
+                      <div className="text-gray-400 mb-4">
+                        <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
                       </div>
-                      <div className="bg-gray-50 px-6 py-3 text-center">
-                        <div className="text-sm text-gray-500">
-                          Première banque
-                        </div>
-                      </div>
+                      <p className="text-gray-500 text-center">
+                        Ajouter un compte
+                      </p>
                     </div>
                   ) : (
                     <div className="flex flex-col h-full">
