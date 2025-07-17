@@ -523,13 +523,12 @@ app.delete('/api/categories/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // Vérifier si la catégorie est utilisée
+    // Vérifier si la catégorie est utilisée dans des budgets ou récurrences
     const count = await prisma.category.findUnique({
       where: { id },
       select: {
         _count: {
           select: {
-            transactions: true,
             budgets: true,
             recurrences: true
           }
@@ -537,12 +536,13 @@ app.delete('/api/categories/:id', async (req, res) => {
       }
     });
     
-    if (count && (count._count.transactions > 0 || count._count.budgets > 0 || count._count.recurrences > 0)) {
+    if (count && (count._count.budgets > 0 || count._count.recurrences > 0)) {
       return res.status(400).json({ 
-        error: 'Cannot delete category that is being used in transactions, budgets, or recurrences' 
+        error: 'Cannot delete category that is being used in budgets or recurrences' 
       });
     }
     
+    // Supprimer la catégorie - les transactions liées passeront automatiquement à categoryId: null
     await prisma.category.delete({
       where: { id }
     });
@@ -625,10 +625,24 @@ app.post('/api/transactions', async (req, res) => {
   try {
     const { amount, description, date, shared, bankId, categoryId } = req.body;
     
-    if (!amount || !description || !bankId || !categoryId) {
+    if (!amount || !description || !bankId) {
       return res.status(400).json({ 
-        error: 'Amount, description, bankId, and categoryId are required' 
+        error: 'Amount, description, and bankId are required' 
       });
+    }
+    
+    // Vérifier que la banque existe
+    const bank = await prisma.bank.findUnique({ where: { id: bankId } });
+    if (!bank) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    
+    // Vérifier que la catégorie existe si elle est fournie
+    if (categoryId) {
+      const category = await prisma.category.findUnique({ where: { id: categoryId } });
+      if (!category) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
     }
     
     const transaction = await prisma.transaction.create({
@@ -638,7 +652,7 @@ app.post('/api/transactions', async (req, res) => {
         date: date ? new Date(date) : new Date(),
         shared: shared || false,
         bankId,
-        categoryId
+        categoryId: categoryId || null
       },
       include: {
         bank: {
@@ -675,6 +689,14 @@ app.put('/api/transactions/:id', async (req, res) => {
     const { id } = req.params;
     const { amount, description, date, shared, categoryId, bankId } = req.body;
     
+    // Vérifier que la catégorie existe si elle est fournie
+    if (categoryId && categoryId !== '') {
+      const category = await prisma.category.findUnique({ where: { id: categoryId } });
+      if (!category) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
+    }
+    
     const transaction = await prisma.transaction.update({
       where: { id },
       data: {
@@ -682,7 +704,7 @@ app.put('/api/transactions/:id', async (req, res) => {
         ...(description && { description }),
         ...(date && { date: new Date(date) }),
         ...(shared !== undefined && { shared }),
-        ...(categoryId && { categoryId }),
+        ...(categoryId !== undefined && { categoryId: categoryId || null }),
         ...(bankId && { bankId })
       },
       include: {

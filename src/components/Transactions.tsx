@@ -133,7 +133,7 @@ export default function Transactions() {
         value = new Date(transaction.date).toISOString().split('T')[0];
         break;
       case 'category':
-        value = transaction.categoryId;
+        value = transaction.categoryId || '';
         break;
       case 'bank':
         value = transaction.bankId;
@@ -168,7 +168,7 @@ export default function Transactions() {
         updateData.date = inlineEditValue;
         break;
       case 'category':
-        updateData.categoryId = inlineEditValue;
+        updateData.categoryId = inlineEditValue || null;
         break;
       case 'bank':
         updateData.bankId = inlineEditValue;
@@ -260,8 +260,14 @@ export default function Transactions() {
     }
     
     // Filtre par catégorie
-    if (filters.categoryId && transaction.categoryId !== filters.categoryId) {
-      return false;
+    if (filters.categoryId) {
+      if (filters.categoryId === 'undefined') {
+        // Filtre pour les transactions sans catégorie
+        if (transaction.categoryId) return false;
+      } else {
+        // Filtre pour une catégorie spécifique
+        if (transaction.categoryId !== filters.categoryId) return false;
+      }
     }
     
     // Filtre par type partagé
@@ -361,6 +367,7 @@ export default function Transactions() {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="">Toutes</option>
+              <option value="undefined">Non défini</option>
               {categories.map(category => (
                 <option key={category.id} value={category.id}>{category.name}</option>
               ))}
@@ -454,8 +461,8 @@ export default function Transactions() {
                 value={editingTransaction?.categoryId || ''}
                 onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
               >
+                <option value="">Non défini</option>
                 {categories.map(category => (
                   <option key={category.id} value={category.id}>{category.name}</option>
                 ))}
@@ -599,6 +606,7 @@ export default function Transactions() {
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       autoFocus
                     >
+                      <option value="">Non défini</option>
                       {categories.map(category => (
                         <option key={category.id} value={category.id}>{category.name}</option>
                       ))}
@@ -607,10 +615,13 @@ export default function Transactions() {
                     <span 
                       onDoubleClick={() => handleInlineEdit(transaction.id, 'category')}
                       className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
-                      style={{ backgroundColor: transaction.category.color + '20', color: transaction.category.color }}
+                      style={{ 
+                        backgroundColor: transaction.category ? transaction.category.color + '20' : '#e5e7eb', 
+                        color: transaction.category ? transaction.category.color : '#6b7280' 
+                      }}
                       title="Double-cliquez pour éditer"
                     >
-                      {transaction.category.name}
+                      {transaction.category ? transaction.category.name : 'Non défini'}
                     </span>
                   )}
                 </td>

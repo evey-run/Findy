@@ -63,8 +63,8 @@ export interface Transaction {
     color: string;
     balance: number;
   };
-  categoryId: string;
-  category: {
+  categoryId?: string;
+  category?: {
     id: string;
     name: string;
     type: 'INCOME' | 'EXPENSE' | 'FIXED';

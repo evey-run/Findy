@@ -100,7 +100,7 @@ function ShareBankModal({ bank, isOpen, onClose, onShare }: ShareBankModalProps)
 }
 
 export default function Banks() {
-  const { banks, loadBanks, setSelectedBank, selectedUser, users } = useAppStore();
+  const { banks, transactions, loadBanks, loadTransactions, setSelectedBank, selectedUser, users } = useAppStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -127,6 +127,7 @@ export default function Banks() {
       setLoading(true);
       try {
         await loadBanks();
+        await loadTransactions();
         if (showArchived) {
           await loadArchivedBanks();
         }
@@ -138,7 +139,7 @@ export default function Banks() {
     };
     
     initBanks();
-  }, [loadBanks, showArchived]);
+  }, [loadBanks, loadTransactions, showArchived]);
 
   const loadArchivedBanks = async () => {
     try {
@@ -775,9 +776,35 @@ export default function Banks() {
               className="bg-gray-50 px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
               onClick={() => handleBankClick(bank)}
             >
-              <div className="text-sm text-gray-500">
-                Créé le {new Date(bank.createdAt).toLocaleDateString('fr-FR')}
-              </div>
+              {/* Afficher les 3 dernières transactions de cette banque */}
+              {transactions.filter(t => t.bankId === bank.id).length > 0 ? (
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">
+                    Dernières transactions:
+                  </p>
+                  <div className="space-y-1">
+                    {transactions
+                      .filter(t => t.bankId === bank.id)
+                      .slice(0, 3)
+                      .map((transaction) => (
+                        <div key={transaction.id} className="flex justify-between text-xs">
+                          <span className="text-gray-600 truncate">
+                            {transaction.description}
+                          </span>
+                          <span className={`font-medium ${
+                            transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">
+                  Aucune transaction récente
+                </div>
+              )}
             </div>
           </div>
         ))}

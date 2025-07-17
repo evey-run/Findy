@@ -7,11 +7,11 @@ const prisma = new PrismaClient();
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
   try {
-    const { userId, categoryId, shared, startDate, endDate, limit, offset } = req.query;
+    const { bankId, categoryId, shared, startDate, endDate, limit, offset } = req.query;
     
     const where: any = {};
     
-    if (userId) where.userId = userId;
+    if (bankId) where.bankId = bankId;
     if (categoryId) where.categoryId = categoryId;
     if (shared !== undefined) where.shared = shared === 'true';
     if (startDate || endDate) {
@@ -23,10 +23,11 @@ router.get('/', async (req, res) => {
     const transactions = await prisma.transaction.findMany({
       where,
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
+            shortName: true,
             color: true
           }
         },
@@ -57,10 +58,10 @@ router.get('/', async (req, res) => {
 // GET /api/transactions/stats/summary - Statistiques résumées
 router.get('/stats/summary', async (req, res) => {
   try {
-    const { userId, startDate, endDate } = req.query;
+    const { bankId, startDate, endDate } = req.query;
     
     const where: any = {};
-    if (userId) where.userId = userId;
+    if (bankId) where.bankId = bankId;
     if (startDate || endDate) {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate as string);
@@ -102,10 +103,11 @@ router.get('/:id', async (req, res) => {
     const transaction = await prisma.transaction.findUnique({
       where: { id },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
+            shortName: true,
             color: true
           }
         },
@@ -135,26 +137,26 @@ router.get('/:id', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 router.post('/', async (req, res) => {
   try {
-    const { amount, description, date, shared, userId, categoryId } = req.body;
+    const { amount, description, date, shared, bankId, categoryId } = req.body;
     
-    if (!amount || !description || !userId || !categoryId) {
+    if (!amount || !description || !bankId) {
       return res.status(400).json({ 
-        error: 'Amount, description, userId, and categoryId are required' 
+        error: 'Amount, description, and bankId are required' 
       });
     }
     
-    // Vérifier que l'utilisateur et la catégorie existent
-    const [user, category] = await Promise.all([
-      prisma.user.findUnique({ where: { id: userId } }),
-      prisma.category.findUnique({ where: { id: categoryId } })
-    ]);
-    
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    // Vérifier que la banque existe
+    const bank = await prisma.bank.findUnique({ where: { id: bankId } });
+    if (!bank) {
+      return res.status(404).json({ error: 'Bank not found' });
     }
     
-    if (!category) {
-      return res.status(404).json({ error: 'Category not found' });
+    // Vérifier que la catégorie existe si elle est fournie
+    if (categoryId) {
+      const category = await prisma.category.findUnique({ where: { id: categoryId } });
+      if (!category) {
+        return res.status(404).json({ error: 'Category not found' });
+      }
     }
     
     const transaction = await prisma.transaction.create({
@@ -163,14 +165,15 @@ router.post('/', async (req, res) => {
         description,
         date: date ? new Date(date) : new Date(),
         shared: shared || false,
-        userId,
-        categoryId
+        bankId,
+        categoryId: categoryId || null
       },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
+            shortName: true,
             color: true
           }
         },
@@ -214,13 +217,14 @@ router.put('/:id', async (req, res) => {
         ...(description && { description }),
         ...(date && { date: new Date(date) }),
         ...(shared !== undefined && { shared }),
-        ...(categoryId && { categoryId })
+        ...(categoryId !== undefined && { categoryId })
       },
       include: {
-        user: {
+        bank: {
           select: {
             id: true,
             name: true,
+            shortName: true,
             color: true
           }
         },
