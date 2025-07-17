@@ -462,9 +462,18 @@ app.get('/api/transactions', async (req, res) => {
     
     // Filtrer par type de compte si spécifié
     if (accountType) {
-      where.bank = {
-        accountType: accountType as string
-      };
+      if (bankId) {
+        // Si on a déjà un bankId, on doit combiner les filtres
+        where.bank = {
+          id: bankId,
+          accountType: accountType as string
+        };
+        delete where.bankId; // Supprimer le filtre bankId simple
+      } else {
+        where.bank = {
+          accountType: accountType as string
+        };
+      }
     }
     
     const transactions = await prisma.transaction.findMany({

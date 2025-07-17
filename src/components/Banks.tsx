@@ -173,6 +173,13 @@ export default function Banks() {
 
   const handleBankClick = (bank: Bank) => {
     console.log('🏦 Bank clicked:', bank.name);
+    
+    // Empêcher la sélection des comptes qui ne sont pas des comptes courants
+    if (bank.accountType !== 'CURRENT') {
+      alert(`Ce compte "${bank.name}" est un ${getAccountTypeInfo(bank.accountType).label.toLowerCase()}. Seuls les comptes courants peuvent être sélectionnés pour voir les transactions.`);
+      return;
+    }
+    
     setSelectedBank(bank);
     console.log('🏦 Selected bank set, navigating to transactions...');
     navigate('/transactions');
@@ -673,7 +680,11 @@ export default function Banks() {
         {banks.map((bank) => (
           <div key={bank.id} className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
             <div 
-              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors flex-1"
+              className={`p-6 transition-colors flex-1 ${
+                bank.accountType === 'CURRENT' 
+                  ? 'cursor-pointer hover:bg-gray-50' 
+                  : 'cursor-not-allowed opacity-75 bg-gray-50'
+              }`}
               onClick={() => handleBankClick(bank)}
             >
               <div className="flex items-center justify-between">
@@ -695,6 +706,9 @@ export default function Banks() {
                     <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
                     <p className="text-sm text-gray-500">
                       {getAccountTypeInfo(bank.accountType).label}
+                      {bank.accountType !== 'CURRENT' && (
+                        <span className="ml-2 text-orange-600 font-medium">(Non sélectionnable)</span>
+                      )}
                       {!selectedUser && bank.users && bank.users.length > 0 && (
                         <span className="ml-2 text-blue-600">
                           • {bank.users.map(u => u.name).join(', ')}

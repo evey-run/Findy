@@ -42,12 +42,6 @@ export default function Transactions() {
     removeTransaction 
   } = useAppStore();
   
-  // Log initial state
-  console.log('🔄 Transactions component rendered');
-  console.log('🏦 Current selectedBank:', selectedBank);
-  console.log('🏦 Available banks:', banks);
-  console.log('💳 Current transactions:', transactions);
-  
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
@@ -86,14 +80,13 @@ export default function Transactions() {
 
   // Recharger les transactions quand la banque sélectionnée change
   useEffect(() => {
-    console.log('🔄 selectedBank changed:', selectedBank);
-    if (selectedBank) {
-      console.log('Loading transactions for bank:', selectedBank.name);
-    } else {
-      console.log('Loading all transactions');
-    }
     loadTransactions();
   }, [selectedBank?.id]);
+  
+  // Log transactions changes
+  useEffect(() => {
+    console.log('Transactions updated:', transactions.length, 'transactions');
+  }, [transactions]);
 
   const handleSave = async () => {
     if (!editingTransaction) return;
@@ -289,9 +282,6 @@ export default function Transactions() {
     return true;
   });
   
-  // Log filtered transactions
-  console.log('🔍 Filtered transactions:', filteredTransactions.length, 'out of', transactions.length);
-
   const formatAmount = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -352,15 +342,13 @@ export default function Transactions() {
             <select
               value={selectedBank?.id || ''}
               onChange={(e) => {
-                console.log('🏦 Bank selector changed:', e.target.value);
                 const bank = banks.find(b => b.id === e.target.value);
-                console.log('🏦 Found bank:', bank);
                 setSelectedBank(bank || null);
               }}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="">Toutes les banques</option>
-              {banks.map(bank => (
+              {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
                 <option key={bank.id} value={bank.id}>{bank.name}</option>
               ))}
             </select>
@@ -424,7 +412,7 @@ export default function Transactions() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 required
               >
-                {banks.map(bank => (
+                {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
                   <option key={bank.id} value={bank.id}>{bank.name}</option>
                 ))}
               </select>
@@ -636,7 +624,7 @@ export default function Transactions() {
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       autoFocus
                     >
-                      {banks.map(bank => (
+                      {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
                         <option key={bank.id} value={bank.id}>{bank.name}</option>
                       ))}
                     </select>
