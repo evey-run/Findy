@@ -211,9 +211,7 @@ app.get('/api/banks', async (req, res) => {
     // Transform the data to include computed fields
     const transformedBanks = banks.map(bank => ({
       ...bank,
-      users: bank.userBanks.map(ub => ub.user),
-      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     }));
     
     res.json(transformedBanks);
@@ -256,16 +254,14 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
         isShared: isShared || false,
         userBanks: {
           create: [
-            // Owner
+            // Add creator
             {
-              userId: userId,
-              role: 'OWNER'
+              userId: userId
             },
-            // Shared users if any
+            // Add shared users if any
             ...(sharedUserIds && Array.isArray(sharedUserIds) ? 
               sharedUserIds.map((id: string) => ({
-                userId: id,
-                role: 'SHARED' as const
+                userId: id
               })) : [])
           ]
         }
@@ -288,9 +284,7 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
     // Transform the data to include computed fields
     const transformedBank = {
       ...bank,
-      users: bank.userBanks.map(ub => ub.user),
-      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     };
     
     res.status(201).json(transformedBank);
@@ -341,9 +335,7 @@ app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
     // Transform the data to include computed fields
     const transformedBank = {
       ...bank,
-      users: bank.userBanks.map(ub => ub.user),
-      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     };
     
     res.json(transformedBank);
@@ -424,9 +416,7 @@ app.put('/api/banks/:id/restore', async (req, res) => {
     // Transform the data to include computed fields
     const transformedBank = {
       ...bank,
-      users: bank.userBanks.map(ub => ub.user),
-      owners: bank.userBanks.filter(ub => ub.role === 'OWNER').map(ub => ub.user),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     };
     
     res.json(transformedBank);

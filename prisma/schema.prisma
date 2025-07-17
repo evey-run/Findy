@@ -44,7 +44,6 @@ model UserBank {
   id     String @id @default(cuid())
   userId String
   bankId String
-  role   String @default("OWNER")
   bank   Bank   @relation(fields: [bankId], references: [id], onDelete: Cascade)
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

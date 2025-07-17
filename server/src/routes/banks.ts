@@ -81,11 +81,7 @@ router.get('/', async (req, res) => {
     // Transform the data to match the expected format
     const transformedBanks = banks.map(bank => ({
       ...bank,
-      users: bank.userBanks.map(ub => ({
-        ...ub.user,
-        role: ub.role
-      })),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     }));
     
     res.json(transformedBanks);
@@ -123,11 +119,7 @@ router.get('/:id', async (req, res) => {
     // Transform the data to match the expected format
     const transformedBank = {
       ...bank,
-      users: bank.userBanks.map(ub => ({
-        ...ub.user,
-        role: ub.role
-      })),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     };
     
     res.json(transformedBank);
@@ -140,12 +132,20 @@ router.get('/:id', async (req, res) => {
 // POST /api/banks - Create a new bank
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { name, shortName, color, iban, balance, userId, createdAt } = req.body;
+    const { name, shortName, color, iban, balance, createdAt } = req.body;
     
-    console.log('🔧 Creating bank with data:', { name, shortName, color, iban, balance, userId, createdAt });
+    // Récupérer les userIds du FormData
+    const userIds: string[] = [];
+    for (const key in req.body) {
+      if (key.startsWith('userIds[')) {
+        userIds.push(req.body[key]);
+      }
+    }
     
-    if (!name || !userId) {
-      return res.status(400).json({ error: 'Name and userId are required' });
+    console.log('🔧 Creating bank with data:', { name, shortName, color, iban, balance, userIds, createdAt });
+    
+    if (!name || userIds.length === 0) {
+      return res.status(400).json({ error: 'Name and at least one user are required' });
     }
     
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -162,11 +162,11 @@ router.post('/', upload.single('image'), async (req, res) => {
         iban,
         balance: parseFloat(balance) || 0,
         createdAt: createdAtDate,
+        isShared: userIds.length > 1, // Marquer comme partagé si plusieurs utilisateurs
         userBanks: {
-          create: {
-            userId: userId,
-            role: 'OWNER'
-          }
+          create: userIds.map((userId: string) => ({
+            userId: userId
+          }))
         }
       },
       include: {
@@ -187,11 +187,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     // Transform the data to match the expected format
     const transformedBank = {
       ...bank,
-      users: bank.userBanks.map(ub => ({
-        ...ub.user,
-        role: ub.role
-      })),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     };
     
     console.log('🔧 Bank created successfully:', transformedBank.name);
@@ -207,6 +203,14 @@ router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, shortName, color, iban, balance, createdAt } = req.body;
+    
+    // Récupérer les userIds du FormData pour la mise à jour
+    const userIds: string[] = [];
+    for (const key in req.body) {
+      if (key.startsWith('userIds[')) {
+        userIds.push(req.body[key]);
+      }
+    }
     
     const updateData: any = {
       name,
@@ -226,6 +230,27 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateData.image = `/uploads/${req.file.filename}`;
     }
     
+    // Mettre à jour le statut partagé en fonction du nombre d'utilisateurs
+    if (userIds.length > 0) {
+      updateData.isShared = userIds.length > 1;
+    }
+    
+    // Si des userIds sont fournis, mettre à jour les relations utilisateur-banque
+    if (userIds.length > 0) {
+      // Supprimer toutes les relations existantes
+      await prisma.userBank.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Créer les nouvelles relations
+      await prisma.userBank.createMany({
+        data: userIds.map((userId) => ({
+          userId,
+          bankId: id
+        }))
+      });
+    }
+
     const bank = await prisma.bank.update({
       where: { id },
       data: updateData,
@@ -247,11 +272,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
     // Transform the data to match the expected format
     const transformedBank = {
       ...bank,
-      users: bank.userBanks.map(ub => ({
-        ...ub.user,
-        role: ub.role
-      })),
-      sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
+      users: bank.userBanks.map(ub => ub.user)
     };
     
     res.json(transformedBank);
@@ -305,8 +326,7 @@ router.post('/:id/share', async (req, res) => {
     await prisma.userBank.create({
       data: {
         userId,
-        bankId: id,
-        role: 'SHARED'
+        bankId: id
       }
     });
     
@@ -337,16 +357,15 @@ router.delete('/:id/share/:userId', async (req, res) => {
       }
     });
     
-    // Check if bank still has any shared users
-    const sharedUsers = await prisma.userBank.findMany({
+    // Check if bank still has multiple users
+    const userCount = await prisma.userBank.count({
       where: {
-        bankId: id,
-        role: 'SHARED'
+        bankId: id
       }
     });
     
     // Update bank shared status
-    if (sharedUsers.length === 0) {
+    if (userCount <= 1) {
       await prisma.bank.update({
         where: { id },
         data: { isShared: false }

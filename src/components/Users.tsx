@@ -35,12 +35,9 @@ export default function Users() {
       const response = await fetch(`/api/users/${userId}`);
       if (response.ok) {
         const userData = await response.json();
-        // Transformer les données pour obtenir les banques avec le rôle
-        const banksWithRole = userData.userBanks.map((userBank: any) => ({
-          ...userBank.bank,
-          userRole: userBank.role
-        }));
-        setSelectedUserBanks(banksWithRole);
+        // Transformer les données pour obtenir les banques
+        const banks = userData.userBanks.map((userBank: any) => userBank.bank);
+        setSelectedUserBanks(banks);
       }
     } catch (error) {
       console.error('Error loading user banks:', error);
@@ -347,8 +344,6 @@ export default function Users() {
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {selectedUserBanks.map((bank) => {
-                        const userRole = (bank as any).userRole || 'UNKNOWN';
-                        
                         return (
                           <div key={bank.id} className="border rounded-lg p-4 hover:bg-gray-50">
                             <div className="flex items-center justify-between">
@@ -367,7 +362,7 @@ export default function Users() {
                                 <div className="ml-3">
                                   <h4 className="text-sm font-medium text-gray-900">{bank.name}</h4>
                                   <p className="text-xs text-gray-500">
-                                    {userRole === 'OWNER' ? 'Propriétaire' : 'Accès partagé'}
+                                    Accès complet
                                   </p>
                                 </div>
                               </div>
@@ -378,17 +373,15 @@ export default function Users() {
                                   </div>
                                   <div className="text-xs text-gray-500">Solde</div>
                                 </div>
-                                {userRole === 'SHARED' && (
-                                  <button
-                                    onClick={() => handleRemoveBankAccess(bank.id, selectedUserId!)}
-                                    className="text-red-600 hover:text-red-900"
-                                    title="Retirer l'accès"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                    </svg>
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => handleRemoveBankAccess(bank.id, selectedUserId!)}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Retirer l'accès"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
                               </div>
                             </div>
                           </div>

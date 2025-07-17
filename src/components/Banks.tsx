@@ -100,7 +100,7 @@ function ShareBankModal({ bank, isOpen, onClose, onShare }: ShareBankModalProps)
 }
 
 export default function Banks() {
-  const { banks, transactions, loadBanks, loadTransactions, setSelectedBank, selectedUser } = useAppStore();
+  const { banks, transactions, users, loadBanks, loadTransactions, setSelectedBank, selectedUser } = useAppStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -116,7 +116,7 @@ export default function Banks() {
     balance: 0,
     accountType: 'CURRENT' as 'CURRENT' | 'SAVINGS' | 'INVESTMENT',
     isShared: false,
-    sharedUserIds: [] as string[],
+    userIds: [] as string[], // Utilisateurs qui auront accès à ce compte
     createdAt: new Date().toISOString().split('T')[0] // Date au format YYYY-MM-DD
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -190,11 +190,11 @@ export default function Banks() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     console.log('🔧 handleSubmit called');
-    console.log('🔧 selectedUser:', selectedUser);
     console.log('🔧 formData:', formData);
     
-    if (!selectedUser) {
-      alert('Veuillez sélectionner un utilisateur');
+    // Vérifier qu'au moins un utilisateur est sélectionné
+    if (formData.userIds.length === 0) {
+      alert('Veuillez sélectionner au moins un utilisateur pour ce compte');
       return;
     }
     
@@ -210,8 +210,12 @@ export default function Banks() {
       formDataToSend.append('iban', formData.iban);
       formDataToSend.append('balance', formData.balance.toString());
       formDataToSend.append('accountType', formData.accountType);
-      formDataToSend.append('userId', selectedUser.id);
       formDataToSend.append('createdAt', formData.createdAt);
+      
+      // Ajouter la liste des utilisateurs
+      formData.userIds.forEach((userId, index) => {
+        formDataToSend.append(`userIds[${index}]`, userId);
+      });
       
       if (imageFile) {
         formDataToSend.append('image', imageFile);
@@ -278,7 +282,7 @@ export default function Banks() {
       balance: bank.balance,
       accountType: bank.accountType,
       isShared: bank.isShared,
-      sharedUserIds: bank.sharedUsers?.map(u => u.id) || [],
+      userIds: bank.users?.map(u => u.id) || [],
       createdAt: bank.createdAt ? new Date(bank.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
     });
     
@@ -355,7 +359,7 @@ export default function Banks() {
       balance: 0,
       accountType: 'CURRENT',
       isShared: false,
-      sharedUserIds: [],
+      userIds: [],
       createdAt: new Date().toISOString().split('T')[0]
     });
     setImageFile(null);
@@ -642,6 +646,51 @@ export default function Banks() {
                         </div>
                       </div>
 
+                      {/* Sélection des utilisateurs */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Utilisateurs ayant accès à ce compte *
+                        </label>
+                        <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-md p-2">
+                          {users.map(user => (
+                            <label key={user.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                              <input
+                                type="checkbox"
+                                checked={formData.userIds.includes(user.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setFormData({
+                                      ...formData,
+                                      userIds: [...formData.userIds, user.id]
+                                    });
+                                  } else {
+                                    setFormData({
+                                      ...formData,
+                                      userIds: formData.userIds.filter(id => id !== user.id)
+                                    });
+                                  }
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <div className="flex items-center space-x-2">
+                                {user.avatar ? (
+                                  <img
+                                    src={`http://localhost:3001${user.avatar}`}
+                                    alt={user.name}
+                                    className="w-6 h-6 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
+                                    {user.name.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                                <span className="text-sm text-gray-900">{user.name}</span>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+
                       {/* Solde - même position qu'une vraie carte */}
                       <div className="mt-4">
                         <div className="text-sm text-gray-500 mb-1">
@@ -818,186 +867,10 @@ export default function Banks() {
             )}
           </div>
         ))}
-        
-        {/* Carte d'ajout de banque */}
-        {selectedUser && (
-          <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[365px]">
-            {!showAddForm ? (
-              <div 
-                className="cursor-pointer flex flex-col items-center justify-center h-full p-6"
-                onClick={() => {
-                  setShowAddForm(true);
-                  setEditingBank(null); // Annuler l'édition si en cours
-                }}
-              >
-                <div className="text-gray-400 mb-4">
-                  <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </div>
-                <p className="text-gray-500 text-center">
-                  Ajouter un compte
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col h-full">
-                <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                  {/* Section principale - même structure qu'une vraie carte */}
-                  <div className="p-4 flex-1">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center">
-                        {/* Logo/Image ou nom court - cliquable pour choisir photo */}
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
-                          onClick={() => document.getElementById('imageInput-2')?.click()}
-                          title="Cliquez pour choisir une image"
-                        >
-                          {imagePreview ? (
-                            <img
-                              src={imagePreview}
-                              alt="Prévisualisation"
-                              className="w-full h-full rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="text-blue-600 text-xs font-bold">
-                              {formData.shortName || 'LOGO'}
-                            </div>
-                          )}
-                        </div>
-                        {/* Input file caché */}
-                        <input
-                          id="imageInput-2"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          className="hidden"
-                        />
-                        <div className="ml-4 flex-1">
-                          {/* Nom de la banque */}
-                          <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="text-lg font-medium text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full"
-                            placeholder="Nom de la banque"
-                            required
-                          />
-                          {/* Type de compte */}
-                          <select
-                            value={formData.accountType}
-                            onChange={(e) => setFormData({...formData, accountType: e.target.value as 'CURRENT' | 'SAVINGS' | 'INVESTMENT'})}
-                            className="text-sm text-gray-500 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full mt-1"
-                            required
-                          >
-                            <option value="CURRENT">Compte courant</option>
-                            <option value="SAVINGS">Livret d'épargne</option>
-                            <option value="INVESTMENT">Compte d'investissement</option>
-                          </select>
-                        </div>
-                      </div>
-                      {/* Bouton fermer */}
-                      <button
-                        type="button"
-                        onClick={resetForm}
-                        className="text-gray-400 hover:text-gray-600 ml-2"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                    
-                    {/* Champs supplémentaires */}
-                    <div className="space-y-3 mb-4">
-                      <div>
-                        <input
-                          type="text"
-                          value={formData.shortName}
-                          onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Nom court (ex: BNP, CA, LCL)"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="text"
-                          value={formData.iban}
-                          onChange={(e) => setFormData({...formData, iban: e.target.value})}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          type="date"
-                          value={formData.createdAt}
-                          onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Solde - même position qu'une vraie carte */}
-                    <div className="mt-4">
-                      <div className="text-sm text-gray-500 mb-1">
-                        Solde initial
-                      </div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.balance}
-                        onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value)})}
-                        className="text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:border-blue-500 focus:outline-none w-full"
-                        placeholder="0.00"
-                        required
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Footer - même structure qu'une vraie carte */}
-                  <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
-                        Nouveau compte
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={resetForm}
-                          className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
-                        >
-                          Annuler
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-3 py-1 text-xs border border-transparent rounded text-white bg-blue-600 hover:bg-blue-700"
-                        >
-                          Créer
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
-      {banks.length === 0 && !selectedUser && (
-        <div className="text-center py-12">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-2a1 1 0 011-1h1a1 1 0 011 1v2M7 19h10" />
-          </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Aucune banque</h3>
-          <p className="mt-1 text-sm text-gray-500">Sélectionnez un utilisateur pour voir ses banques.</p>
-        </div>
-      )}
-      
-      {banks.length === 0 && selectedUser && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">                {/* Carte d'ajout de banque quand il n'y a pas de banques */}
+      {banks.length === 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">{/* Carte d'ajout de banque quand il n'y a pas de banques */}
                 <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[365px]">
                   {!showAddForm ? (
                     <div 
@@ -1113,6 +986,51 @@ export default function Banks() {
                                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                 required
                               />
+                            </div>
+                          </div>
+
+                          {/* Sélection des utilisateurs */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Utilisateurs ayant accès à ce compte *
+                            </label>
+                            <div className="space-y-2 max-h-32 overflow-y-auto border border-gray-300 rounded-md p-2">
+                              {users.map(user => (
+                                <label key={user.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-50 p-1 rounded">
+                                  <input
+                                    type="checkbox"
+                                    checked={formData.userIds.includes(user.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setFormData({
+                                          ...formData,
+                                          userIds: [...formData.userIds, user.id]
+                                        });
+                                      } else {
+                                        setFormData({
+                                          ...formData,
+                                          userIds: formData.userIds.filter(id => id !== user.id)
+                                        });
+                                      }
+                                    }}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <div className="flex items-center space-x-2">
+                                    {user.avatar ? (
+                                      <img
+                                        src={`http://localhost:3001${user.avatar}`}
+                                        alt={user.name}
+                                        className="w-6 h-6 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-6 h-6 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
+                                        {user.name.charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <span className="text-sm text-gray-900">{user.name}</span>
+                                  </div>
+                                </label>
+                              ))}
                             </div>
                           </div>
 

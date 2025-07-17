@@ -73,24 +73,21 @@ async function main() {
   await prisma.userBank.create({
     data: {
       userId: user1.id,
-      bankId: bank1.id,
-      role: 'OWNER'
+      bankId: bank1.id
     }
   });
 
   await prisma.userBank.create({
     data: {
       userId: user2.id,
-      bankId: bank2.id,
-      role: 'OWNER'
+      bankId: bank2.id
     }
   });
 
   await prisma.userBank.create({
     data: {
       userId: user1.id,
-      bankId: bank3.id,
-      role: 'OWNER'
+      bankId: bank3.id
     }
   });
 
@@ -98,8 +95,7 @@ async function main() {
   await prisma.userBank.create({
     data: {
       userId: user2.id,
-      bankId: bank1.id,
-      role: 'SHARED'
+      bankId: bank1.id
     }
   });
 

@@ -11,7 +11,6 @@ export interface UserBank {
   id: string;
   userId: string;
   bankId: string;
-  role: 'OWNER' | 'SHARED';
   user?: User;
   bank?: Bank;
 }
@@ -33,8 +32,6 @@ export interface Bank {
   userBanks?: UserBank[];
   // Computed fields for convenience
   users?: User[];
-  owners?: User[];
-  sharedUsers?: User[];
 }
 
 export interface Category {
