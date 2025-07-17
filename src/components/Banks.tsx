@@ -100,7 +100,7 @@ function ShareBankModal({ bank, isOpen, onClose, onShare }: ShareBankModalProps)
 }
 
 export default function Banks() {
-  const { banks, transactions, loadBanks, loadTransactions, setSelectedBank, selectedUser, users } = useAppStore();
+  const { banks, transactions, loadBanks, loadTransactions, setSelectedBank, selectedUser } = useAppStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -116,7 +116,8 @@ export default function Banks() {
     balance: 0,
     accountType: 'CURRENT' as 'CURRENT' | 'SAVINGS' | 'INVESTMENT',
     isShared: false,
-    sharedUserIds: [] as string[]
+    sharedUserIds: [] as string[],
+    createdAt: new Date().toISOString().split('T')[0] // Date au format YYYY-MM-DD
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -210,6 +211,7 @@ export default function Banks() {
       formDataToSend.append('balance', formData.balance.toString());
       formDataToSend.append('accountType', formData.accountType);
       formDataToSend.append('userId', selectedUser.id);
+      formDataToSend.append('createdAt', formData.createdAt);
       
       if (imageFile) {
         formDataToSend.append('image', imageFile);
@@ -266,26 +268,9 @@ export default function Banks() {
     }
   };
 
-  const handleRemoveSharedAccess = async (bankId: string, userId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir retirer l\'accès à ce compte ?')) {
-      return;
-    }
-    
-    try {
-      const response = await fetch(`/api/banks/${bankId}/share/${userId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await loadBanks();
-      }
-    } catch (error) {
-      console.error('Error removing shared access:', error);
-    }
-  };
-
   const handleEdit = (bank: Bank) => {
     setEditingBank(bank);
+    setShowAddForm(false); // Fermer le formulaire d'ajout si ouvert
     setFormData({
       name: bank.name,
       shortName: bank.shortName || '',
@@ -293,7 +278,8 @@ export default function Banks() {
       balance: bank.balance,
       accountType: bank.accountType,
       isShared: bank.isShared,
-      sharedUserIds: bank.sharedUsers?.map(u => u.id) || []
+      sharedUserIds: bank.sharedUsers?.map(u => u.id) || [],
+      createdAt: bank.createdAt ? new Date(bank.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
     });
     
     // Set image preview if bank has an image
@@ -303,8 +289,6 @@ export default function Banks() {
       setImagePreview(null);
     }
     setImageFile(null);
-    
-    setShowAddForm(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -371,7 +355,8 @@ export default function Banks() {
       balance: 0,
       accountType: 'CURRENT',
       isShared: false,
-      sharedUserIds: []
+      sharedUserIds: [],
+      createdAt: new Date().toISOString().split('T')[0]
     });
     setImageFile(null);
     setImagePreview(null);
@@ -412,11 +397,6 @@ export default function Banks() {
     }
   };
 
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -443,15 +423,6 @@ export default function Banks() {
           {selectedUser && (
             <>
               <button
-                onClick={() => setShowAddForm(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Ajouter une banque
-              </button>
-              <button
                 onClick={() => {
                   setShowArchived(!showArchived);
                   if (!showArchived) {
@@ -469,117 +440,6 @@ export default function Banks() {
           )}
         </div>
       </div>
-
-      {/* Add/Edit Form */}
-      {showAddForm && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">
-            {editingBank ? 'Modifier la banque' : 'Ajouter une banque'}
-          </h3>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Nom</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Nom court</label>
-              <input
-                type="text"
-                value={formData.shortName}
-                onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                placeholder="Ex: BNP, CA, LCL"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Solde</label>
-              <input
-                type="number"
-                step="0.01"
-                value={formData.balance}
-                onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value)})}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Type de compte</label>
-              <select
-                value={formData.accountType}
-                onChange={(e) => setFormData({...formData, accountType: e.target.value as 'CURRENT' | 'SAVINGS' | 'INVESTMENT'})}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
-              >
-                <option value="CURRENT">Compte courant</option>
-                <option value="SAVINGS">Livret d'épargne</option>
-                <option value="INVESTMENT">Compte d'investissement</option>
-              </select>
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700">IBAN</label>
-              <input
-                type="text"
-                value={formData.iban}
-                onChange={(e) => setFormData({...formData, iban: e.target.value})}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                placeholder="Ex: FR76 1234 5678 9012 3456 789"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Logo de la banque</label>
-              {imagePreview && (
-                <div className="mb-4">
-                  <div className="relative inline-block">
-                    <img
-                      src={imagePreview}
-                      alt="Prévisualisation"
-                      className="h-20 w-20 object-cover rounded-lg border border-gray-300"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRemoveImage}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Formats acceptés: PNG, JPG, GIF, WebP. Taille max: 5MB
-              </p>
-            </div>
-            <div className="md:col-span-2 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                {editingBank ? 'Modifier' : 'Ajouter'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
 
       {/* Archived Banks */}
       {showArchived && (
@@ -612,9 +472,9 @@ export default function Banks() {
                 <p className="mt-2 text-sm text-gray-500">Aucune banque archivée</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {archivedBanks.map((bank) => (
-                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+                {archivedBanks.slice().reverse().map((bank) => (
+                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75 flex flex-col h-full min-h-[300px]">
                     <div className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -677,146 +537,645 @@ export default function Banks() {
       )}
 
       {/* Regular Banks Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {banks.map((bank) => (
-          <div key={bank.id} className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
-            <div 
-              className={`p-6 transition-colors flex-1 ${
-                bank.accountType === 'CURRENT' 
-                  ? 'cursor-pointer hover:bg-gray-50' 
-                  : 'cursor-not-allowed opacity-75 bg-gray-50'
-              }`}
-              onClick={() => handleBankClick(bank)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  {bank.image ? (
-                    <img
-                      src={`http://localhost:3001${bank.image}`}
-                      alt={bank.name}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
-                    />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+        {banks.slice().reverse().map((bank) => (
+          <div key={bank.id}>
+            {/* Si la banque est en cours d'édition, afficher le formulaire d'édition */}
+            {editingBank?.id === bank.id ? (
+              <div className="bg-white shadow rounded-lg border-2 border-blue-300 flex flex-col h-full min-h-[400px]">
+                <div className="flex flex-col h-full">
+                  <form onSubmit={handleSubmit} className="flex flex-col h-full">
+                    {/* Section principale - même structure qu'une vraie carte */}
+                    <div className="p-6 flex-1">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center">
+                          {/* Logo/Image ou nom court - cliquable pour choisir photo */}
+                          <div 
+                            className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                            onClick={() => document.getElementById('imageInput-edit')?.click()}
+                            title="Cliquez pour choisir une image"
+                          >
+                            {imagePreview ? (
+                              <img
+                                src={imagePreview}
+                                alt="Prévisualisation"
+                                className="w-full h-full rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="text-blue-600 text-xs font-bold">
+                                {formData.shortName || 'LOGO'}
+                              </div>
+                            )}
+                          </div>
+                          {/* Input file caché */}
+                          <input
+                            id="imageInput-edit"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleImageChange}
+                            className="hidden"
+                          />
+                          <div className="ml-4 flex-1">
+                            {/* Nom de la banque */}
+                            <input
+                              type="text"
+                              value={formData.name}
+                              onChange={(e) => setFormData({...formData, name: e.target.value})}
+                              className="text-lg font-medium text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                              placeholder="Nom de la banque"
+                              required
+                            />
+                            {/* Type de compte */}
+                            <select
+                              value={formData.accountType}
+                              onChange={(e) => setFormData({...formData, accountType: e.target.value as 'CURRENT' | 'SAVINGS' | 'INVESTMENT'})}
+                              className="text-sm text-gray-500 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full mt-1"
+                              required
+                            >
+                              <option value="CURRENT">Compte courant</option>
+                              <option value="SAVINGS">Livret d'épargne</option>
+                              <option value="INVESTMENT">Compte d'investissement</option>
+                            </select>
+                          </div>
+                        </div>
+                        {/* Bouton fermer */}
+                        <button
+                          type="button"
+                          onClick={resetForm}
+                          className="text-gray-400 hover:text-gray-600 ml-2"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      {/* Champs supplémentaires */}
+                      <div className="space-y-3 mb-4">
+                        <div>
+                          <input
+                            type="text"
+                            value={formData.shortName}
+                            onChange={(e) => setFormData({...formData, shortName: e.target.value})}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Nom court (ex: BNP, CA, LCL)"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            value={formData.iban}
+                            onChange={(e) => setFormData({...formData, iban: e.target.value})}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="date"
+                            value={formData.createdAt}
+                            onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
+                            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Solde - même position qu'une vraie carte */}
+                      <div className="mt-4">
+                        <div className="text-sm text-gray-500 mb-1">
+                          Solde
+                        </div>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={formData.balance}
+                          onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value)})}
+                          className="text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                          placeholder="0.00"
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Footer - même structure qu'une vraie carte */}
+                    <div className="bg-gray-50 px-6 py-3">
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-gray-500">
+                          Modification
+                        </div>
+                        <div className="flex space-x-2">
+                          <button
+                            type="button"
+                            onClick={resetForm}
+                            className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                          >
+                            Annuler
+                          </button>
+                          <button
+                            type="submit"
+                            className="px-3 py-1 text-xs border border-transparent rounded text-white bg-blue-600 hover:bg-blue-700"
+                          >
+                            Sauvegarder
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              /* Carte normale de banque */
+              <div className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full min-h-[400px]">
+                <div 
+                  className={`p-6 transition-colors flex-1 ${
+                    bank.accountType === 'CURRENT' 
+                      ? 'cursor-pointer hover:bg-gray-50' 
+                      : 'cursor-not-allowed opacity-75 bg-gray-50'
+                  }`}
+                  onClick={() => handleBankClick(bank)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      {bank.image ? (
+                        <img
+                          src={`http://localhost:3001${bank.image}`}
+                          alt={bank.name}
+                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
+                        />
+                      ) : (
+                        <div 
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold bg-blue-600 flex-shrink-0"
+                        >
+                          {bank.shortName}
+                        </div>
+                      )}
+                      <div className="ml-4">
+                        <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
+                        <p className="text-sm text-gray-500">
+                          {getAccountTypeInfo(bank.accountType).label}
+                          {bank.accountType !== 'CURRENT' && (
+                            <span className="ml-2 text-orange-600 font-medium">(Non sélectionnable)</span>
+                          )}
+                          {!selectedUser && bank.users && bank.users.length > 0 && (
+                            <span className="ml-2 text-blue-600">
+                              • {bank.users.map(u => u.name).join(', ')}
+                            </span>
+                          )}
+                          {selectedUser && bank.isShared && (
+                            <span className="ml-2 text-green-600">(Partagé)</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    {selectedUser && (
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(bank);
+                          }}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Modifier"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBankToShare(bank);
+                            setShowShareModal(true);
+                          }}
+                          className="text-green-600 hover:text-green-900"
+                          title="Partager"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(bank.id);
+                          }}
+                          className="text-red-600 hover:text-red-900"
+                          title="Supprimer"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4">
+                    <div className="text-sm text-gray-500 mb-1">
+                      Solde actuel
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatAmount(bank.balance)}
+                    </div>
+                  </div>
+                </div>
+                <div 
+                  className="bg-gray-50 px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleBankClick(bank)}
+                >
+                  {/* Afficher les 3 dernières transactions de cette banque */}
+                  {transactions.filter(t => t.bankId === bank.id).length > 0 ? (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">
+                        Dernières transactions:
+                      </p>
+                      <div className="space-y-1">
+                        {transactions
+                          .filter(t => t.bankId === bank.id)
+                          .slice(0, 3)
+                          .map((transaction) => (
+                            <div key={transaction.id} className="flex justify-between text-xs">
+                              <span className="text-gray-600 truncate">
+                                {transaction.description}
+                              </span>
+                              <span className={`font-medium ${
+                                transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                                {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
                   ) : (
-                    <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold bg-blue-600 flex-shrink-0"
-                    >
-                      {bank.shortName}
+                    <div className="text-sm text-gray-500">
+                      Aucune transaction récente
                     </div>
                   )}
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
-                    <p className="text-sm text-gray-500">
-                      {getAccountTypeInfo(bank.accountType).label}
-                      {bank.accountType !== 'CURRENT' && (
-                        <span className="ml-2 text-orange-600 font-medium">(Non sélectionnable)</span>
-                      )}
-                      {!selectedUser && bank.users && bank.users.length > 0 && (
-                        <span className="ml-2 text-blue-600">
-                          • {bank.users.map(u => u.name).join(', ')}
-                        </span>
-                      )}
-                      {selectedUser && bank.isShared && (
-                        <span className="ml-2 text-green-600">(Partagé)</span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-                {selectedUser && (
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(bank);
-                      }}
-                      className="text-blue-600 hover:text-blue-900"
-                      title="Modifier"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setBankToShare(bank);
-                        setShowShareModal(true);
-                      }}
-                      className="text-green-600 hover:text-green-900"
-                      title="Partager"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(bank.id);
-                      }}
-                      className="text-red-600 hover:text-red-900"
-                      title="Supprimer"
-                    >
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
-                )}
-              </div>
-              <div className="mt-4">
-                <div className="text-sm text-gray-500 mb-1">
-                  Solde actuel
-                </div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {formatAmount(bank.balance)}
                 </div>
               </div>
-            </div>
-            <div 
-              className="bg-gray-50 px-6 py-3 cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => handleBankClick(bank)}
-            >
-              {/* Afficher les 3 dernières transactions de cette banque */}
-              {transactions.filter(t => t.bankId === bank.id).length > 0 ? (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">
-                    Dernières transactions:
-                  </p>
-                  <div className="space-y-1">
-                    {transactions
-                      .filter(t => t.bankId === bank.id)
-                      .slice(0, 3)
-                      .map((transaction) => (
-                        <div key={transaction.id} className="flex justify-between text-xs">
-                          <span className="text-gray-600 truncate">
-                            {transaction.description}
-                          </span>
-                          <span className={`font-medium ${
-                            transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                            {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-sm text-gray-500">
-                  Aucune transaction récente
-                </div>
-              )}
-            </div>
+            )}
           </div>
         ))}
+        
+        {/* Carte d'ajout de banque */}
+        {selectedUser && (
+          <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[400px]">
+            {!showAddForm ? (
+              <div 
+                className="cursor-pointer"
+                onClick={() => {
+                  setShowAddForm(true);
+                  setEditingBank(null); // Annuler l'édition si en cours
+                }}
+              >
+                <div className="p-6 text-center">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                    <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Ajouter une banque</h3>
+                  <p className="text-sm text-gray-500">
+                    Cliquez pour ajouter un nouveau compte bancaire
+                  </p>
+                </div>
+                <div className="bg-gray-50 px-6 py-3 text-center">
+                  <div className="text-sm text-gray-500">
+                    Nouveau compte
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col h-full">
+                <form onSubmit={handleSubmit} className="flex flex-col h-full">
+                  {/* Section principale - même structure qu'une vraie carte */}
+                  <div className="p-6 flex-1">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        {/* Logo/Image ou nom court - cliquable pour choisir photo */}
+                        <div 
+                          className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                          onClick={() => document.getElementById('imageInput-2')?.click()}
+                          title="Cliquez pour choisir une image"
+                        >
+                          {imagePreview ? (
+                            <img
+                              src={imagePreview}
+                              alt="Prévisualisation"
+                              className="w-full h-full rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-blue-600 text-xs font-bold">
+                              {formData.shortName || 'LOGO'}
+                            </div>
+                          )}
+                        </div>
+                        {/* Input file caché */}
+                        <input
+                          id="imageInput-2"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                        <div className="ml-4 flex-1">
+                          {/* Nom de la banque */}
+                          <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) => setFormData({...formData, name: e.target.value})}
+                            className="text-lg font-medium text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                            placeholder="Nom de la banque"
+                            required
+                          />
+                          {/* Type de compte */}
+                          <select
+                            value={formData.accountType}
+                            onChange={(e) => setFormData({...formData, accountType: e.target.value as 'CURRENT' | 'SAVINGS' | 'INVESTMENT'})}
+                            className="text-sm text-gray-500 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full mt-1"
+                            required
+                          >
+                            <option value="CURRENT">Compte courant</option>
+                            <option value="SAVINGS">Livret d'épargne</option>
+                            <option value="INVESTMENT">Compte d'investissement</option>
+                          </select>
+                        </div>
+                      </div>
+                      {/* Bouton fermer */}
+                      <button
+                        type="button"
+                        onClick={resetForm}
+                        className="text-gray-400 hover:text-gray-600 ml-2"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                    
+                    {/* Champs supplémentaires */}
+                    <div className="space-y-3 mb-4">
+                      <div>
+                        <input
+                          type="text"
+                          value={formData.shortName}
+                          onChange={(e) => setFormData({...formData, shortName: e.target.value})}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="Nom court (ex: BNP, CA, LCL)"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="text"
+                          value={formData.iban}
+                          onChange={(e) => setFormData({...formData, iban: e.target.value})}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
+                        />
+                      </div>
+                      <div>
+                        <input
+                          type="date"
+                          value={formData.createdAt}
+                          onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
+                          className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    {/* Solde - même position qu'une vraie carte */}
+                    <div className="mt-4">
+                      <div className="text-sm text-gray-500 mb-1">
+                        Solde initial
+                      </div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.balance}
+                        onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value)})}
+                        className="text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Footer - même structure qu'une vraie carte */}
+                  <div className="bg-gray-50 px-6 py-3">
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-500">
+                        Nouveau compte
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={resetForm}
+                          className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-3 py-1 text-xs border border-transparent rounded text-white bg-blue-600 hover:bg-blue-700"
+                        >
+                          Créer
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
-      {banks.length === 0 && (
+      {banks.length === 0 && !selectedUser && (
         <div className="text-center py-12">
           <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-2a1 1 0 011-1h1a1 1 0 011 1v2M7 19h10" />
           </svg>
           <h3 className="mt-2 text-sm font-medium text-gray-900">Aucune banque</h3>
-          <p className="mt-1 text-sm text-gray-500">Commencez par ajouter une nouvelle banque.</p>
+          <p className="mt-1 text-sm text-gray-500">Sélectionnez un utilisateur pour voir ses banques.</p>
+        </div>
+      )}
+      
+      {banks.length === 0 && selectedUser && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">                {/* Carte d'ajout de banque quand il n'y a pas de banques */}
+                <div className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[400px]">
+                  {!showAddForm ? (
+                    <div 
+                      className="cursor-pointer"
+                      onClick={() => {
+                        setShowAddForm(true);
+                        setEditingBank(null); // Annuler l'édition si en cours
+                      }}
+                    >
+                      <div className="p-6 text-center">
+                        <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mb-4">
+                          <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Ajouter une banque</h3>
+                        <p className="text-sm text-gray-500">
+                          Commencez par ajouter votre première banque
+                        </p>
+                      </div>
+                      <div className="bg-gray-50 px-6 py-3 text-center">
+                        <div className="text-sm text-gray-500">
+                          Première banque
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col h-full">
+                      <form onSubmit={handleSubmit} className="flex flex-col h-full">
+                        {/* Section principale - même structure qu'une vraie carte */}
+                        <div className="p-6 flex-1">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center">
+                              {/* Logo/Image ou nom court - cliquable pour choisir photo */}
+                              <div 
+                                className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                                onClick={() => document.getElementById('imageInput-3')?.click()}
+                                title="Cliquez pour choisir une image"
+                              >
+                                {imagePreview ? (
+                                  <img
+                                    src={imagePreview}
+                                    alt="Prévisualisation"
+                                    className="w-full h-full rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="text-blue-600 text-xs font-bold">
+                                    {formData.shortName || 'LOGO'}
+                                  </div>
+                                )}
+                              </div>
+                              {/* Input file caché */}
+                              <input
+                                id="imageInput-3"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageChange}
+                                className="hidden"
+                              />
+                              <div className="ml-4 flex-1">
+                                {/* Nom de la banque */}
+                                <input
+                                  type="text"
+                                  value={formData.name}
+                                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                                  className="text-lg font-medium text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                                  placeholder="Nom de la banque"
+                                  required
+                                />
+                                {/* Type de compte */}
+                                <select
+                                  value={formData.accountType}
+                                  onChange={(e) => setFormData({...formData, accountType: e.target.value as 'CURRENT' | 'SAVINGS' | 'INVESTMENT'})}
+                                  className="text-sm text-gray-500 bg-transparent border-b border-gray-300 focus:border-blue-500 focus:outline-none w-full mt-1"
+                                  required
+                                >
+                                  <option value="CURRENT">Compte courant</option>
+                                  <option value="SAVINGS">Livret d'épargne</option>
+                                  <option value="INVESTMENT">Compte d'investissement</option>
+                                </select>
+                              </div>
+                            </div>
+                            {/* Bouton fermer */}
+                            <button
+                              type="button"
+                              onClick={resetForm}
+                              className="text-gray-400 hover:text-gray-600 ml-2"
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                          
+                          {/* Champs supplémentaires */}
+                          <div className="space-y-3 mb-4">
+                            <div>
+                              <input
+                                type="text"
+                                value={formData.shortName}
+                                onChange={(e) => setFormData({...formData, shortName: e.target.value})}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Nom court (ex: BNP, CA, LCL)"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <input
+                                type="text"
+                                value={formData.iban}
+                                onChange={(e) => setFormData({...formData, iban: e.target.value})}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
+                              />
+                            </div>
+                            <div>
+                              <input
+                                type="date"
+                                value={formData.createdAt}
+                                onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
+                                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          {/* Solde - même position qu'une vraie carte */}
+                          <div className="mt-4">
+                            <div className="text-sm text-gray-500 mb-1">
+                              Solde initial
+                            </div>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={formData.balance}
+                              onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value)})}
+                              className="text-2xl font-bold text-gray-900 bg-transparent border-b-2 border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                              placeholder="0.00"
+                              required
+                            />
+                          </div>
+                        </div>
+                        
+                        {/* Footer - même structure qu'une vraie carte */}
+                        <div className="bg-gray-50 px-6 py-3">
+                          <div className="flex justify-between items-center">
+                            <div className="text-sm text-gray-500">
+                              Première banque
+                            </div>
+                            <div className="flex space-x-2">
+                              <button
+                                type="button"
+                                onClick={resetForm}
+                                className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                              >
+                                Annuler
+                              </button>
+                              <button
+                                type="submit"
+                                className="px-3 py-1 text-xs border border-transparent rounded text-white bg-blue-600 hover:bg-blue-700"
+                              >
+                                Créer
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </form>
+                    </div>
+                  )}
+                </div>
         </div>
       )}
 

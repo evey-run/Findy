@@ -140,15 +140,18 @@ router.get('/:id', async (req, res) => {
 // POST /api/banks - Create a new bank
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { name, shortName, color, iban, balance, userId } = req.body;
+    const { name, shortName, color, iban, balance, userId, createdAt } = req.body;
     
-    console.log('🔧 Creating bank with data:', { name, shortName, color, iban, balance, userId });
+    console.log('🔧 Creating bank with data:', { name, shortName, color, iban, balance, userId, createdAt });
     
     if (!name || !userId) {
       return res.status(400).json({ error: 'Name and userId are required' });
     }
     
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    
+    // Si createdAt est fourni, l'utiliser, sinon utiliser la date actuelle
+    const createdAtDate = createdAt ? new Date(createdAt) : new Date();
     
     const bank = await prisma.bank.create({
       data: {
@@ -158,6 +161,7 @@ router.post('/', upload.single('image'), async (req, res) => {
         image: imageUrl,
         iban,
         balance: parseFloat(balance) || 0,
+        createdAt: createdAtDate,
         userBanks: {
           create: {
             userId: userId,
@@ -202,7 +206,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, shortName, color, iban, balance } = req.body;
+    const { name, shortName, color, iban, balance, createdAt } = req.body;
     
     const updateData: any = {
       name,
@@ -211,6 +215,11 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       iban,
       balance
     };
+    
+    // Si createdAt est fourni, l'utiliser
+    if (createdAt) {
+      updateData.createdAt = new Date(createdAt);
+    }
     
     // Add image if uploaded
     if (req.file) {
