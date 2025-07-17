@@ -604,24 +604,15 @@ export default function Recurrences() {
                       <option value="false">Inactive</option>
                     </select>
                   ) : (
-                    <div className="flex flex-col space-y-1">
-                      <span 
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell ${
-                          recurrence.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                        }`}
-                        onDoubleClick={() => handleInlineEdit(recurrence.id, 'active')}
-                        title="Double-cliquez pour éditer"
-                      >
-                        {recurrence.active ? 'Active' : 'Inactive'}
-                      </span>
-                      {recurrence.active && (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          getNextDueStatus(recurrence.nextDue).color
-                        }`}>
-                          {getNextDueStatus(recurrence.nextDue).label}
-                        </span>
-                      )}
-                    </div>
+                    <span 
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell ${
+                        recurrence.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
+                      onDoubleClick={() => handleInlineEdit(recurrence.id, 'active')}
+                      title="Double-cliquez pour éditer"
+                    >
+                      {recurrence.active ? 'Active' : 'Inactive'}
+                    </span>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
