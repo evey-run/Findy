@@ -3,6 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Bank } from '../types/index.js';
 
+// Helper function pour obtenir les informations du type de compte
+const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
+  switch (accountType) {
+    case 'CURRENT':
+      return {
+        label: 'Compte courant',
+        color: 'bg-blue-100 text-blue-800'
+      };
+    case 'SAVINGS':
+      return {
+        label: 'Livret d\'épargne',
+        color: 'bg-green-100 text-green-800'
+      };
+    case 'INVESTMENT':
+      return {
+        label: 'Compte d\'investissement',
+        color: 'bg-purple-100 text-purple-800'
+      };
+    default:
+      return {
+        label: 'Compte courant',
+        color: 'bg-blue-100 text-blue-800'
+      };
+  }
+};
+
 // Modal pour partager un compte
 interface ShareBankModalProps {
   bank: Bank;
@@ -352,19 +378,6 @@ export default function Banks() {
     }).format(amount);
   };
 
-  const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
-    switch (accountType) {
-      case 'CURRENT':
-        return { label: 'Compte courant', color: 'bg-blue-100 text-blue-800' };
-      case 'SAVINGS':
-        return { label: 'Livret d\'épargne', color: 'bg-green-100 text-green-800' };
-      case 'INVESTMENT':
-        return { label: 'Compte d\'investissement', color: 'bg-purple-100 text-purple-800' };
-      default:
-        return { label: 'Compte courant', color: 'bg-blue-100 text-blue-800' };
-    }
-  };
-
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -679,19 +692,16 @@ export default function Banks() {
                     </div>
                   )}
                   <div className="ml-4">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getAccountTypeInfo(bank.accountType).color}`}>
-                        {getAccountTypeInfo(bank.accountType).label}
-                      </span>
-                    </div>
+                    <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
                     <p className="text-sm text-gray-500">
-                      {bank.iban || 'Aucun IBAN'}
+                      {getAccountTypeInfo(bank.accountType).label}
                       {!selectedUser && bank.users && bank.users.length > 0 && (
                         <span className="ml-2 text-blue-600">
                           • {bank.users.map(u => u.name).join(', ')}
-                          {bank.isShared && <span className="ml-1 text-green-600">(Partagé)</span>}
                         </span>
+                      )}
+                      {selectedUser && bank.isShared && (
+                        <span className="ml-2 text-green-600">(Partagé)</span>
                       )}
                     </p>
                   </div>
