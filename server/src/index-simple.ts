@@ -738,37 +738,15 @@ app.delete('/api/transactions/:id', async (req, res) => {
 
 app.get('/api/budgets', async (req, res) => {
   try {
-    const budgets = await prisma.budget.findMany({
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            color: true,
-            icon: true
-          }
-        }
-      }
-    });
-    res.json(budgets);
-  } catch (error) {
-    console.error('Error fetching budgets:', error);
-    res.status(500).json({ error: 'Failed to fetch budgets' });
-  }
-});
-
-app.get('/api/recurrences', async (req, res) => {
-  try {
-    const { bankId, categoryId, active, shared } = req.query;
+    const { bankId, categoryId, period, shared } = req.query;
     
     const where: any = {};
     if (bankId) where.bankId = bankId;
     if (categoryId) where.categoryId = categoryId;
-    if (active !== undefined) where.active = active === 'true';
+    if (period) where.period = period;
     if (shared !== undefined) where.shared = shared === 'true';
     
-    const recurrences = await prisma.recurrence.findMany({
+    const budgets = await prisma.budget.findMany({
       where,
       include: {
         bank: {
@@ -791,35 +769,34 @@ app.get('/api/recurrences', async (req, res) => {
         }
       },
       orderBy: {
-        nextDue: 'asc'
+        createdAt: 'desc'
       }
     });
-    res.json(recurrences);
+    
+    res.json(budgets);
   } catch (error) {
-    console.error('Error fetching recurrences:', error);
-    res.status(500).json({ error: 'Failed to fetch recurrences' });
+    console.error('Error fetching budgets:', error);
+    res.status(500).json({ error: 'Failed to fetch budgets' });
   }
 });
 
-// POST /api/recurrences - Créer une nouvelle récurrence
-app.post('/api/recurrences', async (req, res) => {
+// POST /api/budgets - Créer un nouveau budget
+app.post('/api/budgets', async (req, res) => {
   try {
-    const { amount, frequency, nextDue, description, shared, bankId, categoryId, active } = req.body;
+    const { amount, period, startDate, shared, bankId, categoryId } = req.body;
     
-    if (!amount || !nextDue || !description || !categoryId) {
+    if (!amount || !categoryId) {
       return res.status(400).json({ 
-        error: 'Amount, nextDue, description, and categoryId are required' 
+        error: 'Amount and categoryId are required' 
       });
     }
     
-    const recurrence = await prisma.recurrence.create({
+    const budget = await prisma.budget.create({
       data: {
         amount: parseFloat(amount),
-        frequency: frequency || 'MONTHLY',
-        nextDue: new Date(nextDue),
-        description,
+        period: period || 'MONTHLY',
+        startDate: startDate ? new Date(startDate) : new Date(),
         shared: shared || false,
-        active: active !== false,
         bankId: bankId || null,
         categoryId
       },
@@ -845,30 +822,26 @@ app.post('/api/recurrences', async (req, res) => {
       }
     });
     
-    res.status(201).json(recurrence);
+    res.status(201).json(budget);
   } catch (error) {
-    console.error('Error creating recurrence:', error);
-    res.status(500).json({ error: 'Failed to create recurrence' });
+    console.error('Error creating budget:', error);
+    res.status(500).json({ error: 'Failed to create budget' });
   }
 });
 
-// PUT /api/recurrences/:id - Mettre à jour une récurrence
-app.put('/api/recurrences/:id', async (req, res) => {
+// PUT /api/budgets/:id - Mettre à jour un budget
+app.put('/api/budgets/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, frequency, nextDue, description, shared, active, bankId, categoryId } = req.body;
+    const { amount, period, startDate, shared } = req.body;
     
-    const recurrence = await prisma.recurrence.update({
+    const budget = await prisma.budget.update({
       where: { id },
       data: {
         ...(amount && { amount: parseFloat(amount) }),
-        ...(frequency && { frequency }),
-        ...(nextDue && { nextDue: new Date(nextDue) }),
-        ...(description && { description }),
-        ...(shared !== undefined && { shared }),
-        ...(active !== undefined && { active }),
-        ...(bankId !== undefined && { bankId }),
-        ...(categoryId && { categoryId })
+        ...(period && { period }),
+        ...(startDate && { startDate: new Date(startDate) }),
+        ...(shared !== undefined && { shared })
       },
       include: {
         bank: {
@@ -892,32 +865,112 @@ app.put('/api/recurrences/:id', async (req, res) => {
       }
     });
     
-    res.json(recurrence);
+    res.json(budget);
   } catch (error: any) {
-    console.error('Error updating recurrence:', error);
+    console.error('Error updating budget:', error);
     if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Recurrence not found' });
+      return res.status(404).json({ error: 'Budget not found' });
     }
-    res.status(500).json({ error: 'Failed to update recurrence' });
+    res.status(500).json({ error: 'Failed to update budget' });
   }
 });
 
-// DELETE /api/recurrences/:id - Supprimer une récurrence
-app.delete('/api/recurrences/:id', async (req, res) => {
+// DELETE /api/budgets/:id - Supprimer un budget
+app.delete('/api/budgets/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    await prisma.recurrence.delete({
+    await prisma.budget.delete({
       where: { id }
     });
     
     res.status(204).send();
   } catch (error: any) {
-    console.error('Error deleting recurrence:', error);
+    console.error('Error deleting budget:', error);
     if (error.code === 'P2025') {
-      return res.status(404).json({ error: 'Recurrence not found' });
+      return res.status(404).json({ error: 'Budget not found' });
     }
-    res.status(500).json({ error: 'Failed to delete recurrence' });
+    res.status(500).json({ error: 'Failed to delete budget' });
+  }
+});
+
+// GET /api/budgets/:id/spending - Obtenir les dépenses pour un budget
+app.get('/api/budgets/:id/spending', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const budget = await prisma.budget.findUnique({
+      where: { id },
+      include: {
+        category: true,
+        bank: true
+      }
+    });
+    
+    if (!budget) {
+      return res.status(404).json({ error: 'Budget not found' });
+    }
+    
+    // Calculer la période actuelle
+    const startDate = new Date(budget.startDate);
+    const endDate = new Date(startDate);
+    
+    switch (budget.period) {
+      case 'WEEKLY':
+        endDate.setDate(startDate.getDate() + 7);
+        break;
+      case 'MONTHLY':
+        endDate.setMonth(startDate.getMonth() + 1);
+        break;
+      case 'QUARTERLY':
+        endDate.setMonth(startDate.getMonth() + 3);
+        break;
+      case 'YEARLY':
+        endDate.setFullYear(startDate.getFullYear() + 1);
+        break;
+    }
+    
+    // Récupérer les transactions pour cette période
+    const where: any = {
+      categoryId: budget.categoryId,
+      date: {
+        gte: startDate,
+        lt: endDate
+      }
+    };
+    
+    if (budget.bankId) {
+      where.bankId = budget.bankId;
+    }
+    
+    const transactions = await prisma.transaction.findMany({
+      where,
+      include: {
+        category: true,
+        bank: true
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+    
+    const totalSpent = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    const remaining = budget.amount - totalSpent;
+    const percentage = budget.amount > 0 ? (totalSpent / budget.amount) * 100 : 0;
+    
+    res.json({
+      budget,
+      transactions,
+      totalSpent,
+      remaining,
+      percentage,
+      isOverBudget: totalSpent > budget.amount,
+      periodStart: startDate.toISOString(),
+      periodEnd: endDate.toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching budget spending:', error);
+    res.status(500).json({ error: 'Failed to fetch budget spending' });
   }
 });
 
@@ -1097,6 +1150,195 @@ app.post('/api/recurrences/process', async (req, res) => {
   } catch (error) {
     console.error('Error processing recurrences:', error);
     res.status(500).json({ error: 'Failed to process recurrences' });
+  }
+});
+
+// Routes pour les objectifs d'épargne
+// GET /api/objectives - Récupérer tous les objectifs
+app.get('/api/objectives', async (req, res) => {
+  try {
+    const objectives = await prisma.objective.findMany({
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+    
+    res.json(objectives);
+  } catch (error) {
+    console.error('Error fetching objectives:', error);
+    res.status(500).json({ error: 'Failed to fetch objectives' });
+  }
+});
+
+// POST /api/objectives - Créer un nouvel objectif
+app.post('/api/objectives', async (req, res) => {
+  try {
+    const { title, description, targetAmount, deadline } = req.body;
+    
+    if (!title || !targetAmount) {
+      return res.status(400).json({ 
+        error: 'Title and targetAmount are required' 
+      });
+    }
+    
+    const objective = await prisma.objective.create({
+      data: {
+        title,
+        description: description || null,
+        targetAmount: parseFloat(targetAmount),
+        deadline: deadline ? new Date(deadline) : null,
+        isCompleted: false
+      }
+    });
+    
+    res.status(201).json(objective);
+  } catch (error) {
+    console.error('Error creating objective:', error);
+    res.status(500).json({ error: 'Failed to create objective' });
+  }
+});
+
+// PUT /api/objectives/:id - Mettre à jour un objectif
+app.put('/api/objectives/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, targetAmount, deadline, isCompleted } = req.body;
+    
+    const objective = await prisma.objective.update({
+      where: { id },
+      data: {
+        ...(title && { title }),
+        ...(description !== undefined && { description }),
+        ...(targetAmount && { targetAmount: parseFloat(targetAmount) }),
+        ...(deadline !== undefined && { deadline: deadline ? new Date(deadline) : null }),
+        ...(isCompleted !== undefined && { isCompleted })
+      }
+    });
+    
+    res.json(objective);
+  } catch (error: any) {
+    console.error('Error updating objective:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Objective not found' });
+    }
+    res.status(500).json({ error: 'Failed to update objective' });
+  }
+});
+
+// DELETE /api/objectives/:id - Supprimer un objectif
+app.delete('/api/objectives/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.objective.delete({
+      where: { id }
+    });
+    
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Error deleting objective:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Objective not found' });
+    }
+    res.status(500).json({ error: 'Failed to delete objective' });
+  }
+});
+
+// GET /api/objectives/:id/progress - Obtenir le progrès d'un objectif
+app.get('/api/objectives/:id/progress', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const objective = await prisma.objective.findUnique({
+      where: { id }
+    });
+    
+    if (!objective) {
+      return res.status(404).json({ error: 'Objective not found' });
+    }
+    
+    // Rechercher les transactions qui contiennent "Économie [titre]"
+    const searchPattern = `Économie ${objective.title}`;
+    
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        description: {
+          contains: searchPattern
+        },
+        amount: {
+          gt: 0 // Seulement les transactions positives (épargne)
+        }
+      },
+      include: {
+        bank: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+            color: true
+          }
+        },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            color: true,
+            icon: true
+          }
+        }
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+    
+    const totalSaved = transactions.reduce((sum, t) => sum + t.amount, 0);
+    const remaining = objective.targetAmount - totalSaved;
+    const percentage = objective.targetAmount > 0 ? (totalSaved / objective.targetAmount) * 100 : 0;
+    const isCompleted = totalSaved >= objective.targetAmount;
+    
+    // Mettre à jour automatiquement le statut si l'objectif est atteint
+    if (isCompleted && !objective.isCompleted) {
+      await prisma.objective.update({
+        where: { id },
+        data: { isCompleted: true }
+      });
+    }
+    
+    res.json({
+      objective: {
+        ...objective,
+        isCompleted: isCompleted
+      },
+      transactions,
+      totalSaved,
+      remaining,
+      percentage,
+      isCompleted,
+      searchPattern
+    });
+  } catch (error) {
+    console.error('Error fetching objective progress:', error);
+    res.status(500).json({ error: 'Failed to fetch objective progress' });
+  }
+});
+
+app.get('/api/recurrences', async (req, res) => {
+  try {
+    const recurrences = await prisma.recurrence.findMany({
+      include: {
+        bank: true,
+        category: true
+      },
+      orderBy: {
+        nextDue: 'asc'
+      }
+    });
+    res.json(recurrences);
+  } catch (error) {
+    console.error('Error fetching recurrences:', error);
+    res.status(500).json({ error: 'Failed to fetch recurrences' });
   }
 });
 

@@ -144,6 +144,17 @@ export interface ExpenseByCategory {
   amount: number;
 }
 
+export interface Objective {
+  id: string;
+  title: string;
+  description?: string;
+  targetAmount: number;
+  deadline?: string;
+  isCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface DashboardOverview {
   summary: DashboardSummary;
   recentTransactions: Transaction[];

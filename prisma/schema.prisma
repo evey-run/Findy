@@ -138,6 +138,19 @@ model Recurrence {
   @@map("recurrences")
 }
 
+model Objective {
+  id           String    @id @default(cuid())
+  title        String    // "Moto", "Vacances", etc.
+  description  String?   // Description optionnelle
+  targetAmount Float     // Montant cible à atteindre
+  deadline     DateTime? // Date limite optionnelle
+  isCompleted  Boolean   @default(false) // Si l'objectif est atteint
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@map("objectives")
+}
+
 enum CategoryType {
   INCOME    // Revenus
   EXPENSE   // Dépenses
