@@ -8,7 +8,6 @@ interface EditingRecurrence {
   frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
   nextDue: string;
   description: string;
-  shared: boolean;
   active: boolean;
   bankId?: string;
   categoryId: string;
@@ -56,7 +55,6 @@ export default function Recurrences() {
           frequency: 'MONTHLY',
           nextDue: new Date().toISOString().split('T')[0],
           description: '',
-          shared: false,
           active: true,
           bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
           categoryId: categories[0]?.id || ''
@@ -79,7 +77,6 @@ export default function Recurrences() {
       frequency: recurrence.frequency,
       nextDue: new Date(recurrence.nextDue).toISOString().split('T')[0],
       description: recurrence.description,
-      shared: recurrence.shared,
       active: recurrence.active,
       bankId: recurrence.bankId,
       categoryId: recurrence.categoryId
@@ -100,7 +97,6 @@ export default function Recurrences() {
           frequency: editingRecurrence.frequency,
           nextDue: editingRecurrence.nextDue,
           description: editingRecurrence.description,
-          shared: editingRecurrence.shared,
           active: editingRecurrence.active,
           bankId: editingRecurrence.bankId,
           categoryId: editingRecurrence.categoryId
@@ -154,7 +150,6 @@ export default function Recurrences() {
           frequency: editingRecurrence.frequency,
           nextDue: editingRecurrence.nextDue,
           description: editingRecurrence.description,
-          shared: editingRecurrence.shared,
           active: editingRecurrence.active,
           bankId: editingRecurrence.bankId,
           categoryId: editingRecurrence.categoryId
@@ -170,7 +165,6 @@ export default function Recurrences() {
           frequency: 'MONTHLY',
           nextDue: new Date().toISOString().split('T')[0],
           description: '',
-          shared: false,
           active: true,
           bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
           categoryId: categories[0]?.id || ''
@@ -340,15 +334,6 @@ export default function Recurrences() {
                   <label className="flex items-center text-xs">
                     <input
                       type="checkbox"
-                      checked={editingRecurrence?.shared || false}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, shared: e.target.checked} : null)}
-                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-1 text-gray-700">Partagé</span>
-                  </label>
-                  <label className="flex items-center text-xs">
-                    <input
-                      type="checkbox"
                       checked={editingRecurrence?.active !== false}
                       onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, active: e.target.checked} : null)}
                       className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
@@ -379,7 +364,6 @@ export default function Recurrences() {
                         frequency: 'MONTHLY',
                         nextDue: new Date().toISOString().split('T')[0],
                         description: '',
-                        shared: false,
                         active: true,
                         bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
                         categoryId: categories[0]?.id || ''
@@ -406,11 +390,6 @@ export default function Recurrences() {
                   ) : (
                     <div className="flex items-center">
                       <div className="text-sm font-medium text-gray-900">{recurrence.description}</div>
-                      {recurrence.shared && (
-                        <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          Partagé
-                        </span>
-                      )}
                     </div>
                   )}
                 </td>
@@ -525,15 +504,6 @@ export default function Recurrences() {
                           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                         />
                         <span className="ml-1 text-xs text-gray-700">Active</span>
-                      </label>
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={editingRecurrence?.shared || false}
-                          onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, shared: e.target.checked} : null)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span className="ml-1 text-xs text-gray-700">Partagé</span>
                       </label>
                     </div>
                   ) : (

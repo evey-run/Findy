@@ -7,13 +7,12 @@ const prisma = new PrismaClient();
 // GET /api/recurrences - Récupérer toutes les récurrences
 router.get('/', async (req, res) => {
   try {
-    const { bankId, categoryId, active, shared } = req.query;
+    const { bankId, categoryId, active } = req.query;
     
     const where: any = {};
     if (bankId) where.bankId = bankId;
     if (categoryId) where.categoryId = categoryId;
     if (active !== undefined) where.active = active === 'true';
-    if (shared !== undefined) where.shared = shared === 'true';
     
     const recurrences = await prisma.recurrence.findMany({
       where,
@@ -52,7 +51,7 @@ router.get('/', async (req, res) => {
 // POST /api/recurrences - Créer une nouvelle récurrence
 router.post('/', async (req, res) => {
   try {
-    const { amount, frequency, nextDue, description, shared, bankId, categoryId, active } = req.body;
+    const { amount, frequency, nextDue, description, bankId, categoryId, active } = req.body;
     
     if (!amount || !nextDue || !description || !categoryId) {
       return res.status(400).json({ 
@@ -66,7 +65,6 @@ router.post('/', async (req, res) => {
         frequency: frequency || 'MONTHLY',
         nextDue: new Date(nextDue),
         description,
-        shared: shared || false,
         active: active !== false,
         bankId: bankId || null,
         categoryId
@@ -104,7 +102,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, frequency, nextDue, description, shared, active } = req.body;
+    const { amount, frequency, nextDue, description, active } = req.body;
     
     const recurrence = await prisma.recurrence.update({
       where: { id },
@@ -113,7 +111,6 @@ router.put('/:id', async (req, res) => {
         ...(frequency && { frequency }),
         ...(nextDue && { nextDue: new Date(nextDue) }),
         ...(description && { description }),
-        ...(shared !== undefined && { shared }),
         ...(active !== undefined && { active })
       },
       include: {
@@ -191,7 +188,6 @@ router.post('/:id/execute', async (req, res) => {
         amount: recurrence.amount,
         description: `${recurrence.description} 🔄`,
         date: new Date(),
-        shared: recurrence.shared,
         bankId: recurrence.bankId!,
         categoryId: recurrence.categoryId
       }
@@ -301,7 +297,6 @@ router.post('/process', async (req, res) => {
             amount: recurrence.amount,
             description: `${recurrence.description} 🔄`,
             date: new Date(),
-            shared: recurrence.shared,
             bankId: recurrence.bankId,
             categoryId: recurrence.categoryId
           }

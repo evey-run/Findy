@@ -1093,7 +1093,6 @@ app.post('/api/recurrences/process', async (req, res) => {
             amount: recurrence.amount,
             description: `${recurrence.description} 🔄`,
             date: recurrence.nextDue,
-            shared: recurrence.shared,
             bankId: recurrence.bankId,
             categoryId: recurrence.categoryId
           },
@@ -1370,7 +1369,7 @@ app.get('/api/recurrences', async (req, res) => {
 // POST /api/recurrences - Créer une nouvelle récurrence
 app.post('/api/recurrences', async (req, res) => {
   try {
-    const { amount, frequency, nextDue, description, shared, bankId, categoryId, active } = req.body;
+    const { amount, frequency, nextDue, description, bankId, categoryId, active } = req.body;
     
     if (!amount || !nextDue || !description || !categoryId) {
       return res.status(400).json({ 
@@ -1384,7 +1383,6 @@ app.post('/api/recurrences', async (req, res) => {
         frequency: frequency || 'MONTHLY',
         nextDue: new Date(nextDue),
         description,
-        shared: shared || false,
         active: active !== false,
         bankId: bankId || null,
         categoryId
@@ -1406,7 +1404,7 @@ app.post('/api/recurrences', async (req, res) => {
 app.put('/api/recurrences/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, frequency, nextDue, description, shared, active, bankId, categoryId } = req.body;
+    const { amount, frequency, nextDue, description, active, bankId, categoryId } = req.body;
     
     const recurrence = await prisma.recurrence.update({
       where: { id },
@@ -1415,7 +1413,6 @@ app.put('/api/recurrences/:id', async (req, res) => {
         ...(frequency && { frequency }),
         ...(nextDue && { nextDue: new Date(nextDue) }),
         ...(description && { description }),
-        ...(shared !== undefined && { shared }),
         ...(active !== undefined && { active }),
         ...(bankId !== undefined && { bankId }),
         ...(categoryId && { categoryId })
