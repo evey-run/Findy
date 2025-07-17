@@ -26,6 +26,9 @@ interface AppState {
   // Categories
   categories: Category[];
   setCategories: (categories: Category[]) => void;
+  addCategory: (category: Category) => void;
+  updateCategory: (id: string, category: Partial<Category>) => void;
+  removeCategory: (id: string) => void;
   loadCategories: () => Promise<void>;
   
   // Transactions
@@ -127,6 +130,20 @@ export const useAppStore = create<AppState>()(
       // Categories
       categories: [],
       setCategories: (categories: Category[]) => set({ categories }),
+      addCategory: (category: Category) =>
+        set((state) => ({ 
+          categories: [category, ...state.categories] 
+        })),
+      updateCategory: (id: string, updatedCategory: Partial<Category>) =>
+        set((state) => ({
+          categories: state.categories.map((c) =>
+            c.id === id ? { ...c, ...updatedCategory } : c
+          ),
+        })),
+      removeCategory: (id: string) =>
+        set((state) => ({
+          categories: state.categories.filter((c) => c.id !== id),
+        })),
       loadCategories: async () => {
         try {
           const response = await fetch('/api/categories');
