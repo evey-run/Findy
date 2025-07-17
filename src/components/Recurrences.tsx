@@ -1,16 +1,31 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import type { Recurrence } from '../types';
 
-interface EditingRecurrence {
-  id: string;
-  amount: number;
+// CSS pour les cellules éditables
+const editableCellStyle = `
+  .editable-cell {
+    position: relative;
+    transition: background-color 0.15s ease-in-out;
+  }
+  
+  .editable-cell:hover {
+    background-color: #f3f4f6;
+  }
+`;
+
+interface NewRecurrence {
+  amount: number | string;
   frequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
   nextDue: string;
   description: string;
   active: boolean;
   bankId?: string;
   categoryId: string;
+}
+
+interface InlineEditCell {
+  recurrenceId: string;
+  field: 'amount' | 'description' | 'nextDue' | 'frequency' | 'category' | 'bank' | 'active';
 }
 
 export default function Recurrences() {
@@ -27,8 +42,21 @@ export default function Recurrences() {
   } = useAppStore();
   
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingRecurrence, setEditingRecurrence] = useState<EditingRecurrence | null>(null);
+  
+  // New recurrence form state
+  const [newRecurrence, setNewRecurrence] = useState<NewRecurrence>({
+    amount: '',
+    frequency: 'MONTHLY',
+    nextDue: '',
+    description: '',
+    active: true,
+    bankId: '',
+    categoryId: ''
+  });
+  
+  // Inline editing states
+  const [inlineEditCell, setInlineEditCell] = useState<InlineEditCell | null>(null);
+  const [inlineEditValue, setInlineEditValue] = useState<string>('');
   
   // Fréquences disponibles
   const frequencies = [
@@ -48,17 +76,6 @@ export default function Recurrences() {
           loadBanks(),
           loadCategories()
         ]);
-        // Initialiser le formulaire d'ajout
-        setEditingRecurrence({
-          id: '',
-          amount: 0,
-          frequency: 'MONTHLY',
-          nextDue: new Date().toISOString().split('T')[0],
-          description: '',
-          active: true,
-          bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
-          categoryId: categories[0]?.id || ''
-        });
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -68,56 +85,6 @@ export default function Recurrences() {
     
     initializeData();
   }, [loadRecurrences, loadBanks, loadCategories]);
-
-  const handleEdit = (recurrence: Recurrence) => {
-    setEditingId(recurrence.id);
-    setEditingRecurrence({
-      id: recurrence.id,
-      amount: recurrence.amount,
-      frequency: recurrence.frequency,
-      nextDue: new Date(recurrence.nextDue).toISOString().split('T')[0],
-      description: recurrence.description,
-      active: recurrence.active,
-      bankId: recurrence.bankId,
-      categoryId: recurrence.categoryId
-    });
-  };
-
-  const handleSave = async () => {
-    if (!editingRecurrence) return;
-
-    try {
-      const response = await fetch(`/api/recurrences/${editingRecurrence.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          amount: editingRecurrence.amount,
-          frequency: editingRecurrence.frequency,
-          nextDue: editingRecurrence.nextDue,
-          description: editingRecurrence.description,
-          active: editingRecurrence.active,
-          bankId: editingRecurrence.bankId,
-          categoryId: editingRecurrence.categoryId
-        }),
-      });
-
-      if (response.ok) {
-        const updatedRecurrence = await response.json();
-        updateRecurrence(editingRecurrence.id, updatedRecurrence);
-        setEditingId(null);
-        setEditingRecurrence(null);
-      }
-    } catch (error) {
-      console.error('Error updating recurrence:', error);
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingId(null);
-    setEditingRecurrence(null);
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette récurrence ?')) return;
@@ -137,7 +104,6 @@ export default function Recurrences() {
 
   const handleAddRecurrence = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingRecurrence) return;
 
     try {
       const response = await fetch('/api/recurrences', {
@@ -146,28 +112,28 @@ export default function Recurrences() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          amount: editingRecurrence.amount,
-          frequency: editingRecurrence.frequency,
-          nextDue: editingRecurrence.nextDue,
-          description: editingRecurrence.description,
-          active: editingRecurrence.active,
-          bankId: editingRecurrence.bankId,
-          categoryId: editingRecurrence.categoryId
+          amount: typeof newRecurrence.amount === 'string' ? parseFloat(newRecurrence.amount) : newRecurrence.amount,
+          frequency: newRecurrence.frequency,
+          nextDue: newRecurrence.nextDue,
+          description: newRecurrence.description,
+          active: newRecurrence.active,
+          bankId: newRecurrence.bankId,
+          categoryId: newRecurrence.categoryId
         }),
       });
 
       if (response.ok) {
-        const newRecurrence = await response.json();
-        addRecurrence(newRecurrence);
-        setEditingRecurrence({
-          id: '',
-          amount: 0,
+        const addedRecurrence = await response.json();
+        addRecurrence(addedRecurrence);
+        // Reset form
+        setNewRecurrence({
+          amount: '',
           frequency: 'MONTHLY',
-          nextDue: new Date().toISOString().split('T')[0],
+          nextDue: '',
           description: '',
           active: true,
-          bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
-          categoryId: categories[0]?.id || ''
+          bankId: '',
+          categoryId: ''
         });
       }
     } catch (error) {
@@ -208,6 +174,104 @@ export default function Recurrences() {
     }
   };
 
+  // Inline editing functions
+  const handleInlineEdit = (recurrenceId: string, field: 'amount' | 'description' | 'nextDue' | 'frequency' | 'category' | 'bank' | 'active') => {
+    const recurrence = recurrences.find(r => r.id === recurrenceId);
+    if (!recurrence) return;
+    
+    let value = '';
+    switch (field) {
+      case 'amount':
+        value = recurrence.amount.toString();
+        break;
+      case 'description':
+        value = recurrence.description;
+        break;
+      case 'nextDue':
+        value = recurrence.nextDue.split('T')[0];
+        break;
+      case 'frequency':
+        value = recurrence.frequency;
+        break;
+      case 'category':
+        value = recurrence.categoryId;
+        break;
+      case 'bank':
+        value = recurrence.bankId || '';
+        break;
+      case 'active':
+        value = recurrence.active.toString();
+        break;
+    }
+    
+    setInlineEditCell({ recurrenceId, field });
+    setInlineEditValue(value);
+  };
+
+  const handleInlineSave = async () => {
+    if (!inlineEditCell) return;
+    
+    const { recurrenceId, field } = inlineEditCell;
+    const updateData: any = {};
+    
+    switch (field) {
+      case 'amount':
+        updateData.amount = parseFloat(inlineEditValue);
+        break;
+      case 'description':
+        updateData.description = inlineEditValue;
+        break;
+      case 'nextDue':
+        updateData.nextDue = inlineEditValue;
+        break;
+      case 'frequency':
+        updateData.frequency = inlineEditValue;
+        break;
+      case 'category':
+        updateData.categoryId = inlineEditValue || null;
+        break;
+      case 'bank':
+        updateData.bankId = inlineEditValue || null;
+        break;
+      case 'active':
+        updateData.active = inlineEditValue === 'true';
+        break;
+    }
+    
+    try {
+      const response = await fetch(`/api/recurrences/${recurrenceId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (response.ok) {
+        const updatedRecurrence = await response.json();
+        updateRecurrence(recurrenceId, updatedRecurrence);
+      }
+    } catch (error) {
+      console.error('Error updating recurrence:', error);
+    }
+    
+    setInlineEditCell(null);
+    setInlineEditValue('');
+  };
+
+  const handleInlineCancel = () => {
+    setInlineEditCell(null);
+    setInlineEditValue('');
+  };
+
+  const handleInlineKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleInlineSave();
+    } else if (e.key === 'Escape') {
+      handleInlineCancel();
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -218,6 +282,7 @@ export default function Recurrences() {
 
   return (
     <div className="space-y-6">
+      <style dangerouslySetInnerHTML={{ __html: editableCellStyle }} />
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
@@ -265,8 +330,8 @@ export default function Recurrences() {
               <td className="px-6 py-4">
                 <input
                   type="text"
-                  value={editingRecurrence?.description || ''}
-                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, description: e.target.value} : null)}
+                  value={newRecurrence.description}
+                  onChange={(e) => setNewRecurrence(prev => ({...prev, description: e.target.value}))}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   placeholder="Description de la récurrence"
                   required
@@ -276,8 +341,8 @@ export default function Recurrences() {
                 <input
                   type="number"
                   step="0.01"
-                  value={editingRecurrence?.amount || ''}
-                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
+                  value={newRecurrence.amount}
+                  onChange={(e) => setNewRecurrence(prev => ({...prev, amount: e.target.value}))}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   placeholder="0.00"
                   required
@@ -285,8 +350,8 @@ export default function Recurrences() {
               </td>
               <td className="px-6 py-4">
                 <select
-                  value={editingRecurrence?.frequency || ''}
-                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, frequency: e.target.value as any} : null)}
+                  value={newRecurrence.frequency}
+                  onChange={(e) => setNewRecurrence(prev => ({...prev, frequency: e.target.value as any}))}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   required
                 >
@@ -298,16 +363,16 @@ export default function Recurrences() {
               <td className="px-6 py-4">
                 <input
                   type="date"
-                  value={editingRecurrence?.nextDue || ''}
-                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, nextDue: e.target.value} : null)}
+                  value={newRecurrence.nextDue}
+                  onChange={(e) => setNewRecurrence(prev => ({...prev, nextDue: e.target.value}))}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   required
                 />
               </td>
               <td className="px-6 py-4">
                 <select
-                  value={editingRecurrence?.categoryId || ''}
-                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, categoryId: e.target.value} : null)}
+                  value={newRecurrence.categoryId}
+                  onChange={(e) => setNewRecurrence(prev => ({...prev, categoryId: e.target.value}))}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   required
                 >
@@ -319,8 +384,8 @@ export default function Recurrences() {
               </td>
               <td className="px-6 py-4">
                 <select
-                  value={editingRecurrence?.bankId || ''}
-                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, bankId: e.target.value} : null)}
+                  value={newRecurrence.bankId}
+                  onChange={(e) => setNewRecurrence(prev => ({...prev, bankId: e.target.value}))}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                 >
                   <option value="">Aucune banque</option>
@@ -334,8 +399,8 @@ export default function Recurrences() {
                   <label className="flex items-center text-xs">
                     <input
                       type="checkbox"
-                      checked={editingRecurrence?.active !== false}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, active: e.target.checked} : null)}
+                      checked={newRecurrence.active}
+                      onChange={(e) => setNewRecurrence(prev => ({...prev, active: e.target.checked}))}
                       className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                     <span className="ml-1 text-gray-700">Active</span>
@@ -361,67 +426,109 @@ export default function Recurrences() {
             {recurrences.map((recurrence) => (
               <tr key={recurrence.id} className={`hover:bg-gray-50 ${!recurrence.active ? 'opacity-50' : ''}`}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {editingId === recurrence.id ? (
+                  {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'description' ? (
                     <input
                       type="text"
-                      value={editingRecurrence?.description || ''}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, description: e.target.value} : null)}
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
                     />
                   ) : (
                     <div className="flex items-center">
-                      <div className="text-sm font-medium text-gray-900">{recurrence.description}</div>
+                      <div 
+                        className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                        onDoubleClick={() => handleInlineEdit(recurrence.id, 'description')}
+                        title="Double-cliquez pour éditer"
+                      >
+                        {recurrence.description}
+                      </div>
                     </div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {editingId === recurrence.id ? (
+                  {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'amount' ? (
                     <input
                       type="number"
                       step="0.01"
-                      value={editingRecurrence?.amount || ''}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
                     />
                   ) : (
-                    <div className={`text-sm font-medium ${recurrence.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <div 
+                      className={`text-sm font-medium cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell ${recurrence.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                      onDoubleClick={() => handleInlineEdit(recurrence.id, 'amount')}
+                      title="Double-cliquez pour éditer"
+                    >
                       {formatAmount(recurrence.amount)}
                     </div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {editingId === recurrence.id ? (
+                  {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'frequency' ? (
                     <select
-                      value={editingRecurrence?.frequency || ''}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, frequency: e.target.value as any} : null)}
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
                     >
                       {frequencies.map(freq => (
                         <option key={freq.value} value={freq.value}>{freq.label}</option>
                       ))}
                     </select>
                   ) : (
-                    <div className="text-sm text-gray-900">{getFrequencyLabel(recurrence.frequency)}</div>
+                    <div 
+                      className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      onDoubleClick={() => handleInlineEdit(recurrence.id, 'frequency')}
+                      title="Double-cliquez pour éditer"
+                    >
+                      {getFrequencyLabel(recurrence.frequency)}
+                    </div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {editingId === recurrence.id ? (
+                  {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'nextDue' ? (
                     <input
                       type="date"
-                      value={editingRecurrence?.nextDue || ''}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, nextDue: e.target.value} : null)}
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
                     />
                   ) : (
-                    <div className="text-sm text-gray-900">{formatDate(recurrence.nextDue)}</div>
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                        onDoubleClick={() => handleInlineEdit(recurrence.id, 'nextDue')}
+                        title="Double-cliquez pour éditer"
+                      >
+                        {formatDate(recurrence.nextDue)}
+                      </div>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getNextDueStatus(recurrence.nextDue).color}`}>
+                        {getNextDueStatus(recurrence.nextDue).label}
+                      </span>
+                    </div>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {editingId === recurrence.id ? (
+                  {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'category' ? (
                     <select
-                      value={editingRecurrence?.categoryId || ''}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, categoryId: e.target.value} : null)}
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
                     >
                       {categories.map(category => (
                         <option key={category.id} value={category.id}>{category.name}</option>
@@ -429,8 +536,10 @@ export default function Recurrences() {
                     </select>
                   ) : (
                     <span 
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell" 
                       style={{ backgroundColor: recurrence.category.color + '20', color: recurrence.category.color }}
+                      onDoubleClick={() => handleInlineEdit(recurrence.id, 'category')}
+                      title="Double-cliquez pour éditer"
                     >
                       {recurrence.category.icon && (
                         <span className="mr-1">{recurrence.category.icon}</span>
@@ -440,11 +549,14 @@ export default function Recurrences() {
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {editingId === recurrence.id ? (
+                  {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'bank' ? (
                     <select
-                      value={editingRecurrence?.bankId || ''}
-                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, bankId: e.target.value} : null)}
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
                     >
                       <option value="">Aucune banque</option>
                       {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
@@ -452,7 +564,11 @@ export default function Recurrences() {
                       ))}
                     </select>
                   ) : (
-                    <div className="flex items-center text-sm text-gray-900">
+                    <div 
+                      className="flex items-center text-sm text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      onDoubleClick={() => handleInlineEdit(recurrence.id, 'bank')}
+                      title="Double-cliquez pour éditer"
+                    >
                       {recurrence.bank ? (
                         <>
                           {recurrence.bank.image ? (
@@ -475,23 +591,27 @@ export default function Recurrences() {
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  {editingId === recurrence.id ? (
-                    <div className="flex items-center space-x-2">
-                      <label className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={editingRecurrence?.active !== false}
-                          onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, active: e.target.checked} : null)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span className="ml-1 text-xs text-gray-700">Active</span>
-                      </label>
-                    </div>
+                  {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'active' ? (
+                    <select
+                      value={inlineEditValue}
+                      onChange={(e) => setInlineEditValue(e.target.value)}
+                      onBlur={handleInlineSave}
+                      onKeyDown={handleInlineKeyDown}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      autoFocus
+                    >
+                      <option value="true">Active</option>
+                      <option value="false">Inactive</option>
+                    </select>
                   ) : (
                     <div className="flex flex-col space-y-1">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        recurrence.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span 
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell ${
+                          recurrence.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}
+                        onDoubleClick={() => handleInlineEdit(recurrence.id, 'active')}
+                        title="Double-cliquez pour éditer"
+                      >
                         {recurrence.active ? 'Active' : 'Inactive'}
                       </span>
                       {recurrence.active && (
@@ -505,49 +625,17 @@ export default function Recurrences() {
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                  {editingId === recurrence.id ? (
-                    <div className="flex justify-center space-x-2">
-                      <button
-                        onClick={handleSave}
-                        className="text-green-600 hover:text-green-800"
-                        title="Sauvegarder"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={handleCancel}
-                        className="text-gray-600 hover:text-gray-800"
-                        title="Annuler"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex justify-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(recurrence)}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="Modifier"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(recurrence.id)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Supprimer"
-                      >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => handleDelete(recurrence.id)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Supprimer"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
