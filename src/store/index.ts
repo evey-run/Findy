@@ -161,6 +161,7 @@ export const useAppStore = create<AppState>()(
             const params = new URLSearchParams({
               startDate: state.dateRange.startDate,
               endDate: state.dateRange.endDate,
+              accountType: 'CURRENT', // Filtrer uniquement les comptes courants
             });
             if (state.selectedBank) {
               params.append('bankId', state.selectedBank.id);

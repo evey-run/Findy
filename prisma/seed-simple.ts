@@ -39,6 +39,7 @@ async function main() {
       color: '#f8e45c',
       iban: 'FR76 1234 5678 9012 3456 789',
       balance: 2500.00,
+      accountType: 'CURRENT',
       isShared: true
     }
   });
@@ -50,6 +51,20 @@ async function main() {
       color: '#3b82f6',
       iban: 'FR76 9876 5432 1098 7654 321',
       balance: 1800.50,
+      accountType: 'SAVINGS',
+      isShared: false
+    }
+  });
+
+  // Ajouter un compte d'investissement
+  const bank3 = await prisma.bank.create({
+    data: {
+      name: 'Boursorama Bourse',
+      shortName: 'BB',
+      color: '#10b981',
+      iban: 'FR76 1111 2222 3333 4444 555',
+      balance: 5000.00,
+      accountType: 'INVESTMENT',
       isShared: false
     }
   });
@@ -67,6 +82,14 @@ async function main() {
     data: {
       userId: user2.id,
       bankId: bank2.id,
+      role: 'OWNER'
+    }
+  });
+
+  await prisma.userBank.create({
+    data: {
+      userId: user1.id,
+      bankId: bank3.id,
       role: 'OWNER'
     }
   });

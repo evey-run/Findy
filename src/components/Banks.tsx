@@ -88,6 +88,7 @@ export default function Banks() {
     shortName: '',
     iban: '',
     balance: 0,
+    accountType: 'CURRENT' as 'CURRENT' | 'SAVINGS' | 'INVESTMENT',
     isShared: false,
     sharedUserIds: [] as string[]
   });
@@ -173,6 +174,7 @@ export default function Banks() {
       formDataToSend.append('shortName', formData.shortName);
       formDataToSend.append('iban', formData.iban);
       formDataToSend.append('balance', formData.balance.toString());
+      formDataToSend.append('accountType', formData.accountType);
       formDataToSend.append('userId', selectedUser.id);
       
       if (imageFile) {
@@ -255,6 +257,7 @@ export default function Banks() {
       shortName: bank.shortName || '',
       iban: bank.iban || '',
       balance: bank.balance,
+      accountType: bank.accountType,
       isShared: bank.isShared,
       sharedUserIds: bank.sharedUsers?.map(u => u.id) || []
     });
@@ -332,6 +335,7 @@ export default function Banks() {
       shortName: '',
       iban: '',
       balance: 0,
+      accountType: 'CURRENT',
       isShared: false,
       sharedUserIds: []
     });
@@ -346,6 +350,19 @@ export default function Banks() {
       style: 'currency',
       currency: 'EUR'
     }).format(amount);
+  };
+
+  const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
+    switch (accountType) {
+      case 'CURRENT':
+        return { label: 'Compte courant', color: 'bg-blue-100 text-blue-800' };
+      case 'SAVINGS':
+        return { label: 'Livret d\'épargne', color: 'bg-green-100 text-green-800' };
+      case 'INVESTMENT':
+        return { label: 'Compte d\'investissement', color: 'bg-purple-100 text-purple-800' };
+      default:
+        return { label: 'Compte courant', color: 'bg-blue-100 text-blue-800' };
+    }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -470,6 +487,19 @@ export default function Banks() {
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 required
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Type de compte</label>
+              <select
+                value={formData.accountType}
+                onChange={(e) => setFormData({...formData, accountType: e.target.value as 'CURRENT' | 'SAVINGS' | 'INVESTMENT'})}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                required
+              >
+                <option value="CURRENT">Compte courant</option>
+                <option value="SAVINGS">Livret d'épargne</option>
+                <option value="INVESTMENT">Compte d'investissement</option>
+              </select>
             </div>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700">IBAN</label>
@@ -649,7 +679,12 @@ export default function Banks() {
                     </div>
                   )}
                   <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getAccountTypeInfo(bank.accountType).color}`}>
+                        {getAccountTypeInfo(bank.accountType).label}
+                      </span>
+                    </div>
                     <p className="text-sm text-gray-500">
                       {bank.iban || 'Aucun IBAN'}
                       {!selectedUser && bank.users && bank.users.length > 0 && (

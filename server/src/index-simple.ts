@@ -228,9 +228,9 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
   console.log('🔧 POST /api/banks called with body:', req.body);
   console.log('🔧 File:', req.file);
   try {
-    const { name, shortName, color, iban, balance, userId, isShared, sharedUserIds } = req.body;
+    const { name, shortName, color, iban, balance, accountType, userId, isShared, sharedUserIds } = req.body;
     
-    console.log('🔧 Extracted data:', { name, shortName, color, iban, balance, userId, isShared, sharedUserIds });
+    console.log('🔧 Extracted data:', { name, shortName, color, iban, balance, accountType, userId, isShared, sharedUserIds });
     
     if (!userId) {
       console.log('🔧 Error: userId is required');
@@ -252,6 +252,7 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
         image: imageUrl,
         iban,
         balance: parseFloat(balance) || 0,
+        accountType: accountType || 'CURRENT',
         isShared: isShared || false,
         userBanks: {
           create: [
@@ -447,7 +448,7 @@ app.get('/api/categories', async (req, res) => {
 
 app.get('/api/transactions', async (req, res) => {
   try {
-    const { bankId, categoryId, shared, startDate, endDate } = req.query;
+    const { bankId, categoryId, shared, startDate, endDate, accountType } = req.query;
     
     const where: any = {};
     if (bankId) where.bankId = bankId;
@@ -457,6 +458,13 @@ app.get('/api/transactions', async (req, res) => {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate as string);
       if (endDate) where.date.lte = new Date(endDate as string);
+    }
+    
+    // Filtrer par type de compte si spécifié
+    if (accountType) {
+      where.bank = {
+        accountType: accountType as string
+      };
     }
     
     const transactions = await prisma.transaction.findMany({
