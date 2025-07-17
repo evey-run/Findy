@@ -114,8 +114,8 @@ export const useAppStore = create<AppState>()(
           try {
             const selectedUser = get().selectedUser;
             const url = selectedUser 
-              ? `/api/banks?userId=${selectedUser.id}`
-              : '/api/banks';
+              ? `/api/banks?userId=${selectedUser.id}&archived=false`
+              : '/api/banks?archived=false';
             
             const response = await fetch(url);
             const banks = await response.json();

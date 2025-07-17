@@ -153,6 +153,9 @@ export default function Banks() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('🔧 handleSubmit called');
+    console.log('🔧 selectedUser:', selectedUser);
+    console.log('🔧 formData:', formData);
     
     if (!selectedUser) {
       alert('Veuillez sélectionner un utilisateur');
@@ -162,6 +165,8 @@ export default function Banks() {
     try {
       const url = editingBank ? `/api/banks/${editingBank.id}` : '/api/banks';
       const method = editingBank ? 'PUT' : 'POST';
+      
+      console.log('🔧 Making request to:', url, 'with method:', method);
       
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
@@ -179,12 +184,23 @@ export default function Banks() {
         body: formDataToSend,
       });
 
+      console.log('🔧 Response status:', response.status);
+      console.log('🔧 Response ok:', response.ok);
+
       if (response.ok) {
+        console.log('🔧 Bank saved successfully, reloading banks...');
         await loadBanks(); // Recharger les données depuis le store
         resetForm();
+        console.log('🔧 Banks reloaded and form reset');
+      } else {
+        const errorData = await response.json().catch(() => null);
+        console.error('🔧 Error response:', errorData);
+        const errorMessage = errorData?.details || errorData?.error || 'Erreur lors de l\'enregistrement de la banque';
+        alert(`Erreur: ${errorMessage}`);
       }
     } catch (error) {
-      console.error('Error saving bank:', error);
+      console.error('🔧 Error saving bank:', error);
+      alert('Erreur lors de l\'enregistrement de la banque');
     }
   };
 
@@ -612,9 +628,9 @@ export default function Banks() {
       {/* Regular Banks Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {banks.map((bank) => (
-          <div key={bank.id} className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow">
+          <div key={bank.id} className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col">
             <div 
-              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors"
+              className="p-6 cursor-pointer hover:bg-gray-50 transition-colors flex-1"
               onClick={() => handleBankClick(bank)}
             >
               <div className="flex items-center justify-between">
@@ -623,11 +639,11 @@ export default function Banks() {
                     <img
                       src={`http://localhost:3001${bank.image}`}
                       alt={bank.name}
-                      className="w-12 h-12 rounded-full object-cover border-2 border-gray-200"
+                      className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
                     />
                   ) : (
                     <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold bg-blue-600"
+                      className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold bg-blue-600 flex-shrink-0"
                     >
                       {bank.shortName}
                     </div>
@@ -688,11 +704,11 @@ export default function Banks() {
                 )}
               </div>
               <div className="mt-4">
+                <div className="text-sm text-gray-500 mb-1">
+                  Solde actuel
+                </div>
                 <div className="text-2xl font-bold text-gray-900">
                   {formatAmount(bank.balance)}
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  Solde actuel
                 </div>
               </div>
             </div>

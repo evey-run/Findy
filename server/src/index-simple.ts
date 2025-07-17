@@ -77,6 +77,13 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Middleware de log global
+app.use((req, res, next) => {
+  console.log(`🌐 ${req.method} ${req.url}`);
+  console.log('🌐 Headers:', req.headers);
+  next();
+});
+
 // Serve static files (images)
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
@@ -218,11 +225,21 @@ app.get('/api/banks', async (req, res) => {
 
 // POST - Créer une nouvelle banque
 app.post('/api/banks', upload.single('image'), async (req, res) => {
+  console.log('🔧 POST /api/banks called with body:', req.body);
+  console.log('🔧 File:', req.file);
   try {
     const { name, shortName, color, iban, balance, userId, isShared, sharedUserIds } = req.body;
     
+    console.log('🔧 Extracted data:', { name, shortName, color, iban, balance, userId, isShared, sharedUserIds });
+    
     if (!userId) {
+      console.log('🔧 Error: userId is required');
       return res.status(400).json({ error: 'userId is required' });
+    }
+    
+    if (!name) {
+      console.log('🔧 Error: name is required');
+      return res.status(400).json({ error: 'name is required' });
     }
     
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
@@ -259,7 +276,7 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
+                avatar: true
               }
             }
           }
@@ -277,8 +294,10 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
     
     res.status(201).json(transformedBank);
   } catch (error) {
-    console.error('Error creating bank:', error);
-    res.status(500).json({ error: 'Failed to create bank' });
+    console.error('🔧 Error creating bank:', error);
+    console.error('🔧 Error message:', error.message);
+    console.error('🔧 Error stack:', error.stack);
+    res.status(500).json({ error: 'Failed to create bank', details: error.message });
   }
 });
 
@@ -310,7 +329,7 @@ app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
+                avatar: true
               }
             }
           }
@@ -393,7 +412,7 @@ app.put('/api/banks/:id/restore', async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
+                avatar: true
               }
             }
           }

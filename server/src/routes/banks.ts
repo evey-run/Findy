@@ -39,16 +39,27 @@ const upload = multer({
 // GET /api/banks - Get all banks (optionally filtered by user)
 router.get('/', async (req, res) => {
   try {
-    const { userId } = req.query;
+    const { userId, archived } = req.query;
+    
+    // Construire le filtre where
+    let whereClause: any = {};
+    
+    // Filtre par utilisateur si spécifié
+    if (userId) {
+      whereClause.userBanks = {
+        some: {
+          userId: userId as string
+        }
+      };
+    }
+    
+    // Filtre par statut archivé
+    if (archived !== undefined) {
+      whereClause.archived = archived === 'true';
+    }
     
     const banks = await prisma.bank.findMany({
-      where: userId ? {
-        userBanks: {
-          some: {
-            userId: userId as string
-          }
-        }
-      } : {},
+      where: whereClause,
       include: {
         userBanks: {
           include: {
@@ -56,7 +67,7 @@ router.get('/', async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
+                avatar: true
               }
             }
           }
@@ -97,7 +108,7 @@ router.get('/:id', async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
+                avatar: true
               }
             }
           }
@@ -131,6 +142,8 @@ router.post('/', upload.single('image'), async (req, res) => {
   try {
     const { name, shortName, color, iban, balance, userId } = req.body;
     
+    console.log('🔧 Creating bank with data:', { name, shortName, color, iban, balance, userId });
+    
     if (!name || !userId) {
       return res.status(400).json({ error: 'Name and userId are required' });
     }
@@ -144,7 +157,7 @@ router.post('/', upload.single('image'), async (req, res) => {
         color: color || '#3b82f6',
         image: imageUrl,
         iban,
-        balance: balance || 0,
+        balance: parseFloat(balance) || 0,
         userBanks: {
           create: {
             userId: userId,
@@ -159,7 +172,7 @@ router.post('/', upload.single('image'), async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
+                avatar: true
               }
             }
           }
@@ -177,10 +190,11 @@ router.post('/', upload.single('image'), async (req, res) => {
       sharedUsers: bank.userBanks.filter(ub => ub.role === 'SHARED').map(ub => ub.user)
     };
     
+    console.log('🔧 Bank created successfully:', transformedBank.name);
     res.status(201).json(transformedBank);
   } catch (error) {
-    console.error('Error creating bank:', error);
-    res.status(500).json({ error: 'Failed to create bank' });
+    console.error('🔧 Error creating bank:', error);
+    res.status(500).json({ error: 'Failed to create bank', details: error.message });
   }
 });
 
@@ -213,7 +227,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                email: true
+                avatar: true
               }
             }
           }
