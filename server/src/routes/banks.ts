@@ -163,7 +163,6 @@ router.post('/', upload.single('image'), async (req, res) => {
         balance: parseFloat(balance) || 0,
         accountType: accountType || 'CURRENT',
         createdAt: createdAtDate,
-        isShared: userIds.length > 1, // Marquer comme partagé si plusieurs utilisateurs
         userBanks: {
           create: userIds.map((userId: string) => ({
             userId: userId
@@ -232,11 +231,6 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateData.image = `/uploads/${req.file.filename}`;
     }
     
-    // Mettre à jour le statut partagé en fonction du nombre d'utilisateurs
-    if (userIds.length > 0) {
-      updateData.isShared = userIds.length > 1;
-    }
-    
     // Si des userIds sont fournis, mettre à jour les relations utilisateur-banque
     if (userIds.length > 0) {
       // Supprimer toutes les relations existantes
@@ -297,87 +291,6 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting bank:', error);
     res.status(500).json({ error: 'Failed to delete bank' });
-  }
-});
-
-// POST /api/banks/:id/share - Share a bank with another user
-router.post('/:id/share', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { userId } = req.body;
-    
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
-    
-    // Check if user already has access to this bank
-    const existingAccess = await prisma.userBank.findUnique({
-      where: {
-        userId_bankId: {
-          userId,
-          bankId: id
-        }
-      }
-    });
-    
-    if (existingAccess) {
-      return res.status(400).json({ error: 'User already has access to this bank' });
-    }
-    
-    // Add shared access
-    await prisma.userBank.create({
-      data: {
-        userId,
-        bankId: id
-      }
-    });
-    
-    // Update bank to mark as shared
-    await prisma.bank.update({
-      where: { id },
-      data: { isShared: true }
-    });
-    
-    res.status(201).json({ message: 'Bank shared successfully' });
-  } catch (error) {
-    console.error('Error sharing bank:', error);
-    res.status(500).json({ error: 'Failed to share bank' });
-  }
-});
-
-// DELETE /api/banks/:id/share/:userId - Remove shared access
-router.delete('/:id/share/:userId', async (req, res) => {
-  try {
-    const { id, userId } = req.params;
-    
-    await prisma.userBank.delete({
-      where: {
-        userId_bankId: {
-          userId,
-          bankId: id
-        }
-      }
-    });
-    
-    // Check if bank still has multiple users
-    const userCount = await prisma.userBank.count({
-      where: {
-        bankId: id
-      }
-    });
-    
-    // Update bank shared status
-    if (userCount <= 1) {
-      await prisma.bank.update({
-        where: { id },
-        data: { isShared: false }
-      });
-    }
-    
-    res.status(204).send();
-  } catch (error) {
-    console.error('Error removing shared access:', error);
-    res.status(500).json({ error: 'Failed to remove shared access' });
   }
 });
 

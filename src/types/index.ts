@@ -24,7 +24,6 @@ export interface Bank {
   iban?: string;
   balance: number;
   accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT';
-  isShared: boolean;
   archived: boolean;
   archivedAt?: string;
   createdAt: string;

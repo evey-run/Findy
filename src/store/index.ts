@@ -82,8 +82,8 @@ export const useAppStore = create<AppState>()(
       setUsers: (users: User[]) => set({ users }),
       setSelectedUser: (user: User | null) => {
         set({ selectedUser: user, selectedBank: null });
-        // Reload banks when user changes - DISABLED for debugging
-        // get().loadBanks();
+        // Reload banks when user changes
+        get().loadBanks();
       },
       loadUsers: async () => {
         try {
@@ -95,8 +95,8 @@ export const useAppStore = create<AppState>()(
           const users = await response.json();
           console.log('Users loaded:', users);
           set({ users });
-          // Load all banks by default (no user selected) - DISABLED for debugging
-          // get().loadBanks();
+          // Load all banks by default (no user selected)
+          get().loadBanks();
         } catch (error) {
           console.error('Failed to load users:', error);
           set({ users: [] }); // Set empty array on error

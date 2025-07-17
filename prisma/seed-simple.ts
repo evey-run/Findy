@@ -39,8 +39,7 @@ async function main() {
       color: '#f8e45c',
       iban: 'FR76 1234 5678 9012 3456 789',
       balance: 2500.00,
-      accountType: 'CURRENT',
-      isShared: true
+      accountType: 'CURRENT'
     }
   });
 
@@ -51,8 +50,7 @@ async function main() {
       color: '#3b82f6',
       iban: 'FR76 9876 5432 1098 7654 321',
       balance: 1800.50,
-      accountType: 'SAVINGS',
-      isShared: false
+      accountType: 'SAVINGS'
     }
   });
 
@@ -64,8 +62,7 @@ async function main() {
       color: '#10b981',
       iban: 'FR76 1111 2222 3333 4444 555',
       balance: 5000.00,
-      accountType: 'INVESTMENT',
-      isShared: false
+      accountType: 'INVESTMENT'
     }
   });
 

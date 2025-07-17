@@ -27,7 +27,6 @@ model Bank {
   iban         String?
   balance      Float         @default(0)
   accountType  String        @default("CURRENT")
-  isShared     Boolean       @default(false)
   archived     Boolean       @default(false)
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
