@@ -132,7 +132,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/banks - Create a new bank
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { name, shortName, color, iban, balance, createdAt } = req.body;
+    const { name, shortName, color, iban, balance, createdAt, accountType } = req.body;
     
     // Récupérer les userIds du FormData
     const userIds: string[] = [];
@@ -161,6 +161,7 @@ router.post('/', upload.single('image'), async (req, res) => {
         image: imageUrl,
         iban,
         balance: parseFloat(balance) || 0,
+        accountType: accountType || 'CURRENT',
         createdAt: createdAtDate,
         isShared: userIds.length > 1, // Marquer comme partagé si plusieurs utilisateurs
         userBanks: {
@@ -202,7 +203,7 @@ router.post('/', upload.single('image'), async (req, res) => {
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, shortName, color, iban, balance, createdAt } = req.body;
+    const { name, shortName, color, iban, balance, createdAt, accountType } = req.body;
     
     // Récupérer les userIds du FormData pour la mise à jour
     const userIds: string[] = [];
@@ -217,7 +218,8 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       shortName,
       color,
       iban,
-      balance
+      balance,
+      accountType
     };
     
     // Si createdAt est fourni, l'utiliser

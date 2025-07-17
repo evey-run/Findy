@@ -226,44 +226,54 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
   console.log('🔧 POST /api/banks called with body:', req.body);
   console.log('🔧 File:', req.file);
   try {
-    const { name, shortName, color, iban, balance, accountType, userId, isShared, sharedUserIds } = req.body;
+    const { name, shortName, color, iban, balance, accountType, createdAt } = req.body;
     
-    console.log('🔧 Extracted data:', { name, shortName, color, iban, balance, accountType, userId, isShared, sharedUserIds });
+    // Récupérer les userIds du FormData de différentes manières
+    let userIds: string[] = [];
     
-    if (!userId) {
-      console.log('🔧 Error: userId is required');
-      return res.status(400).json({ error: 'userId is required' });
+    // D'abord essayer le format userIds[0], userIds[1], etc.
+    for (const key in req.body) {
+      if (key.startsWith('userIds[')) {
+        userIds.push(req.body[key]);
+      }
     }
     
-    if (!name) {
-      console.log('🔧 Error: name is required');
-      return res.status(400).json({ error: 'name is required' });
+    // Si pas trouvé, essayer le format 'userIds' direct (cas où c'est déjà un array)
+    if (userIds.length === 0 && req.body.userIds) {
+      if (Array.isArray(req.body.userIds)) {
+        userIds = req.body.userIds;
+      } else {
+        userIds = [req.body.userIds];
+      }
+    }
+    
+    console.log('🔧 Extracted data:', { name, shortName, color, iban, balance, accountType, userIds, createdAt });
+    
+    if (!name || userIds.length === 0) {
+      console.log('🔧 Error: name and at least one user are required');
+      return res.status(400).json({ error: 'Name and at least one user are required' });
     }
     
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    
+    // Si createdAt est fourni, l'utiliser, sinon utiliser la date actuelle
+    const createdAtDate = createdAt ? new Date(createdAt) : new Date();
     
     const bank = await prisma.bank.create({
       data: {
         name,
         shortName,
-        color: '#3b82f6', // Couleur par défaut
+        color: color || '#3b82f6', // Couleur par défaut
         image: imageUrl,
         iban,
         balance: parseFloat(balance) || 0,
         accountType: accountType || 'CURRENT',
-        isShared: isShared || false,
+        isShared: userIds.length > 1, // Marquer comme partagé si plusieurs utilisateurs
+        createdAt: createdAtDate,
         userBanks: {
-          create: [
-            // Add creator
-            {
-              userId: userId
-            },
-            // Add shared users if any
-            ...(sharedUserIds && Array.isArray(sharedUserIds) ? 
-              sharedUserIds.map((id: string) => ({
-                userId: id
-              })) : [])
-          ]
+          create: userIds.map((userId: string) => ({
+            userId: userId
+          }))
         }
       },
       include: {
