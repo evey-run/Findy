@@ -20,6 +20,7 @@ router.get('/', async (req, res) => {
       if (endDate) where.date.lte = new Date(endDate as string);
     }
     
+    // Forcer le rechargement - incluant image pour les banques
     const transactions = await prisma.transaction.findMany({
       where,
       include: {
@@ -28,7 +29,9 @@ router.get('/', async (req, res) => {
             id: true,
             name: true,
             shortName: true,
-            color: true
+            color: true,
+            image: true,
+            balance: true
           }
         },
         category: {
@@ -47,6 +50,11 @@ router.get('/', async (req, res) => {
       take: limit ? parseInt(limit as string) : undefined,
       skip: offset ? parseInt(offset as string) : undefined
     });
+    
+    // Debug: log the first transaction bank to see what fields are returned
+    if (transactions.length > 0) {
+      console.log('🔍 DEBUG - Premier bank d\'une transaction:', JSON.stringify(transactions[0].bank, null, 2));
+    }
     
     res.json(transactions);
   } catch (error) {
@@ -108,7 +116,8 @@ router.get('/:id', async (req, res) => {
             id: true,
             name: true,
             shortName: true,
-            color: true
+            color: true,
+            image: true
           }
         },
         category: {
@@ -174,7 +183,8 @@ router.post('/', async (req, res) => {
             id: true,
             name: true,
             shortName: true,
-            color: true
+            color: true,
+            image: true
           }
         },
         category: {
@@ -225,7 +235,8 @@ router.put('/:id', async (req, res) => {
             id: true,
             name: true,
             shortName: true,
-            color: true
+            color: true,
+            image: true
           }
         },
         category: {

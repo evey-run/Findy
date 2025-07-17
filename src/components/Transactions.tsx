@@ -45,7 +45,6 @@ export default function Transactions() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
   
   // Inline editing states
   const [inlineEditCell, setInlineEditCell] = useState<InlineEditCell | null>(null);
@@ -58,7 +57,6 @@ export default function Transactions() {
     endDate: ''
   });
 
-  // Fetch initial data
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
@@ -68,6 +66,16 @@ export default function Transactions() {
           loadCategories(),
           loadBanks()
         ]);
+        // Initialiser le formulaire d'ajout
+        setEditingTransaction({
+          id: '',
+          amount: 0,
+          description: '',
+          date: new Date().toISOString().split('T')[0],
+          shared: false,
+          categoryId: categories[0]?.id || '',
+          bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
+        });
       } catch (error) {
         console.error('Error initializing data:', error);
       } finally {
@@ -214,15 +222,24 @@ export default function Transactions() {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) return;
 
     try {
+      console.log('Attempting to delete transaction:', id);
       const response = await fetch(`/api/transactions/${id}`, {
         method: 'DELETE',
       });
 
+      console.log('Delete response status:', response.status);
+      
       if (response.ok) {
+        console.log('Transaction deleted successfully, updating UI');
         removeTransaction(id);
+      } else {
+        const errorText = await response.text();
+        console.error('Delete failed:', response.status, errorText);
+        alert('Erreur lors de la suppression: ' + (errorText || 'Erreur inconnue'));
       }
     } catch (error) {
       console.error('Error deleting transaction:', error);
+      alert('Erreur de connexion lors de la suppression');
     }
   };
 
@@ -244,8 +261,15 @@ export default function Transactions() {
 
       if (response.ok) {
         await loadTransactions(); // Recharger les transactions
-        setShowAddForm(false);
-        setEditingTransaction(null);
+        setEditingTransaction({
+          id: '',
+          amount: 0,
+          description: '',
+          date: new Date().toISOString().split('T')[0],
+          shared: false,
+          categoryId: categories[0]?.id || '',
+          bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
+        });
       }
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -316,28 +340,6 @@ export default function Transactions() {
             Transactions
           </h2>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
-          <button
-            onClick={() => {
-              setShowAddForm(true);
-              setEditingTransaction({
-                id: '',
-                amount: 0,
-                description: '',
-                date: new Date().toISOString().split('T')[0],
-                shared: false,
-                categoryId: categories[0]?.id || '',
-                bankId: banks[0]?.id || ''
-              });
-            }}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Ajouter une transaction
-          </button>
-        </div>
       </div>
 
       {/* Filters */}
@@ -406,128 +408,137 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* Add Transaction Form */}
-      {showAddForm && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Ajouter une transaction</h3>
-          <form onSubmit={handleAddTransaction} className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Banque</label>
-              <select
-                value={editingTransaction?.bankId || ''}
-                onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
-              >
-                {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
-                  <option key={bank.id} value={bank.id}>{bank.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Montant</label>
-              <input
-                type="number"
-                step="0.01"
-                value={editingTransaction?.amount || ''}
-                onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Description</label>
-              <input
-                type="text"
-                value={editingTransaction?.description || ''}
-                onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Date</label>
-              <input
-                type="date"
-                value={editingTransaction?.date || ''}
-                onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Catégorie</label>
-              <select
-                value={editingTransaction?.categoryId || ''}
-                onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              >
-                <option value="">Non défini</option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>{category.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="md:col-span-5 flex justify-end space-x-2">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={editingTransaction?.shared || false}
-                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, shared: e.target.checked} : null)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <span className="ml-2 text-sm text-gray-700">Transaction partagée</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowAddForm(false);
-                  setEditingTransaction(null);
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Annuler
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-              >
-                Ajouter
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {/* Transactions Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
+        <table className="min-w-full divide-y divide-gray-200 table-fixed">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                 Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
                 Description
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                 Catégorie
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                 Banque
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                 Montant
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                 Partagé
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
+            {/* Add form row - always visible as first row */}
+            <tr className="bg-blue-50 border-l-4 border-blue-400">
+              <td className="px-6 py-4">
+                <input
+                  type="date"
+                  value={editingTransaction?.date || ''}
+                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  required
+                />
+              </td>
+              <td className="px-6 py-4">
+                <input
+                  type="text"
+                  value={editingTransaction?.description || ''}
+                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  placeholder="Description de la transaction"
+                  required
+                />
+              </td>
+              <td className="px-6 py-4">
+                <select
+                  value={editingTransaction?.categoryId || ''}
+                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                >
+                  <option value="">Non défini</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-6 py-4">
+                <select
+                  value={editingTransaction?.bankId || ''}
+                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  required
+                >
+                  <option value="">Sélectionnez une banque</option>
+                  {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
+                    <option key={bank.id} value={bank.id}>{bank.name}</option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-6 py-4">
+                <input
+                  type="number"
+                  step="0.01"
+                  value={editingTransaction?.amount || ''}
+                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  placeholder="0.00"
+                  required
+                />
+              </td>
+              <td className="px-6 py-4">
+                <label className="flex items-center text-xs">
+                  <input
+                    type="checkbox"
+                    checked={editingTransaction?.shared || false}
+                    onChange={(e) => setEditingTransaction(prev => prev ? {...prev, shared: e.target.checked} : null)}
+                    className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <span className="ml-1 text-gray-700">Partagé</span>
+                </label>
+              </td>
+              <td className="px-6 py-4">
+                <div className="flex space-x-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAddTransaction(e);
+                    }}
+                    className="px-2 py-1 text-xs border border-transparent rounded text-white bg-green-600 hover:bg-green-700"
+                    title="Sauvegarder"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTransaction({
+                        id: '',
+                        amount: 0,
+                        description: '',
+                        date: new Date().toISOString().split('T')[0],
+                        shared: false,
+                        categoryId: categories[0]?.id || '',
+                        bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
+                      });
+                    }}
+                    className="px-2 py-1 text-xs border border-gray-300 rounded text-gray-700 bg-white hover:bg-gray-50"
+                    title="Effacer"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </td>
+            </tr>
             {filteredTransactions.map((transaction) => (
               <tr key={transaction.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -645,9 +656,17 @@ export default function Transactions() {
                       className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell flex items-center"
                       title="Double-cliquez pour éditer"
                     >
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.bank.color }}>
-                        {transaction.bank.shortName}
-                      </div>
+                      {transaction.bank.image ? (
+                        <img
+                          src={`http://localhost:3001${transaction.bank.image}`}
+                          alt={transaction.bank.name}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.bank.color }}>
+                          {transaction.bank.shortName}
+                        </div>
+                      )}
                       <span className="ml-2">{transaction.bank.name}</span>
                     </div>
                   )}

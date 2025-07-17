@@ -82,19 +82,24 @@ export const useAppStore = create<AppState>()(
       setUsers: (users: User[]) => set({ users }),
       setSelectedUser: (user: User | null) => {
         set({ selectedUser: user, selectedBank: null });
-        // Reload banks when user changes
-        get().loadBanks();
+        // Reload banks when user changes - DISABLED for debugging
+        // get().loadBanks();
       },
       loadUsers: async () => {
         try {
+          console.log('Loading users...');
           const response = await fetch('/api/users');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
           const users = await response.json();
           console.log('Users loaded:', users);
           set({ users });
-          // Load all banks by default (no user selected)
-          get().loadBanks();
+          // Load all banks by default (no user selected) - DISABLED for debugging
+          // get().loadBanks();
         } catch (error) {
           console.error('Failed to load users:', error);
+          set({ users: [] }); // Set empty array on error
         }
       },
       
@@ -115,16 +120,22 @@ export const useAppStore = create<AppState>()(
       },
       loadBanks: async () => {
         try {
+          console.log('Loading banks...');
           const selectedUser = get().selectedUser;
           const url = selectedUser 
             ? `/api/banks?userId=${selectedUser.id}&archived=false`
             : '/api/banks?archived=false';
           
           const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
           const banks = await response.json();
+          console.log('Banks loaded:', banks.length, 'banks');
           set({ banks });
         } catch (error) {
           console.error('Failed to load banks:', error);
+          set({ banks: [] }); // Set empty array on error
         }
       },
       
@@ -147,11 +158,17 @@ export const useAppStore = create<AppState>()(
         })),
       loadCategories: async () => {
         try {
+          console.log('Loading categories...');
           const response = await fetch('/api/categories');
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
           const categories = await response.json();
+          console.log('Categories loaded:', categories.length, 'categories');
           set({ categories });
         } catch (error) {
           console.error('Failed to load categories:', error);
+          set({ categories: [] }); // Set empty array on error
         }
       },
       

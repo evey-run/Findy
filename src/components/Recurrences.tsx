@@ -30,7 +30,6 @@ export default function Recurrences() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingRecurrence, setEditingRecurrence] = useState<EditingRecurrence | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
   
   // Fréquences disponibles
   const frequencies = [
@@ -50,6 +49,18 @@ export default function Recurrences() {
           loadBanks(),
           loadCategories()
         ]);
+        // Initialiser le formulaire d'ajout
+        setEditingRecurrence({
+          id: '',
+          amount: 0,
+          frequency: 'MONTHLY',
+          nextDue: new Date().toISOString().split('T')[0],
+          description: '',
+          shared: false,
+          active: true,
+          bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
+          categoryId: categories[0]?.id || ''
+        });
       } catch (error) {
         console.error('Error loading data:', error);
       } finally {
@@ -153,8 +164,17 @@ export default function Recurrences() {
       if (response.ok) {
         const newRecurrence = await response.json();
         addRecurrence(newRecurrence);
-        setShowAddForm(false);
-        setEditingRecurrence(null);
+        setEditingRecurrence({
+          id: '',
+          amount: 0,
+          frequency: 'MONTHLY',
+          nextDue: new Date().toISOString().split('T')[0],
+          description: '',
+          shared: false,
+          active: true,
+          bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
+          categoryId: categories[0]?.id || ''
+        });
       }
     } catch (error) {
       console.error('Error adding recurrence:', error);
@@ -210,185 +230,169 @@ export default function Recurrences() {
             Récurrences
           </h2>
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
-          <button
-            onClick={() => {
-              setShowAddForm(true);
-              setEditingRecurrence({
-                id: '',
-                amount: 0,
-                frequency: 'MONTHLY',
-                nextDue: new Date().toISOString().split('T')[0],
-                description: '',
-                shared: false,
-                active: true,
-                bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
-                categoryId: categories[0]?.id || ''
-              });
-            }}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Ajouter une récurrence
-          </button>
-        </div>
       </div>
 
-      {/* Add Recurrence Form */}
-      {showAddForm && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Ajouter une récurrence</h3>
-          <form onSubmit={handleAddRecurrence} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
+      {/* Add Recurrence Form - Removed as it will be integrated in the table */}
+
+      {/* Recurrences List */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200 table-fixed">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
+                Description
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                Montant
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                Fréquence
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
+                Prochaine échéance
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                Catégorie
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                Banque
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                Statut
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {/* Add form row - always visible as first row */}
+            <tr className="bg-blue-50 border-l-4 border-blue-400">
+              <td className="px-6 py-4">
                 <input
                   type="text"
                   value={editingRecurrence?.description || ''}
                   onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, description: e.target.value} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  placeholder="Description de la récurrence"
                   required
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Montant</label>
+              </td>
+              <td className="px-6 py-4">
                 <input
                   type="number"
                   step="0.01"
                   value={editingRecurrence?.amount || ''}
                   onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  placeholder="0.00"
                   required
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Fréquence</label>
+              </td>
+              <td className="px-6 py-4">
                 <select
                   value={editingRecurrence?.frequency || ''}
                   onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, frequency: e.target.value as any} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   required
                 >
                   {frequencies.map(freq => (
                     <option key={freq.value} value={freq.value}>{freq.label}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Prochaine échéance</label>
+              </td>
+              <td className="px-6 py-4">
                 <input
                   type="date"
                   value={editingRecurrence?.nextDue || ''}
                   onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, nextDue: e.target.value} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                   required
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Banque</label>
+              </td>
+              <td className="px-6 py-4">
+                <select
+                  value={editingRecurrence?.categoryId || ''}
+                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, categoryId: e.target.value} : null)}
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  required
+                >
+                  <option value="">Sélectionnez une catégorie</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-6 py-4">
                 <select
                   value={editingRecurrence?.bankId || ''}
                   onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, bankId: e.target.value} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
                 >
                   <option value="">Aucune banque</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
                     <option key={bank.id} value={bank.id}>{bank.name}</option>
                   ))}
                 </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Catégorie</label>
-                <select
-                  value={editingRecurrence?.categoryId || ''}
-                  onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  required
-                >
-                  {categories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editingRecurrence?.shared || false}
-                    onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, shared: e.target.checked} : null)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Récurrence partagée</span>
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editingRecurrence?.active !== false}
-                    onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, active: e.target.checked} : null)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Active</span>
-                </label>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowAddForm(false);
-                    setEditingRecurrence(null);
-                  }}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                >
-                  Ajouter
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Recurrences List */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Description
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Montant
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Fréquence
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Prochaine échéance
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Catégorie
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Banque
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Statut
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
-              </th>
+              </td>
+              <td className="px-6 py-4">
+                <div className="flex flex-col space-y-1">
+                  <label className="flex items-center text-xs">
+                    <input
+                      type="checkbox"
+                      checked={editingRecurrence?.shared || false}
+                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, shared: e.target.checked} : null)}
+                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-1 text-gray-700">Partagé</span>
+                  </label>
+                  <label className="flex items-center text-xs">
+                    <input
+                      type="checkbox"
+                      checked={editingRecurrence?.active !== false}
+                      onChange={(e) => setEditingRecurrence(prev => prev ? {...prev, active: e.target.checked} : null)}
+                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-1 text-gray-700">Active</span>
+                  </label>
+                </div>
+              </td>
+              <td className="px-6 py-4">
+                <div className="flex space-x-1">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleAddRecurrence(e);
+                    }}
+                    className="px-2 py-1 text-xs border border-transparent rounded text-white bg-green-600 hover:bg-green-700"
+                    title="Sauvegarder"
+                  >
+                    ✓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingRecurrence({
+                        id: '',
+                        amount: 0,
+                        frequency: 'MONTHLY',
+                        nextDue: new Date().toISOString().split('T')[0],
+                        description: '',
+                        shared: false,
+                        active: true,
+                        bankId: banks.filter(b => b.accountType === 'CURRENT')[0]?.id || '',
+                        categoryId: categories[0]?.id || ''
+                      });
+                    }}
+                    className="px-2 py-1 text-xs border border-gray-300 rounded text-gray-700 bg-white hover:bg-gray-50"
+                    title="Effacer"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
             {recurrences.map((recurrence) => (
               <tr key={recurrence.id} className={`hover:bg-gray-50 ${!recurrence.active ? 'opacity-50' : ''}`}>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -488,8 +492,25 @@ export default function Recurrences() {
                       ))}
                     </select>
                   ) : (
-                    <div className="text-sm text-gray-900">
-                      {recurrence.bank ? recurrence.bank.name : 'Aucune banque'}
+                    <div className="flex items-center text-sm text-gray-900">
+                      {recurrence.bank ? (
+                        <>
+                          {recurrence.bank.image ? (
+                            <img
+                              src={`http://localhost:3001${recurrence.bank.image}`}
+                              alt={recurrence.bank.name}
+                              className="w-6 h-6 rounded-full object-cover mr-2"
+                            />
+                          ) : (
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-medium mr-2" style={{ backgroundColor: recurrence.bank.color }}>
+                              {recurrence.bank.shortName}
+                            </div>
+                          )}
+                          <span>{recurrence.bank.name}</span>
+                        </>
+                      ) : (
+                        'Aucune banque'
+                      )}
                     </div>
                   )}
                 </td>

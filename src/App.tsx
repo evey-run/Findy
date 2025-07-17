@@ -25,18 +25,18 @@ function App() {
   useEffect(() => {
     // Charger toutes les données au démarrage
     const initializeApp = async () => {
-      await loadUsers();
-      await loadCategories();
-      await loadTransactions();
-      await loadBudgets();
-      await loadRecurrences();
-      await loadDashboardOverview();
-      
-      // Traiter automatiquement les récurrences dues aujourd'hui
       try {
+        await loadUsers();
+        await loadCategories();
+        await loadTransactions();
+        await loadBudgets();
+        await loadRecurrences();
+        await loadDashboardOverview();
+        
+        // Traiter automatiquement les récurrences dues aujourd'hui
         await processRecurrences();
       } catch (error) {
-        console.error('Failed to process recurrences on startup:', error);
+        console.error('Failed to initialize app:', error);
       }
     };
 

@@ -61,6 +61,7 @@ export interface Transaction {
     name: string;
     shortName?: string;
     color: string;
+    image?: string;
     balance: number;
   };
   categoryId?: string;
@@ -87,6 +88,7 @@ export interface Budget {
     name: string;
     shortName?: string;
     color: string;
+    image?: string;
     balance: number;
   };
   categoryId: string;
@@ -115,6 +117,7 @@ export interface Recurrence {
     name: string;
     shortName?: string;
     color: string;
+    image?: string;
     balance: number;
   };
   categoryId: string;

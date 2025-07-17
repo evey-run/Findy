@@ -23,6 +23,7 @@ router.get('/', async (req, res) => {
             id: true,
             name: true,
             shortName: true,
+            shortName: true,
             color: true,
             image: true
           }
@@ -31,6 +32,7 @@ router.get('/', async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             type: true,
             color: true,
             icon: true
@@ -77,6 +79,7 @@ router.post('/', async (req, res) => {
             id: true,
             name: true,
             shortName: true,
+            shortName: true,
             color: true,
             image: true
           }
@@ -85,6 +88,7 @@ router.post('/', async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             type: true,
             color: true,
             icon: true
@@ -130,6 +134,7 @@ router.put('/:id', async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             type: true,
             color: true,
             icon: true
@@ -189,7 +194,7 @@ router.post('/:id/execute', async (req, res) => {
     const transaction = await prisma.transaction.create({
       data: {
         amount: recurrence.amount,
-        description: `${recurrence.description} 🔄`,
+        description: `${recurrence.description} (Récurrence automatique)`,
         date: new Date(),
         shared: recurrence.shared,
         bankId: recurrence.bankId!,
@@ -235,6 +240,7 @@ router.post('/:id/execute', async (req, res) => {
           select: {
             id: true,
             name: true,
+            shortName: true,
             type: true,
             color: true,
             icon: true
@@ -299,7 +305,7 @@ router.post('/process', async (req, res) => {
         const transaction = await prisma.transaction.create({
           data: {
             amount: recurrence.amount,
-            description: `${recurrence.description} 🔄`,
+            description: `${recurrence.description} (Récurrence automatique)`,
             date: new Date(),
             shared: recurrence.shared,
             bankId: recurrence.bankId,
@@ -336,13 +342,16 @@ router.post('/process', async (req, res) => {
               select: {
                 id: true,
                 name: true,
-                color: true
+            shortName: true,
+                color: true,
+            image: true
               }
             },
             category: {
               select: {
                 id: true,
                 name: true,
+            shortName: true,
                 type: true,
                 color: true,
                 icon: true

@@ -596,6 +596,7 @@ app.get('/api/transactions', async (req, res) => {
             name: true,
             shortName: true,
             color: true,
+            image: true,
             balance: true
           }
         },
@@ -661,6 +662,7 @@ app.post('/api/transactions', async (req, res) => {
             name: true,
             shortName: true,
             color: true,
+            image: true,
             balance: true
           }
         },
@@ -714,6 +716,7 @@ app.put('/api/transactions/:id', async (req, res) => {
             name: true,
             shortName: true,
             color: true,
+            image: true,
             balance: true
           }
         },
@@ -1088,7 +1091,7 @@ app.post('/api/recurrences/process', async (req, res) => {
         const transaction = await prisma.transaction.create({
           data: {
             amount: recurrence.amount,
-            description: `${recurrence.description} (récurrence)`,
+            description: `${recurrence.description} 🔄`,
             date: recurrence.nextDue,
             shared: recurrence.shared,
             bankId: recurrence.bankId,
@@ -1361,6 +1364,94 @@ app.get('/api/recurrences', async (req, res) => {
   } catch (error) {
     console.error('Error fetching recurrences:', error);
     res.status(500).json({ error: 'Failed to fetch recurrences' });
+  }
+});
+
+// POST /api/recurrences - Créer une nouvelle récurrence
+app.post('/api/recurrences', async (req, res) => {
+  try {
+    const { amount, frequency, nextDue, description, shared, bankId, categoryId, active } = req.body;
+    
+    if (!amount || !nextDue || !description || !categoryId) {
+      return res.status(400).json({ 
+        error: 'Amount, nextDue, description, and categoryId are required' 
+      });
+    }
+    
+    const recurrence = await prisma.recurrence.create({
+      data: {
+        amount: parseFloat(amount),
+        frequency: frequency || 'MONTHLY',
+        nextDue: new Date(nextDue),
+        description,
+        shared: shared || false,
+        active: active !== false,
+        bankId: bankId || null,
+        categoryId
+      },
+      include: {
+        bank: true,
+        category: true
+      }
+    });
+    
+    res.status(201).json(recurrence);
+  } catch (error) {
+    console.error('Error creating recurrence:', error);
+    res.status(500).json({ error: 'Failed to create recurrence' });
+  }
+});
+
+// PUT /api/recurrences/:id - Mettre à jour une récurrence
+app.put('/api/recurrences/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, frequency, nextDue, description, shared, active, bankId, categoryId } = req.body;
+    
+    const recurrence = await prisma.recurrence.update({
+      where: { id },
+      data: {
+        ...(amount !== undefined && { amount: parseFloat(amount) }),
+        ...(frequency && { frequency }),
+        ...(nextDue && { nextDue: new Date(nextDue) }),
+        ...(description && { description }),
+        ...(shared !== undefined && { shared }),
+        ...(active !== undefined && { active }),
+        ...(bankId !== undefined && { bankId }),
+        ...(categoryId && { categoryId })
+      },
+      include: {
+        bank: true,
+        category: true
+      }
+    });
+    
+    res.json(recurrence);
+  } catch (error: any) {
+    console.error('Error updating recurrence:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Recurrence not found' });
+    }
+    res.status(500).json({ error: 'Failed to update recurrence' });
+  }
+});
+
+// DELETE /api/recurrences/:id - Supprimer une récurrence
+app.delete('/api/recurrences/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    await prisma.recurrence.delete({
+      where: { id }
+    });
+    
+    res.status(204).send();
+  } catch (error: any) {
+    console.error('Error deleting recurrence:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ error: 'Recurrence not found' });
+    }
+    res.status(500).json({ error: 'Failed to delete recurrence' });
   }
 });
 

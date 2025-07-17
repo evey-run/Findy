@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,38 +8,34 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String   // Nom de l'utilisateur
-  avatar    String?  // URL de l'avatar optionnel
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations many-to-many avec les banques
+  id        String     @id @default(cuid())
+  name      String
+  avatar    String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   userBanks UserBank[]
 
   @@map("users")
 }
 
 model Bank {
-  id        String      @id @default(cuid())
-  name      String      // Nom de la banque (ex: "Crédit Agricole", "BNP Paribas")
-  shortName String?     // Nom court (ex: "CA", "BNP")
-  color     String      @default("#3b82f6") // Couleur pour différencier visuellement
-  image     String?     // URL de l'image/logo de la banque
-  iban      String?     // IBAN du compte (optionnel)
-  balance   Float       @default(0) // Solde actuel du compte
-  accountType AccountType @default(CURRENT) // Type de compte
-  isShared  Boolean     @default(false) // Indique si le compte est partagé
-  archived  Boolean     @default(false) // Indique si le compte est archivé
-  archivedAt DateTime?  // Date d'archivage
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-
-  // Relations
-  userBanks    UserBank[]
-  transactions Transaction[]
+  id           String        @id @default(cuid())
+  name         String
+  shortName    String?
+  color        String        @default("#3b82f6")
+  image        String?
+  iban         String?
+  balance      Float         @default(0)
+  accountType  String        @default("CURRENT")
+  isShared     Boolean       @default(false)
+  archived     Boolean       @default(false)
+  archivedAt   DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   budgets      Budget[]
   recurrences  Recurrence[]
+  transactions Transaction[]
+  userBanks    UserBank[]
 
   @@map("banks")
 }
@@ -51,129 +44,88 @@ model UserBank {
   id     String @id @default(cuid())
   userId String
   bankId String
-  role   UserBankRole @default(OWNER) // Rôle de l'utilisateur pour cette banque
-  
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  bank Bank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  role   String @default("OWNER")
+  bank   Bank   @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, bankId])
   @@map("user_banks")
 }
 
-enum UserBankRole {
-  OWNER     // Propriétaire principal
-  SHARED    // Utilisateur avec accès partagé
-}
-
 model Category {
-  id    String      @id @default(cuid())
-  name  String
-  type  CategoryType
-  color String      @default("#6b7280")
-  icon  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  transactions Transaction[]
+  id           String        @id @default(cuid())
+  name         String
+  type         String
+  color        String        @default("#6b7280")
+  icon         String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   budgets      Budget[]
   recurrences  Recurrence[]
+  transactions Transaction[]
 
   @@map("categories")
 }
 
 model Transaction {
-  id          String      @id @default(cuid())
-  amount      Float       // Positif pour revenus, négatif pour dépenses
+  id          String    @id @default(cuid())
+  amount      Float
   description String
-  date        DateTime    @default(now())
-  shared      Boolean     @default(false) // Pour les dépenses communes
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-
-  // Relations
-  bankId     String
-  bank       Bank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
-  categoryId String?
-  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  date        DateTime  @default(now())
+  shared      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  bankId      String
+  categoryId  String?
+  category    Category? @relation(fields: [categoryId], references: [id])
+  bank        Bank      @relation(fields: [bankId], references: [id], onDelete: Cascade)
 
   @@map("transactions")
 }
 
 model Budget {
-  id           String   @id @default(cuid())
-  amount       Float    // Montant limite
-  period       Period   @default(MONTHLY)
-  startDate    DateTime @default(now())
-  shared       Boolean  @default(false) // Budget commun ou individuel
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  // Relations
-  bankId     String?  // null = budget commun
-  bank       Bank?    @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  amount     Float
+  period     String   @default("MONTHLY")
+  startDate  DateTime @default(now())
+  shared     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bankId     String?
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
+  bank       Bank?    @relation(fields: [bankId], references: [id], onDelete: Cascade)
 
   @@map("budgets")
 }
 
 model Recurrence {
-  id            String    @id @default(cuid())
-  amount        Float
-  frequency     Frequency @default(MONTHLY)
-  nextDue       DateTime
-  description   String
-  shared        Boolean   @default(false)
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relations
-  bankId     String?  // null = récurrence commune
-  bank       Bank?    @relation(fields: [bankId], references: [id], onDelete: Cascade)
-  categoryId String
-  category   Category @relation(fields: [categoryId], references: [id])
+  id          String   @id @default(cuid())
+  amount      Float
+  frequency   String   @default("MONTHLY")
+  nextDue     DateTime
+  description String
+  shared      Boolean  @default(false)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  bankId      String?
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+  bank        Bank?    @relation(fields: [bankId], references: [id], onDelete: Cascade)
 
   @@map("recurrences")
 }
 
 model Objective {
   id           String    @id @default(cuid())
-  title        String    // "Moto", "Vacances", etc.
-  description  String?   // Description optionnelle
-  targetAmount Float     // Montant cible à atteindre
-  deadline     DateTime? // Date limite optionnelle
-  isCompleted  Boolean   @default(false) // Si l'objectif est atteint
+  title        String
+  description  String?
+  targetAmount Float
+  deadline     DateTime?
+  isCompleted  Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@map("objectives")
-}
-
-enum CategoryType {
-  INCOME    // Revenus
-  EXPENSE   // Dépenses
-  FIXED     // Charges fixes
-}
-
-enum Period {
-  WEEKLY
-  MONTHLY
-  QUARTERLY
-  YEARLY
-}
-
-enum AccountType {
-  CURRENT     // Compte courant
-  SAVINGS     // Livret d'épargne
-  INVESTMENT  // Compte d'investissement
-}
-
-enum Frequency {
-  DAILY
-  WEEKLY
-  MONTHLY
-  QUARTERLY
-  YEARLY
 }
