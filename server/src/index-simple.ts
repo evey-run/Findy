@@ -268,7 +268,7 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
         iban,
         balance: parseFloat(balance) || 0,
         accountType: accountType || 'CURRENT',
-        isShared: userIds.length > 1, // Marquer comme partagé si plusieurs utilisateurs
+        // Note: La propriété isShared n'existe plus dans le modèle, donc on la retire
         createdAt: createdAtDate,
         userBanks: {
           create: userIds.map((userId: string) => ({
@@ -355,45 +355,97 @@ app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE - Supprimer ou archiver une banque
+// DELETE - Archiver une banque
 app.delete('/api/banks/:id', async (req, res) => {
   try {
     const bankId = req.params.id;
     
-    // Vérifier s'il y a des transactions liées à cette banque
-    const transactionCount = await prisma.transaction.count({
-      where: { bankId }
+    // Archiver la banque au lieu de la supprimer
+    const bank = await prisma.bank.update({
+      where: { id: bankId },
+      data: { archived: true, archivedAt: new Date() },
+      include: {
+        userBanks: {
+          include: {
+            user: true
+          }
+        }
+      }
+    });
+
+    // Transformer les données pour correspondre au format attendu
+    const transformedBank = {
+      ...bank,
+      users: bank.userBanks.map(ub => ub.user)
+    };
+
+    res.json(transformedBank);
+  } catch (error) {
+    console.error('Error archiving bank:', error);
+    res.status(500).json({ error: 'Failed to archive bank' });
+  }
+});
+
+// Permanently delete an archived bank and all associated data
+app.delete('/api/banks/:id/permanent', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // First, get the bank name for the response
+    const bank = await prisma.bank.findUnique({
+      where: { id },
+      select: { name: true, archived: true }
     });
     
-    if (transactionCount > 0) {
-      // Si des transactions existent, archiver la banque
-      await prisma.bank.update({
-        where: { id: bankId },
-        data: { 
-          archived: true,
-          archivedAt: new Date()
-        }
-      });
-      
-      res.json({ 
-        message: 'Bank archived successfully',
-        archived: true,
-        transactionCount 
-      });
-    } else {
-      // Si aucune transaction, supprimer définitivement
-      await prisma.bank.delete({
-        where: { id: bankId }
-      });
-      
-      res.json({ 
-        message: 'Bank deleted successfully',
-        archived: false 
-      });
+    if (!bank) {
+      return res.status(404).json({ error: 'Bank not found' });
     }
+    
+    if (!bank.archived) {
+      return res.status(400).json({ error: 'Only archived banks can be permanently deleted' });
+    }
+    
+    // Count transactions before deletion for the response
+    const transactionCount = await prisma.transaction.count({
+      where: { bankId: id }
+    });
+    
+    // Use a transaction to ensure all deletions succeed or fail together
+    await prisma.$transaction(async (tx) => {
+      // Delete all transactions associated with this bank
+      await tx.transaction.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Delete all budgets associated with this bank
+      await tx.budget.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Delete all recurrences associated with this bank
+      await tx.recurrence.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Delete user-bank relationships
+      await tx.userBank.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Finally, delete the bank itself
+      await tx.bank.delete({
+        where: { id }
+      });
+    });
+    
+    res.json({
+      message: 'Bank permanently deleted',
+      bankName: bank.name,
+      deletedTransactions: transactionCount
+    });
   } catch (error) {
-    console.error('Error deleting/archiving bank:', error);
-    res.status(500).json({ error: 'Failed to delete/archive bank' });
+    console.error('Error permanently deleting bank:', error);
+    res.status(500).json({ error: 'Failed to permanently delete bank', details: error.message });
   }
 });
 

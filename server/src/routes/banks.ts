@@ -278,19 +278,116 @@ router.put('/:id', upload.single('image'), async (req, res) => {
   }
 });
 
-// DELETE /api/banks/:id - Delete a bank
+// PUT /api/banks/:id/restore - Restore an archived bank
+router.put('/:id/restore', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const bank = await prisma.bank.update({
+      where: { id },
+      data: { archived: false },
+      include: {
+        userBanks: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Transform the data to match the expected format
+    const transformedBank = {
+      ...bank,
+      users: bank.userBanks.map(ub => ub.user)
+    };
+    
+    res.json(transformedBank);
+  } catch (error) {
+    console.error('Error restoring bank:', error);
+    res.status(500).json({ error: 'Failed to restore bank' });
+  }
+});
+
+// DELETE /api/banks/:id/permanent - Permanently delete an archived bank and all associated data
+router.delete('/:id/permanent', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // First, get the bank name for the response
+    const bank = await prisma.bank.findUnique({
+      where: { id },
+      select: { name: true }
+    });
+    
+    if (!bank) {
+      return res.status(404).json({ error: 'Bank not found' });
+    }
+    
+    // Count transactions before deletion for the response
+    const transactionCount = await prisma.transaction.count({
+      where: { bankId: id }
+    });
+    
+    // Use a transaction to ensure all deletions succeed or fail together
+    await prisma.$transaction(async (tx) => {
+      // Delete all transactions associated with this bank
+      await tx.transaction.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Delete all budgets associated with categories that might reference this bank
+      await tx.budget.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Delete all recurrences associated with this bank
+      await tx.recurrence.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Delete user-bank relationships
+      await tx.userBank.deleteMany({
+        where: { bankId: id }
+      });
+      
+      // Finally, delete the bank itself
+      await tx.bank.delete({
+        where: { id }
+      });
+    });
+    
+    res.json({
+      message: 'Bank permanently deleted',
+      bankName: bank.name,
+      deletedTransactions: transactionCount
+    });
+  } catch (error) {
+    console.error('Error permanently deleting bank:', error);
+    res.status(500).json({ error: 'Failed to permanently delete bank' });
+  }
+});
+
+// DELETE /api/banks/:id - Delete a bank (archive it)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    await prisma.bank.delete({
-      where: { id }
+    // Archive the bank instead of deleting it
+    await prisma.bank.update({
+      where: { id },
+      data: { archived: true }
     });
     
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting bank:', error);
-    res.status(500).json({ error: 'Failed to delete bank' });
+    console.error('Error archiving bank:', error);
+    res.status(500).json({ error: 'Failed to archive bank' });
   }
 });
 

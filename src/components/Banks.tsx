@@ -240,7 +240,11 @@ export default function Banks() {
         const result = await response.json();
         alert(`✅ Banque "${result.bankName}" supprimée définitivement.\n\n${result.deletedTransactions} transaction(s) supprimée(s).`);
         
-        await loadArchivedBanks(); // Recharger les archives
+        // Recharger à la fois les banques normales et les archives
+        await Promise.all([
+          loadBanks(),
+          loadArchivedBanks()
+        ]);
       } else {
         const error = await response.json();
         alert(error.error || 'Erreur lors de la suppression définitive');
@@ -323,9 +327,7 @@ export default function Banks() {
           </p>
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4 space-x-3">
-          {selectedUser && (
-            <>
-              <button
+          <button
                 onClick={() => {
                   setShowArchived(!showArchived);
                   if (!showArchived) {
@@ -339,8 +341,6 @@ export default function Banks() {
                 </svg>
                 {showArchived ? 'Masquer les archives' : 'Voir les archives'}
               </button>
-            </>
-          )}
         </div>
       </div>
 
@@ -399,7 +399,7 @@ export default function Banks() {
                             </p>
                           </div>
                         </div>
-                        <div className="flex space-x-2">
+                        <div className="flex flex-col space-y-2">
                           <button
                             onClick={() => handleRestore(bank.id)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
