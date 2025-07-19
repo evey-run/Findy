@@ -1,26 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Objective, Transaction } from '../types';
-import { 
-  PlusIcon, 
-  PencilIcon, 
-  TrashIcon, 
-  ChartBarIcon,
-  CheckCircleIcon,
-  CalendarIcon,
-  CurrencyEuroIcon,
+import {
   TrophyIcon,
-  ClockIcon,
-  HeartIcon,
-  HomeIcon,
-  TruckIcon,
-  AcademicCapIcon,
-  GiftIcon,
-  BeakerIcon,
-  CameraIcon,
-  MusicalNoteIcon,
-  SunIcon,
-  StarIcon
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  CheckCircleIcon,
+  ChartBarIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -35,45 +23,7 @@ interface ObjectiveProgress {
   recentTransactions: Transaction[];
 }
 
-// Mapping des icônes disponibles
-const iconMap = {
-  TrophyIcon,
-  HeartIcon,
-  HomeIcon,
-  TruckIcon,
-  AcademicCapIcon,
-  GiftIcon,
-  BeakerIcon,
-  CameraIcon,
-  MusicalNoteIcon,
-  SunIcon,
-  StarIcon,
-  CurrencyEuroIcon,
-  CalendarIcon,
-  ChartBarIcon
-};
 
-const iconOptions = [
-  { name: 'TrophyIcon', label: '🏆 Trophée' },
-  { name: 'HeartIcon', label: '❤️ Cœur' },
-  { name: 'HomeIcon', label: '🏠 Maison' },
-  { name: 'TruckIcon', label: '🚚 Véhicule' },
-  { name: 'AcademicCapIcon', label: '🎓 Éducation' },
-  { name: 'GiftIcon', label: '🎁 Cadeau' },
-  { name: 'BeakerIcon', label: '🧪 Science' },
-  { name: 'CameraIcon', label: '📷 Photo' },
-  { name: 'MusicalNoteIcon', label: '🎵 Musique' },
-  { name: 'SunIcon', label: '☀️ Vacances' },
-  { name: 'StarIcon', label: '⭐ Favori' },
-  { name: 'CurrencyEuroIcon', label: '💰 Argent' },
-  { name: 'CalendarIcon', label: '📅 Événement' },
-  { name: 'ChartBarIcon', label: '📊 Investissement' }
-];
-
-const getIconComponent = (iconName: string) => {
-  const IconComponent = iconMap[iconName as keyof typeof iconMap] || TrophyIcon;
-  return IconComponent;
-};
 
 export default function Budgets() {
   const { loadCategories, loadBanks, transactions } = useAppStore();
@@ -150,6 +100,8 @@ export default function Budgets() {
   };
 
   const handleEdit = (objective: Objective) => {
+    // Fermer le formulaire d'ajout s'il est ouvert
+    setShowAddForm(false);
     setEditingId(objective.id);
     setEditingObjective(objective);
     setFormData({
@@ -161,7 +113,11 @@ export default function Budgets() {
     });
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    
     if (!editingObjective || !formData.title || !formData.targetAmount) {
       toast.error('Veuillez remplir tous les champs requis');
       return;
@@ -174,6 +130,8 @@ export default function Budgets() {
         deadline: formData.deadline || null
       };
 
+      console.log('Sending objective data:', objectiveData); // Debug log
+
       const response = await fetch(`/api/objectives/${editingObjective.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -182,12 +140,15 @@ export default function Budgets() {
 
       if (response.ok) {
         const updatedObjective = await response.json();
+        console.log('Updated objective received:', updatedObjective); // Debug log
         setObjectives(prev => prev.map(obj => 
           obj.id === editingObjective.id ? updatedObjective : obj
         ));
         toast.success('Objectif mis à jour avec succès');
         handleCancel();
       } else {
+        const errorData = await response.text();
+        console.error('Server error:', errorData);
         throw new Error('Erreur lors de la mise à jour');
       }
     } catch (error) {
@@ -218,6 +179,8 @@ export default function Budgets() {
         deadline: formData.deadline || null
       };
 
+      console.log('Creating objective with data:', objectiveData); // Debug log
+
       const response = await fetch('/api/objectives', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,10 +189,13 @@ export default function Budgets() {
 
       if (response.ok) {
         const newObjective = await response.json();
+        console.log('New objective received:', newObjective); // Debug log
         setObjectives(prev => [newObjective, ...prev]);
         toast.success('Objectif créé avec succès');
         handleCancel();
       } else {
+        const errorData = await response.text();
+        console.error('Server error during creation:', errorData);
         throw new Error('Erreur lors de la création');
       }
     } catch (error) {
@@ -279,16 +245,12 @@ export default function Budgets() {
     return 'bg-red-500';
   };
 
-  const getStatusIcon = (percentage: number, isCompleted: boolean, objective?: Objective) => {
+  const getStatusIcon = (percentage: number, isCompleted: boolean) => {
     if (isCompleted) return <TrophyIcon className="h-6 w-6 text-yellow-500" />;
     if (percentage >= 80) return <CheckCircleIcon className="h-6 w-6 text-green-500" />;
     if (percentage >= 40) return <ChartBarIcon className="h-6 w-6 text-blue-500" />;
     
-    // Utiliser l'icône personnalisée de l'objectif au lieu de l'icône d'attention
-    if (objective?.icon) {
-      const IconComponent = getIconComponent(objective.icon);
-      return <IconComponent className="h-6 w-6 text-gray-600" />;
-    }
+    // Utiliser l'icône de trophée pour tous les objectifs
     return <TrophyIcon className="h-6 w-6 text-gray-600" />;
   };
 
@@ -370,7 +332,7 @@ export default function Budgets() {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <CurrencyEuroIcon className="h-8 w-8 text-green-600" />
+              <TrophyIcon className="h-8 w-8 text-green-600" />
             </div>
             <div className="ml-5 w-0 flex-1">
               <dl>
@@ -388,7 +350,7 @@ export default function Budgets() {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <CurrencyEuroIcon className="h-8 w-8 text-purple-600" />
+              <TrophyIcon className="h-8 w-8 text-purple-600" />
             </div>
             <div className="ml-5 w-0 flex-1">
               <dl>
@@ -416,11 +378,11 @@ export default function Budgets() {
           return (
             <div key={objective.id} className={`bg-white rounded-lg shadow p-6 flex flex-col h-full min-h-[280px] ${overdueClass}`}>
               {editingId === objective.id ? (
-                <div className="flex flex-col h-[280px]">
-                  <form id="edit-objective-form" onSubmit={handleSave} className="space-y-2">
+                <div className="flex flex-col h-full">
+                  <form id="edit-objective-form" onSubmit={handleSave} className="flex flex-col h-full space-y-2">
                     <h3 className="text-md font-medium text-gray-900">Modifier l'objectif</h3>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-1">
                       <input
                         type="text"
                         value={formData.title}
@@ -438,38 +400,27 @@ export default function Budgets() {
                         placeholder="Description..."
                       />
                       
-                      <input
-                        type="number"
-                        step="1"
-                        value={formData.targetAmount}
-                        onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
-                        placeholder="Montant cible (€)"
-                        required
-                      />
-                      
-                      <input
-                        type="date"
-                        value={formData.deadline}
-                        onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
-                      />
-                      
-                      {/* Sélecteur d'icône */}
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Icône</label>
-                        <select
-                          value={formData.icon}
-                          onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
-                        >
-                          {iconOptions.map(option => (
-                            <option key={option.name} value={option.name}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                      {/* Montant et date sur la même ligne */}
+                      <div className="flex space-x-2">
+                        <input
+                          type="number"
+                          step="1"
+                          value={formData.targetAmount}
+                          onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
+                          className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                          placeholder="Montant cible (€)"
+                          required
+                        />
+                        <input
+                          type="date"
+                          value={formData.deadline}
+                          onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                          className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                          placeholder="Échéance"
+                        />
                       </div>
+                      
+
 
                       <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
                         <p className="text-xs text-blue-800">
@@ -501,7 +452,7 @@ export default function Budgets() {
                   {/* Header */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center">
-                      {getStatusIcon(percentage, isCompleted, objective)}
+                      {getStatusIcon(percentage, isCompleted)}
                       <div className="ml-3">
                         <h3 className="text-lg font-medium text-gray-900">
                           {objective.title}
@@ -649,39 +600,26 @@ export default function Budgets() {
                   placeholder="Description..."
                 />
                 
-                <input
-                  type="number"
-                  step="1"
-                  value={formData.targetAmount}
-                  onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
-                  placeholder="Montant cible (€)"
-                  required
-                />
-                
-                <input
-                  type="date"
-                  value={formData.deadline}
-                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
-                />
-                
-                {/* Sélecteur d'icône */}
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Icône</label>
-                  <select
-                    value={formData.icon}
-                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
-                  >
-                    {iconOptions.map(option => (
-                      <option key={option.name} value={option.name}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
+                {/* Montant et date sur la même ligne */}
+                <div className="flex space-x-2">
+                  <input
+                    type="number"
+                    step="1"
+                    value={formData.targetAmount}
+                    onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
+                    className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                    placeholder="Montant cible (€)"
+                    required
+                  />
+                  <input
+                    type="date"
+                    value={formData.deadline}
+                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                    className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                    placeholder="Échéance"
+                  />
                 </div>
-
+                
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
                   <p className="text-xs text-blue-800">
                     <strong>💡 Astuce:</strong> Créez des transactions "Économie {formData.title || '[Titre]'}" pour alimenter cet objectif.
@@ -710,6 +648,9 @@ export default function Budgets() {
         ) : (
           <div 
             onClick={() => {
+              // Fermer le formulaire de modification s'il est ouvert
+              setEditingId(null);
+              setEditingObjective(null);
               setShowAddForm(true);
               setFormData({
                 title: '',

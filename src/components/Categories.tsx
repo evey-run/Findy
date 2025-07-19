@@ -167,6 +167,8 @@ export default function Categories() {
 
   const handleEdit = (category: Category) => {
     const categoryBudget = getCategoryBudget(category.id);
+    // Fermer le formulaire d'ajout si ouvert
+    setShowAddForm(false);
     setEditingId(category.id);
     setEditingCategory({
       id: category.id,
@@ -390,55 +392,67 @@ export default function Categories() {
       </div>
 
       {/* Categories List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">{categories.map((category) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+        {categories.map((category) => {
           const categorySpending = getCategorySpending(category.id);
           const categoryBudget = getCategoryBudget(category.id);
           
           return (
             <div key={category.id} className="bg-white shadow rounded-lg p-6 flex flex-col h-full min-h-[280px]">
               {editingId === category.id ? (
-                <div className="space-y-3 flex-1 flex flex-col">
-                  <input
-                    type="text"
-                    value={editingCategory?.name || ''}
-                    onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
-                    className="w-full text-lg font-medium border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500"
-                  />
-                  <select
-                    value={editingCategory?.type || ''}
-                    onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                    className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                  >
-                    {categoryTypes.map(type => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    value={editingCategory?.icon || ''}
-                    onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                    className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="🛒"
-                  />
-                  <div className="flex flex-wrap gap-1">
-                    {predefinedColors.map(color => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
-                        className={`w-6 h-6 rounded-full border ${
-                          editingCategory?.color === color ? 'border-gray-900' : 'border-gray-300'
-                        }`}
-                        style={{ backgroundColor: color }}
+                /* Edit Form Card - appears in place of the category being edited */
+                <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full space-y-2">
+                  <h3 className="text-md font-medium text-gray-900">Modifier la catégorie</h3>
+                  
+                  <div className="space-y-2 flex-1">
+                    <input
+                      type="text"
+                      value={editingCategory?.name || ''}
+                      onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
+                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+                      placeholder="Nom"
+                      required
+                    />
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={editingCategory?.icon || ''}
+                        onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+                        placeholder="🛒"
                       />
-                    ))}
-                  </div>
+                      
+                      <select
+                        value={editingCategory?.type || ''}
+                        onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
+                        className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
+                        required
+                      >
+                        {categoryTypes.map(type => (
+                          <option key={type.value} value={type.value}>{type.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-1">
+                      {predefinedColors.slice(0, 16).map(color => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
+                          className={`w-4 h-4 rounded-full border ${
+                            editingCategory?.color === color ? 'border-gray-900' : 'border-gray-300'
+                          }`}
+                          style={{ backgroundColor: color }}
+                        />
+                      ))}
+                    </div>
 
-                  {/* Budget editing - Only for EXPENSE categories */}
-                  {editingCategory?.type === 'EXPENSE' && (
-                    <div className="border-t pt-3 mt-3 flex-1">
-                      <h5 className="text-sm font-medium text-gray-900 mb-2">Budget</h5>
-                      <div className="space-y-2">
+                    {/* Budget section - Only for EXPENSE categories */}
+                    {editingCategory?.type === 'EXPENSE' && (
+                      <div className="border-t pt-2">
+                        <p className="text-xs font-medium text-gray-700 mb-1">Budget</p>
                         <input
                           type="number"
                           step="1"
@@ -451,9 +465,10 @@ export default function Categories() {
                               startDate: new Date().toISOString().split('T')[0]
                             }
                           } : null)}
-                          className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1 mb-1"
                           placeholder="Montant (€)"
                         />
+                        
                         <select
                           value={editingCategory?.budget?.period || 'MONTHLY'}
                           onChange={(e) => setEditingCategory(prev => prev ? {
@@ -464,45 +479,33 @@ export default function Categories() {
                               startDate: new Date().toISOString().split('T')[0]
                             }
                           } : null)}
-                          className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm py-1"
                         >
-                          <option value="WEEKLY">Hebdomadaire</option>
                           <option value="MONTHLY">Mensuel</option>
-                          <option value="QUARTERLY">Trimestriel</option>
+                          <option value="WEEKLY">Hebdo</option>
+                          <option value="QUARTERLY">Trimestre</option>
                           <option value="YEARLY">Annuel</option>
                         </select>
-                        <input
-                          type="date"
-                          value={editingCategory?.budget?.startDate || ''}
-                          onChange={(e) => setEditingCategory(prev => prev ? {
-                            ...prev,
-                            budget: prev.budget ? {...prev.budget, startDate: e.target.value} : {
-                              amount: '',
-                              period: 'MONTHLY',
-                              startDate: e.target.value
-                            }
-                          } : null)}
-                          className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                        />
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
-                  <div className="flex space-x-2 mt-auto">
+                  <div className="flex space-x-2 pt-2">
                     <button
-                      onClick={handleSave}
-                      className="flex-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                    >
-                      Sauvegarder
-                    </button>
-                    <button
+                      type="button"
                       onClick={handleCancel}
-                      className="flex-1 px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
+                      className="flex-1 px-2 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
                     >
                       Annuler
                     </button>
+                    <button
+                      type="submit"
+                      className="flex-1 px-2 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                      Sauvegarder
+                    </button>
                   </div>
-                </div>
+                </form>
               ) : (
                 <div className="space-y-3 flex-1 flex flex-col">
                   <div className="flex items-center justify-between">
@@ -696,7 +699,7 @@ export default function Categories() {
 
         {/* Add Category Form Card */}
         {showAddForm ? (
-          <div className="bg-white shadow rounded-lg p-4 flex flex-col h-full min-h-[280px] max-h-[280px]">
+          <div className="bg-white shadow rounded-lg p-6 flex flex-col h-full min-h-[280px]">
             <form onSubmit={handleAddCategory} className="flex flex-col h-full space-y-2">
               <h3 className="text-md font-medium text-gray-900">Ajouter une catégorie</h3>
               
@@ -806,6 +809,8 @@ export default function Categories() {
         ) : (
           <div 
             onClick={() => {
+              // Fermer le formulaire de modification si ouvert
+              setEditingId(null);
               setShowAddForm(true);
               setEditingCategory({
                 id: '',

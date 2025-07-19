@@ -171,6 +171,8 @@ export default function Categories() {
 
   const handleEdit = (category: Category) => {
     const categoryBudget = getCategoryBudget(category.id);
+    // Fermer le formulaire d'ajout s'il est ouvert
+    setShowAddForm(false);
     setEditingId(category.id);
     setEditingCategory({
       id: category.id,
@@ -395,6 +397,8 @@ export default function Categories() {
         <div className="mt-4 flex md:mt-0 md:ml-4">
           <button
             onClick={() => {
+              // Fermer le formulaire de modification s'il est ouvert
+              setEditingId(null);
               setShowAddForm(true);
               setEditingCategory({
                 id: '',
@@ -592,131 +596,162 @@ export default function Categories() {
             return (
               <div key={category.id} className="border rounded-lg p-4 bg-white">
                 {editingId === category.id ? (
-                  <div className="space-y-3">
-                    <input
-                      type="text"
-                      value={editingCategory?.name || ''}
-                      onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
-                      className="w-full text-lg font-medium border-gray-300 rounded-md focus:border-blue-500 focus:ring-blue-500"
-                    />
-                    <select
-                      value={editingCategory?.type || ''}
-                      onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                      className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                    >
-                      {categoryTypes.map(type => (
-                        <option key={type.value} value={type.value}>{type.label}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      value={editingCategory?.icon || ''}
-                      onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                      className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                      placeholder="🛒"
-                    />
-                    <div className="flex flex-wrap gap-1">
-                      {predefinedColors.map(color => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
-                          className={`w-6 h-6 rounded-full border ${
-                            editingCategory?.color === color ? 'border-gray-900' : 'border-gray-300'
-                          }`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-
-                    {/* Budget editing - Only for EXPENSE categories */}
-                    {editingCategory?.type === 'EXPENSE' && (
-                      <div className="border-t pt-3 mt-3">
-                        <h5 className="text-sm font-medium text-gray-900 mb-2">Budget</h5>
-                        <div className="space-y-2">
+                  <div className="bg-white shadow rounded-lg p-6">
+                    <h3 className="text-lg font-medium text-gray-900 mb-4">Modifier la catégorie</h3>
+                    <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Nom</label>
                           <input
-                            type="number"
-                            step="1"
-                            value={editingCategory?.budget?.amount || ''}
-                            onChange={(e) => setEditingCategory(prev => prev ? {
-                              ...prev,
-                              budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
-                                amount: e.target.value,
-                                period: 'MONTHLY',
-                                startDate: new Date().toISOString().split('T')[0],
-                                shared: false
-                              }
-                            } : null)}
-                            className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                            placeholder="Montant (€)"
+                            type="text"
+                            value={editingCategory?.name || ''}
+                            onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            required
                           />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Type</label>
                           <select
-                            value={editingCategory?.budget?.period || 'MONTHLY'}
-                            onChange={(e) => setEditingCategory(prev => prev ? {
-                              ...prev,
-                              budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
-                                amount: '',
-                                period: e.target.value as any,
-                                startDate: new Date().toISOString().split('T')[0],
-                                shared: false
-                              }
-                            } : null)}
-                            className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            value={editingCategory?.type || ''}
+                            onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            required
                           >
-                            <option value="WEEKLY">Hebdomadaire</option>
-                            <option value="MONTHLY">Mensuel</option>
-                            <option value="QUARTERLY">Trimestriel</option>
-                            <option value="YEARLY">Annuel</option>
+                            {categoryTypes.map(type => (
+                              <option key={type.value} value={type.value}>{type.label}</option>
+                            ))}
                           </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Icône (optionnel)</label>
                           <input
-                            type="date"
-                            value={editingCategory?.budget?.startDate || ''}
-                            onChange={(e) => setEditingCategory(prev => prev ? {
-                              ...prev,
-                              budget: prev.budget ? {...prev.budget, startDate: e.target.value} : {
-                                amount: '',
-                                period: 'MONTHLY',
-                                startDate: e.target.value,
-                                shared: false
-                              }
-                            } : null)}
-                            className="w-full rounded-md border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            type="text"
+                            value={editingCategory?.icon || ''}
+                            onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            placeholder="🛒"
                           />
-                          <label className="flex items-center text-sm">
-                            <input
-                              type="checkbox"
-                              checked={editingCategory?.budget?.shared || false}
-                              onChange={(e) => setEditingCategory(prev => prev ? {
-                                ...prev,
-                                budget: prev.budget ? {...prev.budget, shared: e.target.checked} : {
-                                  amount: '',
-                                  period: 'MONTHLY',
-                                  startDate: new Date().toISOString().split('T')[0],
-                                  shared: e.target.checked
-                                }
-                              } : null)}
-                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                            />
-                            <span className="ml-2">Partagé</span>
-                          </label>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Couleur</label>
+                          <div className="mt-1 flex flex-wrap gap-2">
+                            {predefinedColors.map(color => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
+                                className={`w-8 h-8 rounded-full border-2 ${
+                                  editingCategory?.color === color ? 'border-gray-900' : 'border-gray-300'
+                                }`}
+                                style={{ backgroundColor: color }}
+                              />
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    )}
 
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={handleSave}
-                        className="flex-1 px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-                      >
-                        Sauvegarder
-                      </button>
-                      <button
-                        onClick={handleCancel}
-                        className="flex-1 px-3 py-1 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm"
-                      >
-                        Annuler
-                      </button>
-                    </div>
+                      {/* Budget section - Only for EXPENSE categories */}
+                      {editingCategory?.type === 'EXPENSE' && (
+                        <div className="border-t pt-4 mt-4">
+                          <h4 className="text-md font-medium text-gray-900 mb-3">Budget (optionnel)</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Montant (€)</label>
+                              <input
+                                type="number"
+                                step="1"
+                                value={editingCategory?.budget?.amount || ''}
+                                onChange={(e) => setEditingCategory(prev => prev ? {
+                                  ...prev,
+                                  budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
+                                    amount: e.target.value,
+                                    period: 'MONTHLY',
+                                    startDate: new Date().toISOString().split('T')[0],
+                                    shared: false
+                                  }
+                                } : null)}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Période</label>
+                              <select
+                                value={editingCategory?.budget?.period || 'MONTHLY'}
+                                onChange={(e) => setEditingCategory(prev => prev ? {
+                                  ...prev,
+                                  budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
+                                    amount: '',
+                                    period: e.target.value as any,
+                                    startDate: new Date().toISOString().split('T')[0],
+                                    shared: false
+                                  }
+                                } : null)}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              >
+                                <option value="WEEKLY">Hebdomadaire</option>
+                                <option value="MONTHLY">Mensuel</option>
+                                <option value="QUARTERLY">Trimestriel</option>
+                                <option value="YEARLY">Annuel</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700">Date de début</label>
+                              <input
+                                type="date"
+                                value={editingCategory?.budget?.startDate || ''}
+                                onChange={(e) => setEditingCategory(prev => prev ? {
+                                  ...prev,
+                                  budget: prev.budget ? {...prev.budget, startDate: e.target.value} : {
+                                    amount: '',
+                                    period: 'MONTHLY',
+                                    startDate: e.target.value,
+                                    shared: false
+                                  }
+                                } : null)}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-3">
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={editingCategory?.budget?.shared || false}
+                                onChange={(e) => setEditingCategory(prev => prev ? {
+                                  ...prev,
+                                  budget: prev.budget ? {...prev.budget, shared: e.target.checked} : {
+                                    amount: '',
+                                    period: 'MONTHLY',
+                                    startDate: new Date().toISOString().split('T')[0],
+                                    shared: e.target.checked
+                                  }
+                                } : null)}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">Budget partagé</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end space-x-2">
+                        <button
+                          type="button"
+                          onClick={handleCancel}
+                          className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          Annuler
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                        >
+                          Sauvegarder
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 ) : (
                   <div className="space-y-3">
