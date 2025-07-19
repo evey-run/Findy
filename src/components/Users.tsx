@@ -296,6 +296,7 @@ export default function Users() {
                             value={formData.name}
                             onChange={(e) => setFormData({...formData, name: e.target.value})}
                             className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            maxLength={20}
                             required
                           />
                         </div>

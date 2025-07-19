@@ -91,6 +91,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Name is required' });
     }
     
+    if (name.length > 20) {
+      return res.status(400).json({ error: 'Name must be 20 characters or less' });
+    }
+    
     const user = await prisma.user.create({
       data: {
         name,
@@ -114,6 +118,11 @@ router.put('/:id', upload.single('avatar'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email } = req.body;
+    
+    // Validation du nom
+    if (name && name.length > 20) {
+      return res.status(400).json({ error: 'Name must be 20 characters or less' });
+    }
     
     // Préparer les données de mise à jour
     const updateData: any = {
