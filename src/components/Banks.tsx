@@ -501,27 +501,7 @@ export default function Banks() {
                               <option value="SAVINGS">Livret d'épargne</option>
                               <option value="INVESTMENT">Compte d'investissement</option>
                             </select>
-                            
-                            {/* Utilisateurs - inline si pas sélectionné d'utilisateur */}
-                            {!selectedUser && (
-                              <div className="text-sm text-blue-600">
-                                <span>• </span>
-                                <select
-                                  multiple
-                                  value={formData.userIds}
-                                  onChange={(e) => {
-                                    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                                    setFormData({...formData, userIds: selectedOptions});
-                                  }}
-                                  className="text-sm text-blue-600 border-none focus:ring-0 p-0 bg-transparent inline"
-                                  size={1}
-                                >
-                                  {users.map(user => (
-                                    <option key={user.id} value={user.id}>{user.name}</option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
+
                           </div>
                           
                           {/* IBAN - même position que sur les cartes */}
@@ -572,8 +552,8 @@ export default function Banks() {
                         />
                       </div>
                       
-                      {/* Sélection utilisateurs si utilisateur sélectionné - 2 utilisateurs par ligne */}
-                      {selectedUser && (
+                      {/* Sélection utilisateurs - 2 utilisateurs par ligne */}
+                      {(
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Utilisateurs ayant accès *
@@ -700,8 +680,7 @@ export default function Banks() {
                         )}
                       </div>
                     </div>
-                    {selectedUser && (
-                      <div className="flex space-x-2">
+                    <div className="flex space-x-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -727,7 +706,6 @@ export default function Banks() {
                           </svg>
                         </button>
                       </div>
-                    )}
                   </div>
                   <div className="mt-4">
                     <div className="text-sm text-gray-500 mb-1">
@@ -894,27 +872,7 @@ export default function Banks() {
                           <option value="SAVINGS">Livret d'épargne</option>
                           <option value="INVESTMENT">Compte d'investissement</option>
                         </select>
-                        
-                        {/* Utilisateurs - inline si pas sélectionné d'utilisateur */}
-                        {!selectedUser && (
-                          <div className="text-sm text-blue-600">
-                            <span>• </span>
-                            <select
-                              multiple
-                              value={formData.userIds}
-                              onChange={(e) => {
-                                const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
-                                setFormData({...formData, userIds: selectedOptions});
-                              }}
-                              className="text-sm text-blue-600 border-none focus:ring-0 p-0 bg-transparent inline"
-                              size={1}
-                            >
-                              {users.map(user => (
-                                <option key={user.id} value={user.id}>{user.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
+
                       </div>
                       
                       {/* IBAN - même position que sur les cartes */}
@@ -929,8 +887,7 @@ export default function Banks() {
                   </div>
                   
                   {/* Boutons d'action - même position que sur les cartes */}
-                  {selectedUser && (
-                    <div className="flex space-x-2">
+                  <div className="flex space-x-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -955,8 +912,7 @@ export default function Banks() {
                         </svg>
                       </button>
                     </div>
-                  )}
-                </div>
+                  </div>
                 
                 {/* Champs supplémentaires en mode compact */}
                 <div className="space-y-2 mb-4">
@@ -980,8 +936,8 @@ export default function Banks() {
                     />
                   </div>
                   
-                  {/* Sélection utilisateurs si utilisateur sélectionné - format horizontal compact */}
-                  {selectedUser && (
+                  {/* Sélection utilisateurs - format horizontal compact */}
+                  {(
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Utilisateurs ayant accès *
