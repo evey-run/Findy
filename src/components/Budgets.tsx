@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import type { Objective } from '../types';
+import type { Objective, Transaction } from '../types';
 import { 
   PlusIcon, 
   PencilIcon, 
@@ -11,22 +11,72 @@ import {
   CurrencyEuroIcon,
   TrophyIcon,
   ClockIcon,
-  ExclamationTriangleIcon
+  HeartIcon,
+  HomeIcon,
+  TruckIcon,
+  AcademicCapIcon,
+  GiftIcon,
+  BeakerIcon,
+  CameraIcon,
+  MusicalNoteIcon,
+  SunIcon,
+  StarIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 interface ObjectiveProgress {
   objective: Objective;
-  transactions: any[];
+  transactions: Transaction[];
   totalSaved: number;
   remaining: number;
   percentage: number;
   isCompleted: boolean;
   searchPattern: string;
+  recentTransactions: Transaction[];
 }
 
+// Mapping des icônes disponibles
+const iconMap = {
+  TrophyIcon,
+  HeartIcon,
+  HomeIcon,
+  TruckIcon,
+  AcademicCapIcon,
+  GiftIcon,
+  BeakerIcon,
+  CameraIcon,
+  MusicalNoteIcon,
+  SunIcon,
+  StarIcon,
+  CurrencyEuroIcon,
+  CalendarIcon,
+  ChartBarIcon
+};
+
+const iconOptions = [
+  { name: 'TrophyIcon', label: '🏆 Trophée' },
+  { name: 'HeartIcon', label: '❤️ Cœur' },
+  { name: 'HomeIcon', label: '🏠 Maison' },
+  { name: 'TruckIcon', label: '🚚 Véhicule' },
+  { name: 'AcademicCapIcon', label: '🎓 Éducation' },
+  { name: 'GiftIcon', label: '🎁 Cadeau' },
+  { name: 'BeakerIcon', label: '🧪 Science' },
+  { name: 'CameraIcon', label: '📷 Photo' },
+  { name: 'MusicalNoteIcon', label: '🎵 Musique' },
+  { name: 'SunIcon', label: '☀️ Vacances' },
+  { name: 'StarIcon', label: '⭐ Favori' },
+  { name: 'CurrencyEuroIcon', label: '💰 Argent' },
+  { name: 'CalendarIcon', label: '📅 Événement' },
+  { name: 'ChartBarIcon', label: '📊 Investissement' }
+];
+
+const getIconComponent = (iconName: string) => {
+  const IconComponent = iconMap[iconName as keyof typeof iconMap] || TrophyIcon;
+  return IconComponent;
+};
+
 export default function Budgets() {
-  const { loadCategories, loadBanks } = useAppStore();
+  const { loadCategories, loadBanks, transactions } = useAppStore();
   
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: ObjectiveProgress }>({});
@@ -40,7 +90,8 @@ export default function Budgets() {
     title: '',
     description: '',
     targetAmount: '',
-    deadline: ''
+    deadline: '',
+    icon: 'TrophyIcon'
   });
 
   useEffect(() => {
@@ -72,6 +123,17 @@ export default function Budgets() {
     }
   };
 
+  // Fonction pour filtrer les transactions par objectif
+  const getObjectiveTransactions = (objectiveTitle: string): Transaction[] => {
+    const searchPattern = `economie ${objectiveTitle.toLowerCase()}`;
+    return transactions
+      .filter(transaction => 
+        transaction.description.toLowerCase().includes(searchPattern)
+      )
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 3);
+  };
+
   const fetchObjectiveProgress = async (objectiveId: string) => {
     try {
       const response = await fetch(`/api/objectives/${objectiveId}/progress`);
@@ -94,7 +156,8 @@ export default function Budgets() {
       title: objective.title,
       description: objective.description || '',
       targetAmount: objective.targetAmount.toString(),
-      deadline: objective.deadline ? objective.deadline.split('T')[0] : ''
+      deadline: objective.deadline ? objective.deadline.split('T')[0] : '',
+      icon: objective.icon || 'TrophyIcon'
     });
   };
 
@@ -202,7 +265,8 @@ export default function Budgets() {
       title: '',
       description: '',
       targetAmount: '',
-      deadline: ''
+      deadline: '',
+      icon: 'TrophyIcon'
     });
     setEditingObjective(null);
   };
@@ -215,16 +279,24 @@ export default function Budgets() {
     return 'bg-red-500';
   };
 
-  const getStatusIcon = (percentage: number, isCompleted: boolean) => {
+  const getStatusIcon = (percentage: number, isCompleted: boolean, objective?: Objective) => {
     if (isCompleted) return <TrophyIcon className="h-6 w-6 text-yellow-500" />;
     if (percentage >= 80) return <CheckCircleIcon className="h-6 w-6 text-green-500" />;
     if (percentage >= 40) return <ChartBarIcon className="h-6 w-6 text-blue-500" />;
-    return <ExclamationTriangleIcon className="h-6 w-6 text-orange-500" />;
+    
+    // Utiliser l'icône personnalisée de l'objectif au lieu de l'icône d'attention
+    if (objective?.icon) {
+      const IconComponent = getIconComponent(objective.icon);
+      return <IconComponent className="h-6 w-6 text-gray-600" />;
+    }
+    return <TrophyIcon className="h-6 w-6 text-gray-600" />;
   };
 
   const isOverdue = (deadline: string) => {
     return new Date(deadline) < new Date();
   };
+
+
 
   // Calculer les statistiques
   const totalObjectives = objectives.length;
@@ -368,7 +440,7 @@ export default function Budgets() {
                       
                       <input
                         type="number"
-                        step="0.01"
+                        step="1"
                         value={formData.targetAmount}
                         onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
                         className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
@@ -382,6 +454,22 @@ export default function Budgets() {
                         onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                         className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
                       />
+                      
+                      {/* Sélecteur d'icône */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Icône</label>
+                        <select
+                          value={formData.icon}
+                          onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                          className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                        >
+                          {iconOptions.map(option => (
+                            <option key={option.name} value={option.name}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
 
                       <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
                         <p className="text-xs text-blue-800">
@@ -413,7 +501,7 @@ export default function Budgets() {
                   {/* Header */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center">
-                      {getStatusIcon(percentage, isCompleted)}
+                      {getStatusIcon(percentage, isCompleted, objective)}
                       <div className="ml-3">
                         <h3 className="text-lg font-medium text-gray-900">
                           {objective.title}
@@ -476,48 +564,60 @@ export default function Budgets() {
                         }
                       </span>
                     </div>
+                    
+ 
                   </div>
 
                   {/* Détails */}
                   <div className="border-t pt-3 mt-auto">
-                    {deadline && (
-                      <div className={`flex items-center text-sm mb-2 ${
+                    {/* Échéance */}
+                    <div className={`flex items-center text-sm mb-2 ${
+                      deadline ? (
                         isOverdue(deadline) && !isCompleted ? 'text-red-600' : 'text-gray-500'
-                      }`}>
-                        <ClockIcon className="h-4 w-4 mr-2" />
-                        <span>
-                          Échéance: {new Date(deadline).toLocaleDateString('fr-FR')}
-                          {isOverdue(deadline) && !isCompleted && ' (en retard)'}
-                        </span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center text-sm text-gray-500 mb-2">
-                      <CalendarIcon className="h-4 w-4 mr-2" />
+                      ) : 'text-gray-400'
+                    }`}>
+                      <ClockIcon className="h-4 w-4 mr-2" />
                       <span>
-                        Créé le {new Date(objective.createdAt).toLocaleDateString('fr-FR')}
+                        {deadline ? (
+                          <>
+                            Échéance: {new Date(deadline).toLocaleDateString('fr-FR')}
+                            {isOverdue(deadline) && !isCompleted && ' (en retard)'}
+                          </>
+                        ) : (
+                          'Aucune échéance définie'
+                        )}
                       </span>
                     </div>
-
-                    {progress && progress.transactions.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-gray-500 mb-1">
-                          Dernières contributions:
-                        </p>
-                        <div className="space-y-1">
-                          {progress.transactions.slice(0, 3).map((transaction, index) => (
-                            <div key={index} className="flex justify-between text-xs">
-                              <span className="text-gray-600 truncate">
-                                {transaction.description}
-                              </span>
-                              <span className="text-green-600 font-medium">
-                                +{transaction.amount.toLocaleString('fr-FR')} €
-                              </span>
+                    
+                    {/* Transactions */}
+                    {(() => {
+                      const objectiveTransactions = getObjectiveTransactions(objective.title);
+                      return (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Dernières transactions "Economie {objective.title}":
+                          </p>
+                          {objectiveTransactions.length > 0 ? (
+                            <div className="space-y-1">
+                              {objectiveTransactions.map((transaction) => (
+                                <div key={transaction.id} className="flex justify-between text-xs">
+                                  <span className="text-gray-600 truncate">
+                                    {transaction.description}
+                                  </span>
+                                  <span className="text-green-600 font-medium">
+                                    +{transaction.amount.toLocaleString('fr-FR')} €
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          ) : (
+                            <p className="text-xs text-gray-400 italic">
+                              Aucune transaction trouvée
+                            </p>
+                          )}
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               )}
@@ -551,7 +651,7 @@ export default function Budgets() {
                 
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   value={formData.targetAmount}
                   onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
@@ -565,6 +665,22 @@ export default function Budgets() {
                   onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
                 />
+                
+                {/* Sélecteur d'icône */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Icône</label>
+                  <select
+                    value={formData.icon}
+                    onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                    className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm py-1"
+                  >
+                    {iconOptions.map(option => (
+                      <option key={option.name} value={option.name}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 <div className="bg-blue-50 border border-blue-200 rounded-md p-2">
                   <p className="text-xs text-blue-800">
@@ -599,7 +715,8 @@ export default function Budgets() {
                 title: '',
                 description: '',
                 targetAmount: '',
-                deadline: ''
+                deadline: '',
+                icon: 'TrophyIcon'
               });
             }}
             className="bg-white shadow rounded-lg p-6 flex flex-col items-center justify-center h-full min-h-[280px] cursor-pointer hover:bg-gray-50 transition-colors border-2 border-dashed border-gray-300 hover:border-gray-400"

@@ -484,7 +484,7 @@ export default function Categories() {
                     <label className="block text-sm font-medium text-gray-700">Montant (€)</label>
                     <input
                       type="number"
-                      step="0.01"
+                      step="1"
                       value={editingCategory?.budget?.amount || ''}
                       onChange={(e) => setEditingCategory(prev => prev ? {
                         ...prev,
@@ -636,7 +636,7 @@ export default function Categories() {
                         <div className="space-y-2">
                           <input
                             type="number"
-                            step="0.01"
+                            step="1"
                             value={editingCategory?.budget?.amount || ''}
                             onChange={(e) => setEditingCategory(prev => prev ? {
                               ...prev,

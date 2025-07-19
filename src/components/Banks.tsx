@@ -627,7 +627,7 @@ export default function Banks() {
                       </div>
                       <input
                         type="number"
-                        step="0.01"
+                        step="1"
                         value={formData.balance}
                         onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
                         className="text-2xl font-bold text-gray-900 border-none focus:ring-0 p-0 bg-transparent w-full"
@@ -1035,7 +1035,7 @@ export default function Banks() {
                   </div>
                   <input
                     type="number"
-                    step="0.01"
+                    step="1"
                     value={formData.balance}
                     onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
                     className="text-2xl font-bold text-gray-900 border-none focus:ring-0 p-0 bg-transparent w-full"

@@ -441,7 +441,7 @@ export default function Categories() {
                       <div className="space-y-2">
                         <input
                           type="number"
-                          step="0.01"
+                          step="1"
                           value={editingCategory?.budget?.amount || ''}
                           onChange={(e) => setEditingCategory(prev => prev ? {
                             ...prev,
@@ -751,7 +751,7 @@ export default function Categories() {
                     <p className="text-xs font-medium text-gray-700 mb-1">Budget</p>
                     <input
                       type="number"
-                      step="0.01"
+                      step="1"
                       value={editingCategory?.budget?.amount || ''}
                       onChange={(e) => setEditingCategory(prev => prev ? {
                         ...prev,

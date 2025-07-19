@@ -486,7 +486,7 @@ export default function Transactions() {
               <td className="px-6 py-4">
                 <input
                   type="number"
-                  step="0.01"
+                  step="1"
                   value={editingTransaction?.amount || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
                   className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
@@ -657,7 +657,7 @@ export default function Transactions() {
                   {editingId === transaction.id ? (
                     <input
                       type="number"
-                      step="0.01"
+                      step="1"
                       value={editingTransaction?.amount || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)}
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
@@ -665,7 +665,7 @@ export default function Transactions() {
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
                     <input
                       type="number"
-                      step="0.01"
+                      step="1"
                       value={inlineEditValue}
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}

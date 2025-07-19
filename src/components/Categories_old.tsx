@@ -980,7 +980,7 @@ export default function Categories() {
                   <label className="block text-sm font-medium text-gray-700">Montant (€)</label>
                   <input
                     type="number"
-                    step="0.01"
+                    step="1"
                     value={budgetFormData.amount}
                     onChange={(e) => setBudgetFormData({...budgetFormData, amount: e.target.value})}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"

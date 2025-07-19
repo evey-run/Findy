@@ -149,6 +149,7 @@ export interface Objective {
   description?: string;
   targetAmount: number;
   deadline?: string;
+  icon?: string;
   isCompleted: boolean;
   createdAt: string;
   updatedAt: string;
