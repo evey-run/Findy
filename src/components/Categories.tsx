@@ -392,13 +392,13 @@ export default function Categories() {
       </div>
 
       {/* Categories List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 auto-rows-fr">
         {categories.map((category) => {
           const categorySpending = getCategorySpending(category.id);
           const categoryBudget = getCategoryBudget(category.id);
           
           return (
-            <div key={category.id} className="bg-white shadow rounded-lg p-6 flex flex-col h-full min-h-[280px]">
+            <div key={category.id} className="bg-white shadow rounded-lg p-4 flex flex-col h-full min-h-[180px]">
               {editingId === category.id ? (
                 /* Edit Form Card - appears in place of the category being edited */
                 <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full space-y-2">
@@ -588,7 +588,7 @@ export default function Categories() {
                         </div>
                         
                         <div className="flex justify-between text-xs text-gray-500 mt-1">
-                          <span>{categorySpending.percentage.toFixed(1)}%</span>
+                          <span>{Math.round(categorySpending.percentage)}%</span>
                           <span className={categorySpending.isOverBudget ? 'text-red-600' : 'text-green-600'}>
                             {categorySpending.isOverBudget ? 'Budget dépassé !' : `${formatCurrency(categorySpending.remaining)} restant`}
                           </span>
@@ -596,8 +596,54 @@ export default function Categories() {
 
                         <div className="border-t pt-3 mt-3">
                           {/* Afficher les 3 dernières transactions de cette catégorie */}
-                          {transactions.filter(t => t.categoryId === category.id).length > 0 && (
-                            <div className="mt-3">
+                          <div className="mt-3">
+                            {transactions.filter(t => t.categoryId === category.id).length > 0 ? (
+                              <>
+                                <p className="text-xs text-gray-500 mb-1">
+                                  Dernières transactions:
+                                </p>
+                                <div className="space-y-1">
+                                  {transactions
+                                    .filter(t => t.categoryId === category.id)
+                                    .slice(0, 3)
+                                    .map((transaction) => (
+                                      <div key={transaction.id} className="flex justify-between text-xs">
+                                        <span className="text-gray-600 truncate">
+                                          {transaction.description}
+                                        </span>
+                                        <span className={`font-medium ${
+                                          transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                                        }`}>
+                                          {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
+                                        </span>
+                                      </div>
+                                    ))}
+                                </div>
+                              </>
+                            ) : (
+                              <div className="text-center py-2">
+                                <p className="text-xs text-gray-400 italic">
+                                  Aucune transaction pour cette catégorie
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* No budget - show recent transactions */}
+                    {category.type === 'EXPENSE' && !categoryBudget && (
+                      <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                        <div className="flex items-center justify-center text-gray-500 mb-2">
+                          <ChartBarIcon className="h-4 w-4 mr-1" />
+                          <span className="text-sm">Pas de budget défini</span>
+                        </div>
+                        
+                        {/* Afficher les 3 dernières transactions de cette catégorie */}
+                        <div className="mt-3">
+                          {transactions.filter(t => t.categoryId === category.id).length > 0 ? (
+                            <>
                               <p className="text-xs text-gray-500 mb-1">
                                 Dernières transactions:
                               </p>
@@ -618,45 +664,15 @@ export default function Categories() {
                                     </div>
                                   ))}
                               </div>
+                            </>
+                          ) : (
+                            <div className="text-center py-2">
+                              <p className="text-xs text-gray-400 italic">
+                                Aucune transaction pour cette catégorie
+                              </p>
                             </div>
                           )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* No budget - show recent transactions */}
-                    {category.type === 'EXPENSE' && !categoryBudget && (
-                      <div className="mt-4 p-3 bg-gray-50 rounded-md">
-                        <div className="flex items-center justify-center text-gray-500 mb-2">
-                          <ChartBarIcon className="h-4 w-4 mr-1" />
-                          <span className="text-sm">Pas de budget défini</span>
-                        </div>
-                        
-                        {/* Afficher les 3 dernières transactions de cette catégorie */}
-                        {transactions.filter(t => t.categoryId === category.id).length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-xs text-gray-500 mb-1">
-                              Dernières transactions:
-                            </p>
-                            <div className="space-y-1">
-                              {transactions
-                                .filter(t => t.categoryId === category.id)
-                                .slice(0, 3)
-                                .map((transaction) => (
-                                  <div key={transaction.id} className="flex justify-between text-xs">
-                                    <span className="text-gray-600 truncate">
-                                      {transaction.description}
-                                    </span>
-                                    <span className={`font-medium ${
-                                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                      {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                                    </span>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     )}
                     
@@ -664,30 +680,38 @@ export default function Categories() {
                     {(category.type === 'INCOME' || category.type === 'FIXED') && (
                       <div className="mt-4 p-3 bg-gray-50 rounded-md">
                         {/* Afficher les 3 dernières transactions de cette catégorie */}
-                        {transactions.filter(t => t.categoryId === category.id).length > 0 && (
-                          <div>
-                            <p className="text-xs text-gray-500 mb-1">
-                              Dernières transactions:
-                            </p>
-                            <div className="space-y-1">
-                              {transactions
-                                .filter(t => t.categoryId === category.id)
-                                .slice(0, 3)
-                                .map((transaction) => (
-                                  <div key={transaction.id} className="flex justify-between text-xs">
-                                    <span className="text-gray-600 truncate">
-                                      {transaction.description}
-                                    </span>
-                                    <span className={`font-medium ${
-                                      transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
-                                    }`}>
-                                      {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                                    </span>
-                                  </div>
-                                ))}
+                        <div>
+                          {transactions.filter(t => t.categoryId === category.id).length > 0 ? (
+                            <>
+                              <p className="text-xs text-gray-500 mb-1">
+                                Dernières transactions:
+                              </p>
+                              <div className="space-y-1">
+                                {transactions
+                                  .filter(t => t.categoryId === category.id)
+                                  .slice(0, 3)
+                                  .map((transaction) => (
+                                    <div key={transaction.id} className="flex justify-between text-xs">
+                                      <span className="text-gray-600 truncate">
+                                        {transaction.description}
+                                      </span>
+                                      <span className={`font-medium ${
+                                        transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
+                                      }`}>
+                                        {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
+                                      </span>
+                                    </div>
+                                  ))}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-center py-2">
+                              <p className="text-xs text-gray-400 italic">
+                                Aucune transaction pour cette catégorie
+                              </p>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -699,7 +723,7 @@ export default function Categories() {
 
         {/* Add Category Form Card */}
         {showAddForm ? (
-          <div className="bg-white shadow rounded-lg p-6 flex flex-col h-full min-h-[280px]">
+          <div className="bg-white shadow rounded-lg p-4 flex flex-col h-full min-h-[180px]">
             <form onSubmit={handleAddCategory} className="flex flex-col h-full space-y-2">
               <h3 className="text-md font-medium text-gray-900">Ajouter une catégorie</h3>
               
