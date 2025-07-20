@@ -202,13 +202,33 @@ router.post('/', upload.single('image'), async (req, res) => {
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, shortName, color, iban, balance, createdAt, accountType } = req.body;
+    let { name, shortName, color, iban, balance, createdAt, accountType, data } = req.body;
     
-    // Récupérer les userIds du FormData pour la mise à jour
-    const userIds: string[] = [];
-    for (const key in req.body) {
-      if (key.startsWith('userIds[')) {
-        userIds.push(req.body[key]);
+    // Vérifier si les données sont envoyées dans le champ 'data' (format JSON)
+    let userIds: string[] = [];
+    if (data) {
+      try {
+        // Si data est une chaîne, la parser en JSON
+        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        userIds = Array.isArray(parsedData.userIds) ? parsedData.userIds : [];
+        
+        // Mettre à jour les autres champs si présents dans data
+        if (parsedData.name) name = parsedData.name;
+        if (parsedData.shortName) shortName = parsedData.shortName;
+        if (parsedData.color) color = parsedData.color;
+        if (parsedData.iban) iban = parsedData.iban;
+        if (parsedData.balance !== undefined) balance = parsedData.balance;
+        if (parsedData.accountType) accountType = parsedData.accountType;
+        if (parsedData.createdAt) createdAt = parsedData.createdAt;
+      } catch (error) {
+        console.error('Error parsing data field:', error);
+      }
+    } else {
+      // Récupérer les userIds de l'ancienne méthode (pour rétrocompatibilité)
+      for (const key in req.body) {
+        if (key.startsWith('userIds[')) {
+          userIds.push(req.body[key]);
+        }
       }
     }
     

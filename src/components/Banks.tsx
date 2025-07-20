@@ -131,19 +131,24 @@ export default function Banks() {
       
       console.log('🔧 Making request to:', url, 'with method:', method);
       
+      // Créer un objet avec toutes les données du formulaire
+      const bankData = {
+        name: formData.name,
+        shortName: formData.shortName,
+        iban: formData.iban,
+        balance: parseFloat(formData.balance.toString()),
+        accountType: formData.accountType,
+        createdAt: formData.createdAt,
+        userIds: formData.userIds // Envoyer directement le tableau d'IDs
+      };
+      
+      // Créer le FormData
       const formDataToSend = new FormData();
-      formDataToSend.append('name', formData.name);
-      formDataToSend.append('shortName', formData.shortName);
-      formDataToSend.append('iban', formData.iban);
-      formDataToSend.append('balance', formData.balance.toString());
-      formDataToSend.append('accountType', formData.accountType);
-      formDataToSend.append('createdAt', formData.createdAt);
       
-      // Ajouter la liste des utilisateurs
-      formData.userIds.forEach((userId, index) => {
-        formDataToSend.append(`userIds[${index}]`, userId);
-      });
+      // Ajouter les données JSON
+      formDataToSend.append('data', JSON.stringify(bankData));
       
+      // Ajouter le fichier image s'il y en a un
       if (imageFile) {
         formDataToSend.append('image', imageFile);
       }

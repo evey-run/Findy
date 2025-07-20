@@ -310,8 +310,35 @@ app.post('/api/banks', upload.single('image'), async (req, res) => {
 app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
   try {
     const bankId = req.params.id;
-    const { name, shortName, iban, balance } = req.body;
+    console.log('🔧 PUT /api/banks/' + bankId + ' called with body:', req.body);
     
+    // Récupérer les données du formulaire
+    let { name, shortName, iban, balance, data } = req.body;
+    let userIds: string[] = [];
+    
+    // Vérifier si les données sont envoyées dans le champ 'data' (format JSON)
+    if (data) {
+      try {
+        // Si data est une chaîne, la parser en JSON
+        const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        console.log('🔧 Parsed data:', parsedData);
+        
+        // Récupérer les userIds
+        if (Array.isArray(parsedData.userIds)) {
+          userIds = parsedData.userIds;
+        }
+        
+        // Mettre à jour les autres champs si présents dans data
+        if (parsedData.name) name = parsedData.name;
+        if (parsedData.shortName) shortName = parsedData.shortName;
+        if (parsedData.iban) iban = parsedData.iban;
+        if (parsedData.balance !== undefined) balance = parsedData.balance;
+      } catch (error) {
+        console.error('Error parsing data field:', error);
+      }
+    }
+    
+    // Préparer les données de mise à jour
     const updateData: any = {
       name,
       shortName,
@@ -319,39 +346,82 @@ app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
       balance: parseFloat(balance)
     };
     
-    // Add image if uploaded
+    // Ajouter l'image si elle est téléchargée
     if (req.file) {
       updateData.image = `/uploads/${req.file.filename}`;
     }
     
-    const bank = await prisma.bank.update({
-      where: { id: bankId },
-      data: updateData,
-      include: {
-        userBanks: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true
+    // Commencer une transaction pour mettre à jour la banque et les utilisateurs
+    const result = await prisma.$transaction(async (prisma) => {
+      // Mettre à jour les informations de base de la banque
+      const bank = await prisma.bank.update({
+        where: { id: bankId },
+        data: updateData,
+        include: {
+          userBanks: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  avatar: true
+                }
               }
             }
           }
         }
+      });
+      
+      // Mettre à jour les utilisateurs si des userIds sont fournis
+      if (userIds.length > 0) {
+        // Supprimer toutes les relations existantes
+        await prisma.userBank.deleteMany({
+          where: { bankId }
+        });
+        
+        // Créer les nouvelles relations
+        await prisma.userBank.createMany({
+          data: userIds.map((userId: string) => ({
+            userId,
+            bankId
+          }))
+        });
+        
+        // Récupérer à nouveau la banque avec les utilisateurs mis à jour
+        return await prisma.bank.findUnique({
+          where: { id: bankId },
+          include: {
+            userBanks: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    avatar: true
+                  }
+                }
+              }
+            }
+          }
+        });
       }
+      
+      return bank;
     });
     
-    // Transform the data to include computed fields
+    // Transformer les données pour inclure les champs calculés
     const transformedBank = {
-      ...bank,
-      users: bank.userBanks.map(ub => ub.user)
+      ...result,
+      users: result?.userBanks.map(ub => ub.user) || []
     };
     
     res.json(transformedBank);
   } catch (error) {
     console.error('Error updating bank:', error);
-    res.status(500).json({ error: 'Failed to update bank' });
+    res.status(500).json({ 
+      error: 'Failed to update bank',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 });
 
