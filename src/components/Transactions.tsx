@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
+import type { Bank } from '../types';
 
 // CSS pour les cellules éditables
 const editableCellStyle = `
@@ -39,8 +40,13 @@ export default function Transactions() {
     selectedBank,
     setSelectedBank,
     updateTransaction,
-    removeTransaction 
+    removeTransaction,
+    users,
+    selectedUser
   } = useAppStore();
+  
+  // Vérifie si tous les utilisateurs sont sélectionnés (selectedUser est null)
+  const allUsersSelected = selectedUser === null;
   
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -356,9 +362,17 @@ export default function Transactions() {
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="">Toutes les banques</option>
-              {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
-                <option key={bank.id} value={bank.id}>{bank.name}</option>
-              ))}
+              {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
+                // Récupérer les utilisateurs associés à cette banque
+                const bankUsers = bank.userBanks?.map(ub => ub.user?.name).filter(Boolean) || [];
+                const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+                
+                return (
+                  <option key={bank.id} value={bank.id}>
+                    {bank.name}{allUsersSelected && bankUsersText}
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div>
@@ -628,9 +642,20 @@ export default function Transactions() {
                       className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                       autoFocus
                     >
-                      {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
-                        <option key={bank.id} value={bank.id}>{bank.name}</option>
-                      ))}
+                      {banks
+                        .filter((bank: Bank) => bank.accountType === 'CURRENT')
+                        .map((bank: Bank) => {
+                          // Vérifier si la banque a des utilisateurs
+                          const bankWithUsers = bank as Bank & { userBanks?: Array<{ user?: { name: string } }> };
+                          const userNames = bankWithUsers.userBanks?.map(ub => ub.user?.name).filter(Boolean).join(', ') || '';
+                          const displayText = userNames ? `${bank.name} (${userNames})` : bank.name;
+                          
+                          return (
+                            <option key={bank.id} value={bank.id}>
+                              {displayText}
+                            </option>
+                          );
+                        })}
                     </select>
                   ) : (
                     <div 
@@ -649,7 +674,19 @@ export default function Transactions() {
                           {transaction.bank.shortName}
                         </div>
                       )}
-                      <span className="ml-2">{transaction.bank.name}</span>
+                      <div className="ml-2">
+                        <div className="font-medium">{transaction.bank.name}</div>
+                        {(() => {
+                          const bankWithUsers = transaction.bank as Bank & { userBanks?: Array<{ user?: { name: string } }> };
+                          const userNames = bankWithUsers.userBanks?.map(ub => ub.user?.name).filter(Boolean).join(', ');
+                          
+                          return userNames ? (
+                            <div className="text-xs text-gray-500">
+                              {userNames}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
                     </div>
                   )}
                 </td>

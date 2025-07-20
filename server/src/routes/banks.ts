@@ -202,28 +202,38 @@ router.post('/', upload.single('image'), async (req, res) => {
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('🔧 Raw request body:', req.body);
     let { name, shortName, color, iban, balance, createdAt, accountType, data } = req.body;
+    console.log('🔧 Initial values - accountType:', accountType, 'data:', data);
     
     // Vérifier si les données sont envoyées dans le champ 'data' (format JSON)
     let userIds: string[] = [];
+    
+    // Extraire les données du formulaire
     if (data) {
       try {
         // Si data est une chaîne, la parser en JSON
         const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+        console.log('🔍 Parsed data from form:', parsedData);
+        
+        // Extraire les IDs utilisateurs
         userIds = Array.isArray(parsedData.userIds) ? parsedData.userIds : [];
         
-        // Mettre à jour les autres champs si présents dans data
-        if (parsedData.name) name = parsedData.name;
-        if (parsedData.shortName) shortName = parsedData.shortName;
-        if (parsedData.color) color = parsedData.color;
-        if (parsedData.iban) iban = parsedData.iban;
-        if (parsedData.balance !== undefined) balance = parsedData.balance;
-        if (parsedData.accountType) accountType = parsedData.accountType;
-        if (parsedData.createdAt) createdAt = parsedData.createdAt;
+        // Mettre à jour tous les champs du formulaire
+        name = parsedData.name || name;
+        shortName = parsedData.shortName || shortName;
+        color = parsedData.color || color;
+        iban = parsedData.iban || iban;
+        balance = parsedData.balance !== undefined ? parseFloat(parsedData.balance) : balance;
+        accountType = parsedData.accountType || accountType || 'CURRENT';
+        createdAt = parsedData.createdAt || createdAt;
+        
+        console.log('🔍 Extracted values:', { name, shortName, color, iban, balance, accountType, userIds });
       } catch (error) {
-        console.error('Error parsing data field:', error);
+        console.error('❌ Error parsing data field:', error);
       }
     } else {
+      console.log('ℹ️ No data field found in request, using direct form fields');
       // Récupérer les userIds de l'ancienne méthode (pour rétrocompatibilité)
       for (const key in req.body) {
         if (key.startsWith('userIds[')) {
@@ -237,9 +247,13 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       shortName,
       color,
       iban,
-      balance,
-      accountType
+      balance: parseFloat(balance),
+      accountType: accountType || 'CURRENT' // S'assurer que accountType a une valeur par défaut
     };
+    
+    console.log('📝 Final update data before DB update:');
+    console.log(JSON.stringify(updateData, null, 2));
+    console.log('🔍 Account type being saved:', updateData.accountType);
     
     // Si createdAt est fourni, l'utiliser
     if (createdAt) {
@@ -267,6 +281,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       });
     }
 
+    console.log('🔧 About to update bank with ID:', id);
     const bank = await prisma.bank.update({
       where: { id },
       data: updateData,

@@ -225,33 +225,77 @@ app.get('/api/banks', async (req, res) => {
 app.post('/api/banks', upload.single('image'), async (req, res) => {
   console.log('🔧 POST /api/banks called with body:', req.body);
   console.log('🔧 File:', req.file);
+  
   try {
-    const { name, shortName, color, iban, balance, accountType, createdAt } = req.body;
-    
-    // Récupérer les userIds du FormData de différentes manières
+    // Variables pour stocker les données extraites
+    let name: string | undefined;
+    let shortName: string | undefined;
+    let color: string | undefined;
+    let iban: string | undefined;
+    let balance: number = 0;
+    let accountType: string = 'CURRENT';
+    let createdAt: string | undefined;
     let userIds: string[] = [];
     
-    // D'abord essayer le format userIds[0], userIds[1], etc.
-    for (const key in req.body) {
-      if (key.startsWith('userIds[')) {
-        userIds.push(req.body[key]);
+    // Vérifier si les données sont envoyées dans le champ 'data' (format JSON)
+    if (req.body.data) {
+      try {
+        // Si data est une chaîne, la parser en JSON
+        const parsedData = typeof req.body.data === 'string' ? JSON.parse(req.body.data) : req.body.data;
+        console.log('🔧 Parsed data:', parsedData);
+        
+        // Extraire les champs du JSON
+        if (parsedData.name) name = parsedData.name;
+        if (parsedData.shortName) shortName = parsedData.shortName;
+        if (parsedData.color) color = parsedData.color;
+        if (parsedData.iban) iban = parsedData.iban;
+        if (parsedData.balance !== undefined) balance = parseFloat(parsedData.balance) || 0;
+        if (parsedData.accountType) accountType = parsedData.accountType;
+        if (parsedData.createdAt) createdAt = parsedData.createdAt;
+        if (Array.isArray(parsedData.userIds)) userIds = parsedData.userIds;
+      } catch (error) {
+        console.error('Error parsing data field:', error);
+        return res.status(400).json({ error: 'Invalid data format in request' });
       }
-    }
-    
-    // Si pas trouvé, essayer le format 'userIds' direct (cas où c'est déjà un array)
-    if (userIds.length === 0 && req.body.userIds) {
-      if (Array.isArray(req.body.userIds)) {
-        userIds = req.body.userIds;
-      } else {
-        userIds = [req.body.userIds];
+    } else {
+      // Récupérer les champs directement du corps de la requête (rétrocompatibilité)
+      name = req.body.name;
+      shortName = req.body.shortName;
+      color = req.body.color;
+      iban = req.body.iban;
+      balance = parseFloat(req.body.balance) || 0;
+      accountType = req.body.accountType || 'CURRENT';
+      createdAt = req.body.createdAt;
+      
+      // Récupérer les userIds du FormData de différentes manières
+      // D'abord essayer le format userIds[0], userIds[1], etc.
+      for (const key in req.body) {
+        if (key.startsWith('userIds[')) {
+          userIds.push(req.body[key]);
+        }
+      }
+      
+      // Si pas trouvé, essayer le format 'userIds' direct (cas où c'est déjà un array)
+      if (userIds.length === 0 && req.body.userIds) {
+        if (Array.isArray(req.body.userIds)) {
+          userIds = req.body.userIds;
+        } else {
+          userIds = [req.body.userIds];
+        }
       }
     }
     
     console.log('🔧 Extracted data:', { name, shortName, color, iban, balance, accountType, userIds, createdAt });
     
+    // Validation des champs obligatoires
     if (!name || userIds.length === 0) {
       console.log('🔧 Error: name and at least one user are required');
-      return res.status(400).json({ error: 'Name and at least one user are required' });
+      console.log('🔧 name:', name);
+      console.log('🔧 userIds:', userIds);
+      return res.status(400).json({ 
+        error: 'Name and at least one user are required',
+        details: { name, userIds }
+      });
     }
     
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;

@@ -45,7 +45,7 @@ interface AppState {
   addBudget: (budget: Budget) => void;
   updateBudget: (id: string, budget: Partial<Budget>) => void;
   removeBudget: (id: string) => void;
-  loadBudgets: () => Promise<void>;
+  loadBudgets: (forceLoadAll?: boolean) => Promise<void>;
   
   // Recurrences
   recurrences: Recurrence[];
@@ -234,13 +234,16 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           budgets: state.budgets.filter((b) => b.id !== id),
         })),
-      loadBudgets: async () => {
+      loadBudgets: async (forceLoadAll: boolean = false) => {
         try {
           const state = get();
           const params = new URLSearchParams();
-          if (state.selectedBank) {
+          
+          // Ne pas filtrer par banque si forceLoadAll est true
+          if (!forceLoadAll && state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
+          
           const response = await fetch(`/api/budgets?${params}`);
           const budgets = await response.json();
           set({ budgets });

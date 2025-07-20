@@ -118,6 +118,7 @@ export default function Banks() {
     e.preventDefault();
     console.log('🔧 handleSubmit called');
     console.log('🔧 formData:', formData);
+    console.log('🔧 accountType value:', formData.accountType);
     
     // Vérifier qu'au moins un utilisateur est sélectionné
     if (formData.userIds.length === 0) {
@@ -162,6 +163,14 @@ export default function Banks() {
       console.log('🔧 Response ok:', response.ok);
 
       if (response.ok) {
+        const responseData = await response.json();
+        console.log('🔧 API Response data:', responseData);
+        
+        // Vérifier si la réponse contient la banque mise à jour
+        if (responseData && responseData.accountType) {
+          console.log('🔧 Updated bank data from API:', responseData);
+        }
+        
         console.log('🔧 Bank saved successfully, reloading banks...');
         await loadBanks(); // Recharger les données depuis le store
         resetForm();
@@ -179,6 +188,8 @@ export default function Banks() {
   };
 
   const handleEdit = (bank: Bank) => {
+    console.log('🔧 Editing bank:', bank);
+    console.log('🔧 Bank account type:', bank.accountType);
     setEditingBank(bank);
     setShowAddForm(false); // Fermer le formulaire d'ajout si ouvert
     setFormData({
@@ -499,7 +510,10 @@ export default function Banks() {
                           <div className="flex items-center space-x-2 mb-1">
                             <select
                               value={formData.accountType}
-                              onChange={(e) => setFormData({...formData, accountType: e.target.value as any})}
+                              onChange={(e) => {
+                                console.log('🔧 Selected account type:', e.target.value);
+                                setFormData({...formData, accountType: e.target.value as any});
+                              }}
                               className="text-sm text-gray-500 border-none focus:ring-0 p-0 bg-transparent"
                             >
                               <option value="CURRENT">Compte courant</option>

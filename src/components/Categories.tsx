@@ -75,7 +75,8 @@ export default function Categories() {
       setLoading(true);
       try {
         await loadCategories();
-        await loadBudgets();
+        // Charger tous les budgets, indépendamment de la banque sélectionnée
+        await loadBudgets(true);
         await loadTransactions();
         await loadUsers();
       } catch (error) {
@@ -561,10 +562,7 @@ export default function Categories() {
                            categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}</span>
                         </div>
                         
-                        <div className="flex justify-between text-sm text-gray-600 mb-2">
-                          <span>Dépensé</span>
-                          <span>Budget</span>
-                        </div>
+
                         <div className="flex justify-between text-lg font-semibold mb-2">
                           <span className="text-red-600">
                             {formatCurrency(categorySpending.totalSpent)}
