@@ -455,44 +455,6 @@ export default function Budgets() {
                         placeholder="Description de l'objectif..."
                       />
                     </div>
-
-                    {/* Barre de progression */}
-                    <div className="mt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-medium text-gray-300">
-                          Progression
-                        </span>
-                        <span 
-                          className="text-xl font-bold"
-                          style={{ color: isCompleted ? '#10b981' : '#6226fa' }}
-                        >
-                          {percentage.toFixed(1)}%
-                        </span>
-                      </div>
-                      
-                      <div className="w-full rounded-full h-3" style={{ backgroundColor: '#1f2226' }}>
-                        <div
-                          className="h-3 rounded-full transition-all duration-300"
-                          style={{ 
-                            width: `${Math.min(percentage, 100)}%`,
-                            backgroundColor: isCompleted ? '#10b981' : '#6226fa'
-                          }}
-                        />
-                      </div>
-                      
-                      <div className="flex justify-between text-sm text-gray-400 mt-2">
-                        <span></span>
-                        <span className={isCompleted ? 'text-green-400' : 'text-gray-400'}>
-                          {progress ? 
-                            (progress.remaining > 0 ? 
-                              `${progress.remaining.toLocaleString('fr-FR')} € restant` : 
-                              'Objectif atteint ! 🎉'
-                            ) : 
-                            `${objective.targetAmount.toLocaleString('fr-FR')} € restant`
-                          }
-                        </span>
-                      </div>
-                    </div>
                   </div>
                   
                   <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
@@ -542,7 +504,10 @@ export default function Budgets() {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEdit(objective)}
-                          className="text-gray-500 hover:text-violet-400 transition-colors"
+                          className="transition-colors"
+                          style={{ color: '#616875' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           title="Modifier"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -551,7 +516,10 @@ export default function Budgets() {
                         </button>
                         <button
                           onClick={() => handleDelete(objective.id)}
-                          className="text-gray-500 hover:text-red-400 transition-colors"
+                          className="transition-colors"
+                          style={{ color: '#616875' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           title="Supprimer"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

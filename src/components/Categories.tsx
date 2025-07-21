@@ -656,7 +656,10 @@ export default function Categories() {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => handleEdit(category)}
-                          className="text-gray-500 hover:text-violet-400 transition-colors"
+                          className="transition-colors"
+                          style={{ color: '#616875' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           title="Modifier"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -665,7 +668,10 @@ export default function Categories() {
                         </button>
                         <button
                           onClick={() => handleDelete(category.id)}
-                          className="text-gray-500 hover:text-red-400 transition-colors"
+                          className="transition-colors"
+                          style={{ color: '#616875' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           title="Supprimer"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

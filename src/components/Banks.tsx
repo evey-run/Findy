@@ -790,8 +790,10 @@ export default function Banks() {
                             e.stopPropagation();
                             handleEdit(bank);
                           }}
-                          className="text-violet-400 hover:text-violet-300"
-                          style={{ color: '#6226fa' }}
+                          className="transition-colors"
+                          style={{ color: '#616875' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           title="Modifier"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -803,7 +805,10 @@ export default function Banks() {
                             e.stopPropagation();
                             handleDelete(bank.id);
                           }}
-                          className="text-red-400 hover:text-red-300"
+                          className="transition-colors"
+                          style={{ color: '#616875' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           title="Supprimer"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
