@@ -619,7 +619,10 @@ export default function Recurrences() {
                   <div className="flex justify-center">
                     <button
                       onClick={() => handleDelete(recurrence.id)}
-                      className="text-red-600 hover:text-red-800"
+                      className="transition-colors"
+                      style={{ color: '#616875' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                       title="Supprimer"
                     >
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

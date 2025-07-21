@@ -376,7 +376,10 @@ export default function Users() {
                                 </div>
                                 <button
                                   onClick={() => handleRemoveBankAccess(bank.id, selectedUserId!)}
-                                  className="text-red-600 hover:text-red-900"
+                                  className="transition-colors"
+                                  style={{ color: '#616875' }}
+                                  onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                                  onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                                   title="Retirer l'accès"
                                 >
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
