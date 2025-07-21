@@ -400,7 +400,7 @@ export default function Banks() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
       </div>
     );
   }
@@ -912,7 +912,7 @@ export default function Banks() {
           <div 
             className="shadow rounded-lg border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
             style={{ 
-              borderColor: '#9ca3af' // même couleur que text-gray-400
+              borderColor: '#616875' // couleur intermédiaire
             } as React.CSSProperties}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = '#6226fa';
@@ -922,11 +922,11 @@ export default function Banks() {
               if (text) text.style.color = '#6226fa';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#9ca3af';
+              e.currentTarget.style.borderColor = '#616875';
               const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
               const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#9ca3af';
-              if (text) text.style.color = '#9ca3af';
+              if (icon) icon.style.color = '#616875';
+              if (text) text.style.color = '#616875';
             }}
             onClick={() => {
               setShowAddForm(true);
@@ -934,12 +934,12 @@ export default function Banks() {
             }}
           >
             <div className="flex flex-col items-center justify-center h-full p-6">
-              <div className="mb-4 transition-colors icon-plus" style={{ color: '#9ca3af' }}>
+              <div className="mb-4 transition-colors icon-plus" style={{ color: '#616875' }}>
                 <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
               </div>
-              <p className="text-center font-medium transition-colors text-add" style={{ color: '#9ca3af' }}>
+              <p className="text-center font-medium transition-colors text-add" style={{ color: '#616875' }}>
                 Ajouter une banque
               </p>
             </div>

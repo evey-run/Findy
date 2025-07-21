@@ -854,7 +854,7 @@ export default function Transactions() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
       </div>
     );
   }
@@ -1368,7 +1368,7 @@ export default function Transactions() {
         {/* Indicateur de chargement pour le scroll infini */}
         {loadingMore && (
           <div className="flex justify-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
             <span className="ml-2 text-sm text-gray-600">Chargement...</span>
           </div>
         )}

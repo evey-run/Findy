@@ -83,24 +83,23 @@ export default function Layout({ children }: LayoutProps) {
           {/* Section utilisateur avec avatar et menu déroulant */}
           <div className="px-4 mt-6">
             <div className="relative" ref={menuRef}>
-              {/* Bouton principal avec avatar au-dessus du nom */}
-              <button
-                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-                className="w-full flex flex-col items-center py-3 hover:bg-white/5 rounded-lg transition-all"
-              >
+              {/* Avatar au-dessus, séparé du bouton cliquable */}
+              <div className="w-full flex flex-col items-center">
                 {selectedUser ? (
                   <>
                     {renderUserAvatar(selectedUser, "h-20 w-20")}
                     <div className="text-center mt-2">
-                      <p className="text-white font-medium text-sm">{selectedUser.name}</p>
-                      <div className="flex items-center justify-center space-x-1 mt-1">
-                        <p className="text-gray-400 text-xs">Utilisateur actuel</p>
+                      <button
+                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                        className="flex items-center justify-center space-x-1 px-2 py-1 hover:bg-white/10 rounded transition-all"
+                      >
+                        <p className="text-white font-medium text-sm">{selectedUser.name}</p>
                         {isUserMenuOpen ? (
                           <ChevronUpIcon className="h-3 w-3 text-gray-400" />
                         ) : (
                           <ChevronDownIcon className="h-3 w-3 text-gray-400" />
                         )}
-                      </div>
+                      </button>
                     </div>
                   </>
                 ) : (
@@ -109,19 +108,21 @@ export default function Layout({ children }: LayoutProps) {
                       ∀
                     </div>
                     <div className="text-center mt-2">
-                      <p className="text-white font-medium text-sm">Tous les utilisateurs</p>
-                      <div className="flex items-center justify-center space-x-1 mt-1">
-                        <p className="text-gray-400 text-xs">Vue globale</p>
+                      <button
+                        onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                        className="flex items-center justify-center space-x-1 px-2 py-1 hover:bg-white/10 rounded transition-all"
+                      >
+                        <p className="text-white font-medium text-sm">Tous les utilisateurs</p>
                         {isUserMenuOpen ? (
                           <ChevronUpIcon className="h-3 w-3 text-gray-400" />
                         ) : (
                           <ChevronDownIcon className="h-3 w-3 text-gray-400" />
                         )}
-                      </div>
+                      </button>
                     </div>
                   </>
                 )}
-              </button>
+              </div>
 
               {/* Menu déroulant */}
               {isUserMenuOpen && (
@@ -162,7 +163,6 @@ export default function Layout({ children }: LayoutProps) {
                       {renderUserAvatar(user, "h-8 w-8")}
                       <div>
                         <p className="text-white text-sm">{user.name}</p>
-                        <p className="text-gray-400 text-xs">Utilisateur personnel</p>
                       </div>
                     </button>
                   ))}
