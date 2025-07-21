@@ -2,9 +2,6 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Category, Budget } from '../types';
 import { 
-  PlusIcon, 
-  PencilIcon, 
-  TrashIcon, 
   ChartBarIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -614,18 +611,21 @@ export default function Categories() {
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleEdit(category)}
-                        className="text-violet-400 hover:text-violet-300"
-                        style={{ color: '#6226fa' }}
+                        className="text-gray-500 hover:text-violet-400 transition-colors"
                         title="Modifier"
                       >
-                        <PencilIcon className="w-5 h-5" />
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
                       </button>
                       <button
                         onClick={() => handleDelete(category.id)}
-                        className="text-red-400 hover:text-red-300"
+                        className="text-gray-500 hover:text-red-400 transition-colors"
                         title="Supprimer"
                       >
-                        <TrashIcon className="w-5 h-5" />
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
                       </button>
                     </div>
                   </div>
@@ -903,7 +903,9 @@ export default function Categories() {
           >
             <div className="flex flex-col items-center justify-center h-full p-6">
               <div className="mb-4 transition-colors icon-plus" style={{ color: '#616875' }}>
-                <PlusIcon className="h-12 w-12" />
+                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
               </div>
               <p className="text-center font-medium transition-colors text-add" style={{ color: '#616875' }}>
                 Ajouter une catégorie
