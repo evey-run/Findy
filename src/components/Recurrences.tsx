@@ -602,24 +602,30 @@ export default function Recurrences() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'active' ? (
-                    <input
-                      type="checkbox"
-                      checked={inlineEditValue === 'true' || inlineEditValue === true}
-                      onChange={e => setInlineEditValue(e.target.checked ? 'true' : 'false')}
-                      onBlur={handleInlineSave}
-                      className="h-4 w-4 rounded"
-                      style={{ accentColor: '#6226fa' }}
-                      autoFocus
-                    />
+                    <label className="flex items-center text-xs text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={inlineEditValue === 'true' || inlineEditValue === true}
+                        onChange={e => setInlineEditValue(e.target.checked ? 'true' : 'false')}
+                        onBlur={handleInlineSave}
+                        className="h-4 w-4 rounded"
+                        style={{ accentColor: '#6226fa' }}
+                        autoFocus
+                      />
+                      <span className="ml-1 text-gray-300">Active</span>
+                    </label>
                   ) : (
-                    <input
-                      type="checkbox"
-                      checked={recurrence.active}
-                      onChange={e => handleInlineEdit(recurrence.id, 'active')}
-                      className="h-4 w-4 rounded cursor-pointer"
-                      style={{ accentColor: '#6226fa' }}
-                      title="Double-cliquez pour éditer"
-                    />
+                    <label className="flex items-center text-xs text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={recurrence.active}
+                        onChange={e => handleInlineEdit(recurrence.id, 'active')}
+                        className="h-4 w-4 rounded cursor-pointer"
+                        style={{ accentColor: '#6226fa' }}
+                        title="Double-cliquez pour éditer"
+                      />
+                      <span className="ml-1 text-gray-300">{recurrence.active ? 'Active' : 'Inactive'}</span>
+                    </label>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
