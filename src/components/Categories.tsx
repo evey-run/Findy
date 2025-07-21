@@ -537,7 +537,8 @@ export default function Categories() {
                             <select
                               value={editingCategory?.type || ''}
                               onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                              className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
+                              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
                               required
                             >
                               {categoryTypes.map(type => (
@@ -599,7 +600,8 @@ export default function Categories() {
                                 startDate: new Date().toISOString().split('T')[0]
                               }
                             } : null)}
-                            className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                            className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
+                            style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
                           >
                             <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
                             <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>
@@ -819,7 +821,7 @@ export default function Categories() {
                         <select
                           value={editingCategory?.type || ''}
                           onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                          className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                          className="text-sm text-white border-none focus:ring-0 bg-transparent rounded-md py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                           required
                         >
                           {categoryTypes.map(type => (
@@ -881,7 +883,7 @@ export default function Categories() {
                             startDate: new Date().toISOString().split('T')[0]
                           }
                         } : null)}
-                        className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                        className="text-sm text-white border-none focus:ring-0 bg-transparent rounded-md py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
                         <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>

@@ -947,7 +947,20 @@ export default function Transactions() {
 
   return (
     <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
-      <style>{editableCellStyle}</style>
+      <style>{`
+        /* Forcer le style du selecteur de banque dans la section filtre */
+        select[name="bank-filter-select"] {
+          background-color: #1f2226 !important;
+          color: #fff !important;
+          min-height: 2.5rem !important;
+          border: none !important;
+          padding: 0.5rem 0.75rem !important;
+          font-weight: 500 !important;
+          appearance: none !important;
+          -webkit-appearance: none !important;
+          -moz-appearance: none !important;
+        }
+      `}</style>
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
@@ -988,13 +1001,13 @@ export default function Transactions() {
           <div>
             <label className="block text-sm font-medium text-gray-300">Banque</label>
             <select
+              name="bank-filter-select"
               value={selectedBank?.id || ''}
               onChange={(e) => {
                 const bank = banks.find(b => b.id === e.target.value);
                 setSelectedBank(bank || null);
               }}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226' }}
+              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
             >
               <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes les banques</option>
               {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
@@ -1017,8 +1030,8 @@ export default function Transactions() {
               placeholder="Rechercher..."
               value={filters.searchText}
               onChange={(e) => setFilters({...filters, searchText: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226' }}
+              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
+              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
             />
           </div>
           <div>
@@ -1026,8 +1039,8 @@ export default function Transactions() {
             <select
               value={filters.categoryId}
               onChange={(e) => setFilters({...filters, categoryId: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226' }}
+              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
+              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
             >
               <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes</option>
               <option value="undefined" style={{ backgroundColor: '#1f2226' }}>Non défini</option>
@@ -1042,8 +1055,8 @@ export default function Transactions() {
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226' }}
+              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
+              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
             />
           </div>
           <div>
@@ -1116,8 +1129,7 @@ export default function Transactions() {
                   type="date"
                   value={editingTransaction?.date || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                  style={{ backgroundColor: '#272a2f' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                   required
                 />
               </td>
@@ -1126,8 +1138,7 @@ export default function Transactions() {
                   type="text"
                   value={editingTransaction?.description || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                  style={{ backgroundColor: '#272a2f' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                   placeholder="Description de la transaction"
                   required
                 />
@@ -1136,8 +1147,7 @@ export default function Transactions() {
                 <select
                   value={editingTransaction?.categoryId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                  style={{ backgroundColor: '#272a2f' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                 >
                   <option value="" style={{ backgroundColor: '#272a2f' }}>Non défini</option>
                   {categories.map(category => (
@@ -1149,8 +1159,7 @@ export default function Transactions() {
                 <select
                   value={editingTransaction?.bankId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
-                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                  style={{ backgroundColor: '#272a2f' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                   required
                 >
                   <option value="" style={{ backgroundColor: '#272a2f' }}>Sélectionnez une banque</option>
@@ -1227,8 +1236,7 @@ export default function Transactions() {
                       type="date"
                       value={editingTransaction?.date || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'date' ? (
                     <input
@@ -1667,33 +1675,33 @@ export default function Transactions() {
 
       {/* Modal de modification en lot */}
       {showBulkEditModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
+        <div className="fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-0 w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-2xl rounded-xl" style={{ background: '#272a2f' }}>
+            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
               {/* En-tête */}
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Modification en lot des transactions
-                </h3>
-                <button
-                  onClick={() => setShowBulkEditModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+              <h3 className="text-lg font-bold text-white">
+                Modification en lot des transactions
+              </h3>
+              <button
+                onClick={() => setShowBulkEditModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-6">
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Section 1: Critères de sélection */}
                 <div className="space-y-4">
-                  <h4 className="text-md font-medium text-gray-900 border-b pb-2">
+                  <h4 className="text-md font-bold text-white border-b border-gray-700 pb-2">
                     1. Quelles transactions modifier ?
                   </h4>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Contient le texte
                     </label>
                     <input
@@ -1701,18 +1709,20 @@ export default function Transactions() {
                       placeholder="ex: abonnement"
                       value={bulkEditFilters.searchText}
                       onChange={(e) => setBulkEditFilters({...bulkEditFilters, searchText: e.target.value})}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                      style={{ backgroundColor: '#1f2226' }}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Catégorie
                     </label>
                     <select
                       value={bulkEditFilters.categoryId}
                       onChange={(e) => setBulkEditFilters({...bulkEditFilters, categoryId: e.target.value})}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                      style={{ backgroundColor: '#1f2226' }}
                     >
                       <option value="">Toutes les catégories</option>
                       <option value="undefined">Non défini</option>
@@ -1723,13 +1733,14 @@ export default function Transactions() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Banque
                     </label>
                     <select
                       value={bulkEditFilters.bankId}
                       onChange={(e) => setBulkEditFilters({...bulkEditFilters, bankId: e.target.value})}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                      style={{ backgroundColor: '#1f2226' }}
                     >
                       <option value="">Toutes les banques</option>
                       {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
@@ -1740,37 +1751,40 @@ export default function Transactions() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Date début
-                      </label>
-                      <input
-                        type="date"
-                        value={bulkEditFilters.startDate}
-                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, startDate: e.target.value})}
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      />
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Date début
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkEditFilters.startDate}
+                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, startDate: e.target.value})}
+                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                      style={{ backgroundColor: '#1f2226' }}
+                    />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Date fin
-                      </label>
-                      <input
-                        type="date"
-                        value={bulkEditFilters.endDate}
-                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, endDate: e.target.value})}
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
-                      />
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Date fin
+                    </label>
+                    <input
+                      type="date"
+                      value={bulkEditFilters.endDate}
+                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, endDate: e.target.value})}
+                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                      style={{ backgroundColor: '#1f2226' }}
+                    />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
                       Statut pointé
                     </label>
                     <select
                       value={bulkEditFilters.checked}
                       onChange={(e) => setBulkEditFilters({...bulkEditFilters, checked: e.target.value})}
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                      style={{ backgroundColor: '#1f2226' }}
                     >
                       <option value="">Tous</option>
                       <option value="true">Pointé</option>
@@ -1779,9 +1793,9 @@ export default function Transactions() {
                   </div>
 
                   {/* Aperçu des transactions concernées */}
-                  <div className="mt-4 p-3 bg-blue-50 rounded-md">
-                    <p className="text-sm font-medium text-blue-900">
-                      Aperçu: {getBulkEditTargetTransactions().length} transaction(s) seront modifiées
+                  <div className="mt-4 p-3 rounded-md" style={{ background: '#1f2226' }}>
+                    <p className="text-sm font-medium text-blue-300">
+                      Aperçu : {getBulkEditTargetTransactions().length} transaction(s) seront modifiées
                     </p>
                   </div>
                 </div>

@@ -594,7 +594,8 @@ export default function Banks() {
                                 console.log('🔧 Selected account type:', e.target.value);
                                 setFormData({...formData, accountType: e.target.value as any});
                               }}
-                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                              className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
+                              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
                             >
                               <option value="CURRENT">Compte courant</option>
                               <option value="SAVINGS">Livret d'épargne</option>
@@ -1001,7 +1002,8 @@ export default function Banks() {
                         <select
                           value={formData.accountType}
                           onChange={(e) => setFormData({...formData, accountType: e.target.value as any})}
-                          className="text-sm text-gray-500 border-none focus:ring-0 p-0 bg-transparent"
+                          className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
+                          style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
                         >
                           <option value="CURRENT">Compte courant</option>
                           <option value="SAVINGS">Livret d'épargne</option>
