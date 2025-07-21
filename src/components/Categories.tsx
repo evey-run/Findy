@@ -164,10 +164,16 @@ export default function Categories() {
   }, [loadCategories, loadBudgets, loadTransactions, loadUsers]);
 
   // Calcul des dépenses pour chaque budget
-  const calculateBudgetSpending = async () => {
+  const calculateBudgetSpending = () => {
+    console.log('📊 Calculating budget spending...');
+    console.log('📊 Budgets:', budgets.length);
+    console.log('📊 Transactions:', transactions.length);
+    
     const spending: { [key: string]: BudgetSpending } = {};
     
     for (const budget of budgets) {
+      console.log(`📊 Processing budget for category ${budget.categoryId}`);
+      
       // Calculer les dates de début et fin de période
       const startDate = new Date(budget.startDate);
       let endDate = new Date(startDate);
@@ -187,18 +193,26 @@ export default function Categories() {
           break;
       }
       
+      console.log(`📊 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+      
       // Filtrer les transactions pour ce budget
-      const relevantTransactions = transactions.filter(t => 
-        t.categoryId === budget.categoryId &&
-        t.amount < 0 && // Seulement les dépenses
-        new Date(t.date) >= startDate &&
-        new Date(t.date) <= endDate &&
-        (!budget.bankId || t.bankId === budget.bankId) // Filtrer par banque si budget spécifique
-      );
+      const relevantTransactions = transactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        const isInCategory = t.categoryId === budget.categoryId;
+        const isExpense = t.amount < 0; // Seulement les dépenses
+        const isInDateRange = transactionDate >= startDate && transactionDate <= endDate;
+        const isInBank = !budget.bankId || t.bankId === budget.bankId;
+        
+        return isInCategory && isExpense && isInDateRange && isInBank;
+      });
+      
+      console.log(`📊 Found ${relevantTransactions.length} relevant transactions`);
       
       const totalSpent = Math.abs(relevantTransactions.reduce((sum, t) => sum + t.amount, 0));
       const remaining = Math.max(0, budget.amount - totalSpent);
       const percentage = budget.amount > 0 ? (totalSpent / budget.amount) * 100 : 0;
+      
+      console.log(`📊 Budget ${budget.id}: spent ${totalSpent}, remaining ${remaining}, percentage ${percentage}%`);
       
       spending[budget.id] = {
         budget,
@@ -211,14 +225,28 @@ export default function Categories() {
       };
     }
     
+    console.log('📊 Final spending object:', spending);
     setBudgetSpending(spending);
   };
 
-  // Effet pour recalculer les budgets
+  // Effet pour recalculer les budgets - ajout des dépendances manquantes
   useEffect(() => {
-    if (budgets.length > 0 && transactions.length > 0) {
+    console.log('📊 Effect triggered - budgets:', budgets.length, 'transactions:', transactions.length);
+    if (budgets.length > 0 && transactions.length >= 0) { // Permet les calculs même avec 0 transaction
       calculateBudgetSpending();
     }
+  }, [budgets, transactions, categories]); // Ajout de categories pour recalculer si nécessaire
+
+  // Force le recalcul périodique pour s'assurer que les données sont à jour
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (budgets.length > 0) {
+        console.log('📊 Periodic recalculation of budget spending');
+        calculateBudgetSpending();
+      }
+    }, 5000); // Recalcule toutes les 5 secondes
+
+    return () => clearInterval(interval);
   }, [budgets, transactions]);
 
   // Fonction pour obtenir le budget d'une catégorie
@@ -658,7 +686,7 @@ export default function Categories() {
                         <div className="flex justify-between text-sm text-gray-400 mt-2">
                           <span></span>
                           <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-gray-400'}>
-                            {categorySpending.isOverBudget ? 'Budget dépassé !' : `${formatCurrency(categorySpending.totalSpent)}/${formatCurrency(categoryBudget.amount)}`}
+                            {formatCurrency(categorySpending.totalSpent)}/{formatCurrency(categoryBudget.amount)}
                           </span>
                         </div>
                       </div>
