@@ -126,7 +126,7 @@ export default function Layout({ children }: LayoutProps) {
 
               {/* Menu déroulant */}
               {isUserMenuOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 rounded-lg shadow-xl z-50">
+                <div className="absolute top-full left-0 right-0 mt-2 rounded-lg shadow-xl z-50" style={{ backgroundColor: '#1f2226' }}>
                   {/* Option "Tous les utilisateurs" */}
                   <button
                     onClick={() => {
