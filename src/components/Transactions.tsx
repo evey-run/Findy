@@ -1676,7 +1676,7 @@ export default function Transactions() {
       {/* Modal de modification en lot */}
       {showBulkEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-10 mx-auto p-0 w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-2xl rounded-xl" style={{ background: '#272a2f' }}>
+          <div className="relative top-24 mx-auto p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl" style={{ background: '#272a2f' }}>
             <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
               {/* En-tête */}
               <h3 className="text-lg font-bold text-white">
@@ -1700,96 +1700,80 @@ export default function Transactions() {
                     1. Quelles transactions modifier ?
                   </h4>
                   
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Contient le texte
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="ex: abonnement"
-                      value={bulkEditFilters.searchText}
-                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, searchText: e.target.value})}
-                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                      style={{ backgroundColor: '#1f2226' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Catégorie
-                    </label>
-                    <select
-                      value={bulkEditFilters.categoryId}
-                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, categoryId: e.target.value})}
-                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                      style={{ backgroundColor: '#1f2226' }}
-                    >
-                      <option value="">Toutes les catégories</option>
-                      <option value="undefined">Non défini</option>
-                      {categories.map(category => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Banque
-                    </label>
-                    <select
-                      value={bulkEditFilters.bankId}
-                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, bankId: e.target.value})}
-                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                      style={{ backgroundColor: '#1f2226' }}
-                    >
-                      <option value="">Toutes les banques</option>
-                      {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
-                        <option key={bank.id} value={bank.id}>{bank.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Date début
-                    </label>
-                    <input
-                      type="date"
-                      value={bulkEditFilters.startDate}
-                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, startDate: e.target.value})}
-                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                      style={{ backgroundColor: '#1f2226' }}
-                    />
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Contient le texte</label>
+                      <input
+                        type="text"
+                        placeholder="ex: abonnement"
+                        value={bulkEditFilters.searchText}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, searchText: e.target.value})}
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
+                      />
                     </div>
-                    <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Date fin
-                    </label>
-                    <input
-                      type="date"
-                      value={bulkEditFilters.endDate}
-                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, endDate: e.target.value})}
-                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                      style={{ backgroundColor: '#1f2226' }}
-                    />
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Catégorie</label>
+                      <select
+                        value={bulkEditFilters.categoryId}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, categoryId: e.target.value})}
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
+                      >
+                        <option value="">Toutes les catégories</option>
+                        <option value="undefined">Non défini</option>
+                        {categories.map(category => (
+                          <option key={category.id} value={category.id}>{category.name}</option>
+                        ))}
+                      </select>
                     </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Statut pointé
-                    </label>
-                    <select
-                      value={bulkEditFilters.checked}
-                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, checked: e.target.value})}
-                      className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                      style={{ backgroundColor: '#1f2226' }}
-                    >
-                      <option value="">Tous</option>
-                      <option value="true">Pointé</option>
-                      <option value="false">Non pointé</option>
-                    </select>
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Banque</label>
+                      <select
+                        value={bulkEditFilters.bankId}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, bankId: e.target.value})}
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
+                      >
+                        <option value="">Toutes les banques</option>
+                        {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
+                          <option key={bank.id} value={bank.id}>{bank.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Date début</label>
+                      <input
+                        type="date"
+                        value={bulkEditFilters.startDate}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, startDate: e.target.value})}
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Date fin</label>
+                      <input
+                        type="date"
+                        value={bulkEditFilters.endDate}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, endDate: e.target.value})}
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
+                      />
+                    </div>
+                    <div className="flex-1 min-w-[180px]">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">Statut pointé</label>
+                      <select
+                        value={bulkEditFilters.checked}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, checked: e.target.value})}
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
+                      >
+                        <option value="">Tous</option>
+                        <option value="true">Pointé</option>
+                        <option value="false">Non pointé</option>
+                      </select>
+                    </div>
                   </div>
 
                   {/* Aperçu des transactions concernées */}
@@ -1801,8 +1785,8 @@ export default function Transactions() {
                 </div>
 
                 {/* Section 2: Actions à effectuer */}
-                <div className="space-y-4">
-                  <h4 className="text-md font-bold text-white border-b border-gray-700 pb-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <h4 className="text-md font-bold text-white border-b border-gray-700 pb-2 col-span-1 md:col-span-2">
                     2. Quelles modifications appliquer ?
                   </h4>
 
@@ -1858,8 +1842,8 @@ export default function Transactions() {
                         {/* Champs de saisie */}
                         {!bulkEditActions.replaceText.replaceAll ? (
                           // Mode remplacement partiel
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
+                          <div className="flex gap-4">
+                            <div className="flex-1 min-w-[180px]">
                               <label className="block text-xs text-gray-600 mb-1">Remplacer</label>
                               <input
                                 type="text"
@@ -1872,7 +1856,7 @@ export default function Transactions() {
                                 className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
                               />
                             </div>
-                            <div>
+                            <div className="flex-1 min-w-[180px]">
                               <label className="block text-xs text-gray-600 mb-1">Par</label>
                               <input
                                 type="text"
