@@ -1215,11 +1215,14 @@ export default function Transactions() {
                       e.preventDefault();
                       handleAddTransaction(e);
                     }}
-                    className="px-2 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                    style={{ backgroundColor: '#22c55e' }}
-                    title="Sauvegarder"
+                    className="px-2 py-1 text-xs font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center gap-1"
+                    style={{ backgroundColor: '#6226fa', minWidth: '0' }}
+                    title="Ajouter"
                   >
-                    ✓
+                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 3.5v9m4.5-4.5h-9" />
+                    </svg>
+                    Ajouter
                   </button>
                 </div>
               </td>
@@ -1424,36 +1427,27 @@ export default function Transactions() {
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
-                    <input
-                      type="checkbox"
-                      checked={editingTransaction?.checked || false}
-                      onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
-                      className="h-4 w-4 rounded"
-                      style={{ accentColor: '#6226fa' }}
-                    />
-                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'checked' ? (
-                    <select
-                      value={inlineEditValue}
-                      onChange={(e) => setInlineEditValue(e.target.value)}
-                      onBlur={handleInlineSave}
-                      onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
-                      autoFocus
-                    >
-                      <option value="true" style={{ backgroundColor: '#1f2226' }}>Oui</option>
-                      <option value="false" style={{ backgroundColor: '#1f2226' }}>Non</option>
-                    </select>
+                    <label className="flex items-center text-xs text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={editingTransaction?.checked || false}
+                        onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
+                        className="h-3 w-3 rounded"
+                        style={{ accentColor: '#6226fa' }}
+                      />
+                      <span className="ml-1 text-gray-300">Pointé</span>
+                    </label>
                   ) : (
-                    <span 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'checked')}
-                      className={`cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        transaction.checked ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}
-                      title="Double-cliquez pour éditer"
-                    >
-                      {transaction.checked ? 'Oui' : 'Non'}
-                    </span>
+                    <label className="flex items-center text-xs text-gray-300">
+                      <input
+                        type="checkbox"
+                        checked={transaction.checked}
+                        readOnly
+                        className="h-3 w-3 rounded"
+                        style={{ accentColor: '#6226fa' }}
+                      />
+                      <span className="ml-1 text-gray-300">Pointé</span>
+                    </label>
                   )}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
