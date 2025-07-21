@@ -506,8 +506,8 @@ export default function Categories() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
                         <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
-                          style={{ borderColor: '#6226fa', backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
+                          className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+                          style={{ backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
                           title="Couleur de la catégorie"
                         >
                           <span className="text-lg font-bold">
@@ -620,7 +620,7 @@ export default function Categories() {
                         <button
                           type="button"
                           onClick={handleCancel}
-                          className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                          className="px-3 py-1 text-xs border border-gray-300 rounded text-white hover:text-gray-700 hover:bg-gray-100"
                         >
                           Annuler
                         </button>
@@ -685,7 +685,7 @@ export default function Categories() {
                              categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
                              categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}
                             </span>
-                            <span className={`text-2xl font-bold ${categorySpending.isOverBudget ? 'text-red-400' : 'text-violet-400'}`}>
+                            <span className={`text-xl font-bold ${categorySpending.isOverBudget ? 'text-red-400' : 'text-violet-400'}`}>
                               {Math.round(categorySpending.percentage)}%
                             </span>
                           </div>
@@ -779,8 +779,8 @@ export default function Categories() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
                     <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
-                      style={{ borderColor: '#6226fa', backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
+                      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+                      style={{ backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
                       title="Couleur de la catégorie"
                     >
                       <span className="text-lg font-bold">
@@ -893,7 +893,7 @@ export default function Categories() {
                     <button
                       type="button"
                       onClick={handleCancel}
-                      className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                      className="px-3 py-1 text-xs border border-gray-300 rounded text-white hover:text-gray-700 hover:bg-gray-100"
                     >
                       Annuler
                     </button>
