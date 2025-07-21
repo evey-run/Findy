@@ -15,6 +15,83 @@ const editableCellStyle = `
   }
 `;
 
+// Styles pour la barre de scroll personnalisée
+const scrollbarStyles = `
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #1f2226;
+    border-radius: 8px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #6226fa;
+    border-radius: 8px;
+    border: 1px solid #1f2226;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed;
+    border: 1px solid #1f2226;
+  }
+  
+  ::-webkit-scrollbar-thumb:active {
+    background: #6226fa;
+    border: 1px solid #1f2226;
+  }
+  
+  /* Firefox */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #6226fa #1f2226;
+  }
+  
+  /* Styles spécifiques pour les conteneurs avec scroll */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #1f2226;
+    border-radius: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #6226fa !important;
+    border-radius: 8px;
+    border: 1px solid #1f2226;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed !important;
+    border: 1px solid #1f2226;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #6226fa !important;
+    border: 1px solid #1f2226;
+  }
+  
+  /* Force pour tous les scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #6226fa #1f2226;
+  }
+`;
+
+// Injecter les styles dans le document
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = scrollbarStyles;
+  if (!document.head.querySelector('style[data-scrollbar-custom]')) {
+    styleElement.setAttribute('data-scrollbar-custom', 'true');
+    document.head.appendChild(styleElement);
+  }
+}
+
 interface EditingTransaction {
   id: string;
   amount: number;
@@ -860,18 +937,23 @@ export default function Transactions() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
       <style>{editableCellStyle}</style>
+      {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             Transactions
           </h2>
+          <p className="text-sm text-gray-300 mt-1">
+            Gérez toutes vos transactions et opérations bancaires
+          </p>
         </div>
         <div className="mt-4 flex gap-3 md:mt-0 md:ml-4">
           <button
             onClick={() => setShowBulkEditModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
+            style={{ backgroundColor: '#6227f5' }}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -880,7 +962,8 @@ export default function Transactions() {
           </button>
           <button
             onClick={() => setShowImportModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
+            style={{ backgroundColor: '#6227f5' }}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
@@ -891,26 +974,27 @@ export default function Transactions() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className="shadow rounded-lg p-6" style={{ backgroundColor: '#272a2f' }}>
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">Banque</label>
+            <label className="block text-sm font-medium text-gray-300">Banque</label>
             <select
               value={selectedBank?.id || ''}
               onChange={(e) => {
                 const bank = banks.find(b => b.id === e.target.value);
                 setSelectedBank(bank || null);
               }}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              style={{ backgroundColor: '#1f2226' }}
             >
-              <option value="">Toutes les banques</option>
+              <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes les banques</option>
               {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
                 // Récupérer les utilisateurs associés à cette banque
                 const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                 const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                 
                 return (
-                  <option key={bank.id} value={bank.id}>
+                  <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1f2226' }}>
                     {bank.name}{bankUsersText}
                   </option>
                 );
@@ -918,109 +1002,113 @@ export default function Transactions() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Recherche</label>
+            <label className="block text-sm font-medium text-gray-300">Recherche</label>
             <input
               type="text"
               placeholder="Rechercher..."
               value={filters.searchText}
               onChange={(e) => setFilters({...filters, searchText: e.target.value})}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              style={{ backgroundColor: '#1f2226' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Catégorie</label>
+            <label className="block text-sm font-medium text-gray-300">Catégorie</label>
             <select
               value={filters.categoryId}
               onChange={(e) => setFilters({...filters, categoryId: e.target.value})}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              style={{ backgroundColor: '#1f2226' }}
             >
-              <option value="">Toutes</option>
-              <option value="undefined">Non défini</option>
+              <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes</option>
+              <option value="undefined" style={{ backgroundColor: '#1f2226' }}>Non défini</option>
               {categories.map(category => (
-                <option key={category.id} value={category.id}>{category.name}</option>
+                <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Date début</label>
+            <label className="block text-sm font-medium text-gray-300">Date début</label>
             <input
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              data-date-format="dd/mm/yyyy"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              style={{ backgroundColor: '#1f2226' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Date fin</label>
+            <label className="block text-sm font-medium text-gray-300">Date fin</label>
             <input
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters({...filters, endDate: e.target.value})}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              data-date-format="dd/mm/yyyy"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              style={{ backgroundColor: '#1f2226' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">Pointé</label>
+            <label className="block text-sm font-medium text-gray-300">Pointé</label>
             <select
               value={filters.checked}
               onChange={(e) => setFilters({...filters, checked: e.target.value})}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              style={{ backgroundColor: '#1f2226' }}
             >
-              <option value="">Tous</option>
-              <option value="true">Oui</option>
-              <option value="false">Non</option>
+              <option value="" style={{ backgroundColor: '#1f2226' }}>Tous</option>
+              <option value="true" style={{ backgroundColor: '#1f2226' }}>Oui</option>
+              <option value="false" style={{ backgroundColor: '#1f2226' }}>Non</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* Transactions Table */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <div className="shadow rounded-lg overflow-hidden" style={{ backgroundColor: '#272a2f' }}>
         <div 
-          className="overflow-y-auto"
+          className="overflow-y-auto custom-scrollbar"
           style={{ maxHeight: '70vh' }}
           onScroll={handleScroll}
         >
-          <table className="w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50 sticky top-0 z-10">
+          <table className="w-full divide-y" style={{ backgroundColor: '#272a2f', borderColor: '#1f2226' }}>
+          <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                 Date
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-80">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-80">
                 Description
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
                 Catégorie
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
                 Banque
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
                 Propriétaires
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                 Montant
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
                 Pointé
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y" style={{ backgroundColor: '#272a2f', borderColor: '#1f2226' }}>
             {/* Add form row - always visible as first row */}
-            <tr className="bg-blue-50 border-l-4 border-blue-400">
+            <tr className="border-l-4" style={{ backgroundColor: '#1f2226', borderLeftColor: '#6226fa' }}>
               <td className="px-6 py-4">
                 <input
                   type="date"
                   value={editingTransaction?.date || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                  style={{ backgroundColor: '#272a2f' }}
                   required
                 />
               </td>
@@ -1029,7 +1117,8 @@ export default function Transactions() {
                   type="text"
                   value={editingTransaction?.description || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                  style={{ backgroundColor: '#272a2f' }}
                   placeholder="Description de la transaction"
                   required
                 />
@@ -1038,11 +1127,12 @@ export default function Transactions() {
                 <select
                   value={editingTransaction?.categoryId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                  style={{ backgroundColor: '#272a2f' }}
                 >
-                  <option value="">Non défini</option>
+                  <option value="" style={{ backgroundColor: '#272a2f' }}>Non défini</option>
                   {categories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
+                    <option key={category.id} value={category.id} style={{ backgroundColor: '#272a2f' }}>{category.name}</option>
                   ))}
                 </select>
               </td>
@@ -1050,16 +1140,17 @@ export default function Transactions() {
                 <select
                   value={editingTransaction?.bankId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                  style={{ backgroundColor: '#272a2f' }}
                   required
                 >
-                  <option value="">Sélectionnez une banque</option>
+                  <option value="" style={{ backgroundColor: '#272a2f' }}>Sélectionnez une banque</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
                     const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                     const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                     
                     return (
-                      <option key={bank.id} value={bank.id}>
+                      <option key={bank.id} value={bank.id} style={{ backgroundColor: '#272a2f' }}>
                         {bank.name}{bankUsersText}
                       </option>
                     );
@@ -1067,7 +1158,7 @@ export default function Transactions() {
                 </select>
               </td>
               <td className="px-6 py-4">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-300">
                   {editingTransaction?.bankId ? 
                     (() => {
                       const selectedBankObj = banks.find(b => b.id === editingTransaction.bankId);
@@ -1084,20 +1175,22 @@ export default function Transactions() {
                   step="1"
                   value={editingTransaction?.amount || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                  style={{ backgroundColor: '#272a2f' }}
                   placeholder="0.00"
                   required
                 />
               </td>
               <td className="px-6 py-4">
-                <label className="flex items-center text-xs">
+                <label className="flex items-center text-xs text-gray-300">
                   <input
                     type="checkbox"
                     checked={editingTransaction?.checked || false}
                     onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
-                    className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="h-3 w-3 rounded"
+                    style={{ accentColor: '#6226fa' }}
                   />
-                  <span className="ml-1 text-gray-700">Pointé</span>
+                  <span className="ml-1 text-gray-300">Pointé</span>
                 </label>
               </td>
               <td className="px-6 py-4">
@@ -1108,7 +1201,8 @@ export default function Transactions() {
                       e.preventDefault();
                       handleAddTransaction(e);
                     }}
-                    className="px-2 py-1 text-xs border border-transparent rounded text-white bg-green-600 hover:bg-green-700"
+                    className="px-2 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
+                    style={{ backgroundColor: '#22c55e' }}
                     title="Sauvegarder"
                   >
                     ✓
@@ -1117,14 +1211,15 @@ export default function Transactions() {
               </td>
             </tr>
             {filteredTransactions.map((transaction) => (
-              <tr key={transaction.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <tr key={transaction.id} className="hover:opacity-80 transition-opacity" style={{ backgroundColor: '#272a2f' }}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="date"
                       value={editingTransaction?.date || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'date' ? (
                     <input
@@ -1133,26 +1228,28 @@ export default function Transactions() {
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                       autoFocus
                     />
                   ) : (
                     <span 
                       onDoubleClick={() => handleInlineEdit(transaction.id, 'date')}
-                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
                       title="Double-cliquez pour éditer"
                     >
                       {formatDate(transaction.date)}
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="text"
                       value={editingTransaction?.description || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'description' ? (
                     <input
@@ -1161,28 +1258,30 @@ export default function Transactions() {
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                       autoFocus
                     />
                   ) : (
                     <span 
                       onDoubleClick={() => handleInlineEdit(transaction.id, 'description')}
-                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
                       title="Double-cliquez pour éditer"
                     >
                       {transaction.description}
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <select
                       value={editingTransaction?.categoryId || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                     >
                       {categories.map(category => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
+                        <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
                       ))}
                     </select>
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'category' ? (
@@ -1378,7 +1477,7 @@ export default function Transactions() {
         {loadingMore && (
           <div className="flex justify-center py-4">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
-            <span className="ml-2 text-sm text-gray-600">Chargement...</span>
+            <span className="ml-2 text-sm text-gray-300">Chargement...</span>
           </div>
         )}
         
@@ -1387,8 +1486,8 @@ export default function Transactions() {
             <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">Aucune transaction</h3>
-            <p className="mt-1 text-sm text-gray-500">Commencez par ajouter une nouvelle transaction.</p>
+            <h3 className="mt-2 text-sm font-medium text-white">Aucune transaction</h3>
+            <p className="mt-1 text-sm text-gray-300">Commencez par ajouter une nouvelle transaction.</p>
           </div>
         )}
       </div>
