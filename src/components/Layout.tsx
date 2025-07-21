@@ -65,7 +65,8 @@ export default function Layout({ children }: LayoutProps) {
     } else {
       return (
         <div
-          className={`${size} rounded-full flex items-center justify-center text-white text-sm font-medium bg-green-600`}
+          className={`${size} rounded-full flex items-center justify-center text-white text-sm font-medium`} 
+          style={{ backgroundColor: '#6226fa' }}
         >
           {user?.name?.charAt(0)?.toUpperCase() || '?'}
         </div>
@@ -104,7 +105,7 @@ export default function Layout({ children }: LayoutProps) {
                   </>
                 ) : (
                   <>
-                    <div className="h-12 w-12 rounded-full flex items-center justify-center bg-green-600 text-white font-bold">
+                    <div className="h-12 w-12 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: '#6226fa' }}>
                       ∀
                     </div>
                     <div className="text-center mt-2">
@@ -132,10 +133,10 @@ export default function Layout({ children }: LayoutProps) {
                       setIsUserMenuOpen(false);
                     }}
                     className={`w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-white/10 transition-colors first:rounded-t-lg ${
-                      selectedUser === null ? 'bg-green-600/20' : ''
+                      selectedUser === null ? 'bg-violet-600/20' : ''
                     }`}
                   >
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center bg-green-600 text-white font-bold text-xs">
+                    <div className="h-8 w-8 rounded-full flex items-center justify-center text-white font-bold text-xs" style={{ backgroundColor: '#6226fa' }}>
                       ∀
                     </div>
                     <div>
@@ -155,7 +156,7 @@ export default function Layout({ children }: LayoutProps) {
                       className={`w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-white/10 transition-colors ${
                         index === users.length - 1 ? 'rounded-b-lg' : ''
                       } ${
-                        selectedUser?.id === user.id ? 'bg-green-600/20' : ''
+                        selectedUser?.id === user.id ? 'bg-violet-600/20' : ''
                       }`}
                     >
                       {renderUserAvatar(user, "h-8 w-8")}

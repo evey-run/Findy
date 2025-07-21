@@ -91,7 +91,7 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
     case 'SAVINGS':
       return {
         label: 'Livret d\'épargne',
-        color: 'bg-green-100 text-green-800'
+        color: 'bg-violet-100 text-violet-800'
       };
     case 'INVESTMENT':
       return {
@@ -656,12 +656,12 @@ export default function Banks() {
                       {/* Sélection utilisateurs - 2 utilisateurs par ligne */}
                       {(
                         <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                          <label className="block text-xs font-medium text-gray-300 mb-1">
                             Utilisateurs ayant accès *
                           </label>
-                          <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded max-h-16 overflow-y-auto custom-scrollbar">
+                          <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#1f2226', border: '1px solid #272a2f' }}>
                             {users.map(user => (
-                              <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded text-xs">
+                              <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-white/10 px-1 py-0.5 rounded text-xs">
                                 <input
                                   type="checkbox"
                                   checked={formData.userIds.includes(user.id)}
@@ -678,7 +678,7 @@ export default function Banks() {
                                       });
                                     }
                                   }}
-                                  className="w-3 h-3 rounded border-gray-300 focus:ring-2"
+                                  className="w-3 h-3 rounded border-gray-600 focus:ring-2"
                                   style={{ color: '#6226fa', accentColor: '#6226fa' }}
                                 />
                                 <div className="flex items-center space-x-1">
@@ -693,7 +693,7 @@ export default function Banks() {
                                       {user.name.charAt(0).toUpperCase()}
                                     </div>
                                   )}
-                                  <span className="text-xs text-gray-900">{user.name}</span>
+                                  <span className="text-xs text-gray-300">{user.name}</span>
                                 </div>
                               </label>
                             ))}
@@ -1071,12 +1071,12 @@ export default function Banks() {
                   {/* Sélection utilisateurs - format horizontal compact */}
                   {(
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                      <label className="block text-xs font-medium text-gray-300 mb-1">
                         Utilisateurs ayant accès *
                       </label>
-                      <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded max-h-16 overflow-y-auto custom-scrollbar">
+                      <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#1f2226', border: '1px solid #272a2f' }}>
                         {users.map(user => (
-                          <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded text-xs">
+                          <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-white/10 px-1 py-0.5 rounded text-xs">
                             <input
                               type="checkbox"
                               checked={formData.userIds.includes(user.id)}
@@ -1093,7 +1093,7 @@ export default function Banks() {
                                   });
                                 }
                               }}
-                              className="w-3 h-3 rounded border-gray-300 focus:ring-2"
+                              className="w-3 h-3 rounded border-gray-600 focus:ring-2"
                               style={{ color: '#6226fa', accentColor: '#6226fa' }}
                             />
                             <div className="flex items-center space-x-1">
@@ -1108,7 +1108,7 @@ export default function Banks() {
                                   {user.name.charAt(0).toUpperCase()}
                                 </div>
                               )}
-                              <span className="text-xs text-gray-900 truncate max-w-16">{user.name}</span>
+                              <span className="text-xs text-gray-300 truncate max-w-16">{user.name}</span>
                             </div>
                           </label>
                         ))}
