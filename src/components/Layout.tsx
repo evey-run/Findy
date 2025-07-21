@@ -104,7 +104,7 @@ export default function Layout({ children }: LayoutProps) {
                   </>
                 ) : (
                   <>
-                    <div className="h-12 w-12 rounded-full flex items-center justify-center text-white font-bold" style={{ backgroundColor: '#6226fa' }}>
+                    <div className="h-20 w-20 rounded-full flex items-center justify-center text-white font-bold text-3xl" style={{ backgroundColor: '#6226fa' }}>
                       ∀
                     </div>
                     <div className="text-center mt-2">
