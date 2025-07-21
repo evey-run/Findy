@@ -281,133 +281,130 @@ export default function Recurrences() {
   }
 
   return (
-    <div className="space-y-6">
-      <style dangerouslySetInnerHTML={{ __html: editableCellStyle }} />
+    <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
+      <style>{`
+        .editable-cell { position: relative; transition: background-color 0.15s; }
+        .editable-cell:hover { background-color: #23272b; }
+        select, input[type='text'], input[type='number'], input[type='date'] {
+          background-color: #1f2226 !important;
+          color: #fff !important;
+          border: none !important;
+          padding: 0.5rem 0.75rem !important;
+          font-weight: 500 !important;
+          border-radius: 0.5rem !important;
+        }
+        th, td { color: #fff !important; }
+      `}</style>
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             Récurrences
           </h2>
         </div>
       </div>
-
-      {/* Add Recurrence Form - Removed as it will be integrated in the table */}
-
-      {/* Recurrences List */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200 table-fixed">
-          <thead className="bg-gray-50">
+      <div className="shadow rounded-lg overflow-hidden" style={{ backgroundColor: '#272a2f' }}>
+        <table className="min-w-full divide-y divide-gray-600 table-fixed" style={{ backgroundColor: '#272a2f' }}>
+          <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/5">
-                Description
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                Montant
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                Fréquence
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-36">
-                Prochaine échéance
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                Catégorie
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                Banque
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
-                Statut
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
-                Actions
-              </th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-1/5">Description</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">Montant</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Fréquence</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-36">Prochaine échéance</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Catégorie</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Banque</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">Statut</th>
+              <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-24">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
             {/* Add form row - always visible as first row */}
-            <tr className="bg-blue-50 border-l-4 border-blue-400">
-              <td className="px-6 py-4">
+            <tr className="border-l-4" style={{ backgroundColor: '#1f2226', borderLeftColor: '#6226fa' }}>
+              <td className="px-4 py-2">
                 <input
                   type="text"
                   value={newRecurrence.description}
                   onChange={(e) => setNewRecurrence(prev => ({...prev, description: e.target.value}))}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3"
+                  style={{ backgroundColor: '#1f2226' }}
                   placeholder="Description de la récurrence"
                   required
                 />
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <input
                   type="number"
                   step="1"
                   value={newRecurrence.amount}
                   onChange={(e) => setNewRecurrence(prev => ({...prev, amount: e.target.value}))}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3"
+                  style={{ backgroundColor: '#1f2226' }}
                   placeholder="0.00"
                   required
                 />
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <select
                   value={newRecurrence.frequency}
                   onChange={(e) => setNewRecurrence(prev => ({...prev, frequency: e.target.value as any}))}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3"
+                  style={{ backgroundColor: '#1f2226' }}
                   required
                 >
                   {frequencies.map(freq => (
-                    <option key={freq.value} value={freq.value}>{freq.label}</option>
+                    <option key={freq.value} value={freq.value} style={{ backgroundColor: '#1f2226' }}>{freq.label}</option>
                   ))}
                 </select>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <input
                   type="date"
                   value={newRecurrence.nextDue}
                   onChange={(e) => setNewRecurrence(prev => ({...prev, nextDue: e.target.value}))}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3"
+                  style={{ backgroundColor: '#1f2226' }}
                   required
                 />
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <select
                   value={newRecurrence.categoryId}
                   onChange={(e) => setNewRecurrence(prev => ({...prev, categoryId: e.target.value}))}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3"
+                  style={{ backgroundColor: '#1f2226' }}
                   required
                 >
-                  <option value="">Sélectionnez une catégorie</option>
+                  <option value="" style={{ backgroundColor: '#1f2226' }}>Sélectionnez une catégorie</option>
                   {categories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
+                    <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
                   ))}
                 </select>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <select
                   value={newRecurrence.bankId}
                   onChange={(e) => setNewRecurrence(prev => ({...prev, bankId: e.target.value}))}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                  className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3"
+                  style={{ backgroundColor: '#1f2226' }}
                 >
-                  <option value="">Aucune banque</option>
+                  <option value="" style={{ backgroundColor: '#1f2226' }}>Aucune banque</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
-                    <option key={bank.id} value={bank.id}>{bank.name}</option>
+                    <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1f2226' }}>{bank.name}</option>
                   ))}
                 </select>
               </td>
-              <td className="px-6 py-4">
-                <div className="flex flex-col space-y-1">
-                  <label className="flex items-center text-xs">
-                    <input
-                      type="checkbox"
-                      checked={newRecurrence.active}
-                      onChange={(e) => setNewRecurrence(prev => ({...prev, active: e.target.checked}))}
-                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span className="ml-1 text-gray-700">Active</span>
-                  </label>
-                </div>
+              <td className="px-4 py-2">
+                <label className="flex items-center text-xs text-gray-300">
+                  <input
+                    type="checkbox"
+                    checked={newRecurrence.active}
+                    onChange={(e) => setNewRecurrence(prev => ({...prev, active: e.target.checked}))}
+                    className="h-3 w-3 rounded"
+                    style={{ accentColor: '#6226fa' }}
+                  />
+                  <span className="ml-1 text-gray-300">Active</span>
+                </label>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <div className="flex justify-center">
                   <button
                     type="button"
@@ -415,17 +412,27 @@ export default function Recurrences() {
                       e.preventDefault();
                       handleAddRecurrence(e);
                     }}
-                    className="px-2 py-1 text-xs border border-transparent rounded text-white bg-green-600 hover:bg-green-700"
-                    title="Sauvegarder"
+                    className="px-2 py-1 text-xs font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center gap-1"
+                    style={{ backgroundColor: '#6226fa', minWidth: '0' }}
+                    title="Ajouter"
                   >
-                    ✓
+                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 3.5v9m4.5-4.5h-9" />
+                    </svg>
+                    Ajouter
                   </button>
                 </div>
               </td>
             </tr>
             {recurrences.map((recurrence) => (
-              <tr key={recurrence.id} className={`hover:bg-gray-50 ${!recurrence.active ? 'opacity-50' : ''}`}>
-                <td className="px-6 py-4 whitespace-nowrap">
+              <tr
+                key={recurrence.id}
+                className={`border-l-4 transition-opacity ${!recurrence.active ? 'opacity-50' : ''}`}
+                style={{ backgroundColor: '#1f2226', borderLeftColor: recurrence.active ? '#6226fa' : '#616875' }}
+                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2d235a'}
+                onMouseLeave={e => e.currentTarget.style.backgroundColor = '#1f2226'}
+              >
+                <td className="px-6 py-4 whitespace-nowrap text-white">
                   {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'description' ? (
                     <input
                       type="text"
@@ -439,7 +446,7 @@ export default function Recurrences() {
                   ) : (
                     <div className="flex items-center">
                       <div 
-                        className="text-sm font-medium text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                        className="text-sm font-medium text-white cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
                         onDoubleClick={() => handleInlineEdit(recurrence.id, 'description')}
                         title="Double-cliquez pour éditer"
                       >
@@ -462,7 +469,7 @@ export default function Recurrences() {
                     />
                   ) : (
                     <div 
-                      className={`text-sm font-medium cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell ${recurrence.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                      className={`text-sm font-medium cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell ${recurrence.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}
                       onDoubleClick={() => handleInlineEdit(recurrence.id, 'amount')}
                       title="Double-cliquez pour éditer"
                     >
@@ -486,7 +493,7 @@ export default function Recurrences() {
                     </select>
                   ) : (
                     <div 
-                      className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      className="text-sm text-white cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
                       onDoubleClick={() => handleInlineEdit(recurrence.id, 'frequency')}
                       title="Double-cliquez pour éditer"
                     >
@@ -508,7 +515,7 @@ export default function Recurrences() {
                   ) : (
                     <div className="flex items-center space-x-2">
                       <div 
-                        className="text-sm text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                        className="text-sm text-white cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
                         onDoubleClick={() => handleInlineEdit(recurrence.id, 'nextDue')}
                         title="Double-cliquez pour éditer"
                       >
@@ -536,7 +543,7 @@ export default function Recurrences() {
                     </select>
                   ) : (
                     <span 
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell" 
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell text-white" 
                       style={{ backgroundColor: recurrence.category.color + '20', color: recurrence.category.color }}
                       onDoubleClick={() => handleInlineEdit(recurrence.id, 'category')}
                       title="Double-cliquez pour éditer"
@@ -565,7 +572,7 @@ export default function Recurrences() {
                     </select>
                   ) : (
                     <div 
-                      className="flex items-center text-sm text-gray-900 cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
+                      className="flex items-center text-sm text-white cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell"
                       onDoubleClick={() => handleInlineEdit(recurrence.id, 'bank')}
                       title="Double-cliquez pour éditer"
                     >
@@ -605,8 +612,8 @@ export default function Recurrences() {
                     </select>
                   ) : (
                     <span 
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell ${
-                        recurrence.active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell text-white ${
+                        recurrence.active ? 'bg-green-100' : 'bg-gray-100'
                       }`}
                       onDoubleClick={() => handleInlineEdit(recurrence.id, 'active')}
                       title="Double-cliquez pour éditer"
