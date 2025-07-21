@@ -1435,28 +1435,24 @@ export default function Transactions() {
                       style={{ accentColor: '#6226fa' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'checked' ? (
-                    <select
-                      value={inlineEditValue}
-                      onChange={(e) => setInlineEditValue(e.target.value)}
+                    <input
+                      type="checkbox"
+                      checked={inlineEditValue === true || inlineEditValue === 'true'}
+                      onChange={(e) => setInlineEditValue(e.target.checked ? 'true' : 'false')}
                       onBlur={handleInlineSave}
-                      onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      className="h-4 w-4 rounded"
+                      style={{ accentColor: '#6226fa' }}
                       autoFocus
-                    >
-                      <option value="true" style={{ backgroundColor: '#1f2226' }}>Oui</option>
-                      <option value="false" style={{ backgroundColor: '#1f2226' }}>Non</option>
-                    </select>
+                    />
                   ) : (
-                    <span 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'checked')}
-                      className={`cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        transaction.checked ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                      }`}
+                    <input
+                      type="checkbox"
+                      checked={transaction.checked}
+                      onChange={(e) => handleInlineEdit(transaction.id, 'checked', e.target.checked ? 'true' : 'false')}
+                      className="h-4 w-4 rounded cursor-pointer"
+                      style={{ accentColor: '#6226fa' }}
                       title="Double-cliquez pour éditer"
-                    >
-                      {transaction.checked ? 'Oui' : 'Non'}
-                    </span>
+                    />
                   )}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
