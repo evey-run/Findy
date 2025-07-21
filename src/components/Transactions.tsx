@@ -1708,7 +1708,7 @@ export default function Transactions() {
                         placeholder="ex: abonnement"
                         value={bulkEditFilters.searchText}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, searchText: e.target.value})}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       />
                     </div>
@@ -1717,7 +1717,7 @@ export default function Transactions() {
                       <select
                         value={bulkEditFilters.categoryId}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, categoryId: e.target.value})}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Toutes les catégories</option>
@@ -1732,7 +1732,7 @@ export default function Transactions() {
                       <select
                         value={bulkEditFilters.bankId}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, bankId: e.target.value})}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Toutes les banques</option>
@@ -1747,7 +1747,7 @@ export default function Transactions() {
                         type="date"
                         value={bulkEditFilters.startDate}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, startDate: e.target.value})}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       />
                     </div>
@@ -1757,7 +1757,7 @@ export default function Transactions() {
                         type="date"
                         value={bulkEditFilters.endDate}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, endDate: e.target.value})}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       />
                     </div>
@@ -1766,7 +1766,7 @@ export default function Transactions() {
                       <select
                         value={bulkEditFilters.checked}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, checked: e.target.value})}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Tous</option>
@@ -1791,7 +1791,7 @@ export default function Transactions() {
                   </h4>
 
                   {/* Remplacement de texte */}
-                  <div className="border rounded-md p-4">
+                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -1897,7 +1897,7 @@ export default function Transactions() {
                   </div>
 
                   {/* Changement de catégorie */}
-                  <div className="border rounded-md p-4">
+                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -1920,7 +1920,7 @@ export default function Transactions() {
                           ...bulkEditActions,
                           changeCategory: { ...bulkEditActions.changeCategory, categoryId: e.target.value }
                         })}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Non défini</option>
@@ -1932,7 +1932,7 @@ export default function Transactions() {
                   </div>
 
                   {/* Changement de statut pointé */}
-                  <div className="border rounded-md p-4">
+                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -1955,7 +1955,7 @@ export default function Transactions() {
                           ...bulkEditActions,
                           changeChecked: { ...bulkEditActions.changeChecked, checked: e.target.value === 'true' }
                         })}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="true">Pointé</option>
@@ -1965,7 +1965,7 @@ export default function Transactions() {
                   </div>
 
                   {/* Changement de banque */}
-                  <div className="border rounded-md p-4">
+                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -1988,7 +1988,7 @@ export default function Transactions() {
                           ...bulkEditActions,
                           changeBank: { ...bulkEditActions.changeBank, bankId: e.target.value }
                         })}
-                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Sélectionner une banque</option>
