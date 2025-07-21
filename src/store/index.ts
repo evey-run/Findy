@@ -38,6 +38,8 @@ interface AppState {
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
   loadTransactions: () => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  appendTransactions: (newTransactions: Transaction[]) => void;
   
   // Budgets
   budgets: Budget[];
@@ -194,6 +196,8 @@ export const useAppStore = create<AppState>()(
           const state = get();
           const params = new URLSearchParams({
             accountType: 'CURRENT', // Toujours filtrer par comptes courants
+            page: '1',
+            limit: '50'
           });
           
           // Ajouter les filtres de dates seulement s'ils sont définis et non vides
@@ -209,13 +213,58 @@ export const useAppStore = create<AppState>()(
           }
           
           const response = await fetch(`/api/transactions?${params}`);
-          const transactions = await response.json();
+          const data = await response.json();
           
-          set({ transactions });
+          // Gérer la nouvelle structure de réponse avec pagination
+          if (data.transactions) {
+            set({ transactions: data.transactions });
+          } else {
+            // Rétrocompatibilité avec l'ancienne API
+            set({ transactions: data });
+          }
         } catch (error) {
           console.error('Failed to load transactions:', error);
         }
       },
+      
+      loadMoreTransactions: async (page: number, itemsPerPage: number) => {
+        try {
+          const state = get();
+          const params = new URLSearchParams({
+            accountType: 'CURRENT',
+            page: page.toString(),
+            limit: itemsPerPage.toString()
+          });
+          
+          // Ajouter les filtres de dates
+          if (state.dateRange.startDate && state.dateRange.startDate !== '') {
+            params.append('startDate', state.dateRange.startDate);
+          }
+          if (state.dateRange.endDate && state.dateRange.endDate !== '') {
+            params.append('endDate', state.dateRange.endDate);
+          }
+          
+          if (state.selectedBank) {
+            params.append('bankId', state.selectedBank.id);
+          }
+          
+          const response = await fetch(`/api/transactions?${params}`);
+          const data = await response.json();
+          
+          return {
+            hasMore: data.hasMore,
+            newTransactions: data.transactions
+          };
+        } catch (error) {
+          console.error('Failed to load more transactions:', error);
+          return { hasMore: false, newTransactions: [] };
+        }
+      },
+      
+      appendTransactions: (newTransactions: Transaction[]) =>
+        set((state) => ({
+          transactions: [...state.transactions, ...newTransactions]
+        })),
       
       // Budgets
       budgets: [],

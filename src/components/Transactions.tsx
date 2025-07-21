@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
+import Papa from 'papaparse';
 
 // CSS pour les cellules éditables
 const editableCellStyle = `
@@ -41,12 +42,34 @@ export default function Transactions() {
     setSelectedBank,
     updateTransaction,
     removeTransaction,
-    users,
-    selectedUser
+    addTransaction,
+    loadMoreTransactions,
+    appendTransactions
   } = useAppStore();
   
+  // États pour l'import CSV
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importProgress, setImportProgress] = useState<{
+    isImporting: boolean;
+    imported: number;
+    total: number;
+    errors: string[];
+  }>({
+    isImporting: false,
+    imported: 0,
+    total: 0,
+    errors: []
+  });
+
+  // États pour le scroll infini
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const ITEMS_PER_PAGE = 50;
+
   // Vérifie si tous les utilisateurs sont sélectionnés (selectedUser est null)
-  const allUsersSelected = selectedUser === null;
+  // const allUsersSelected = selectedUser === null;
   
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -60,7 +83,31 @@ export default function Transactions() {
     categoryId: '',
     checked: '',
     startDate: '',
+    endDate: '',
+    searchText: ''
+  });
+
+  // États pour la modification en lot
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [bulkEditFilters, setBulkEditFilters] = useState({
+    searchText: '',
+    categoryId: '',
+    bankId: '',
+    checked: '',
+    startDate: '',
     endDate: ''
+  });
+  const [bulkEditActions, setBulkEditActions] = useState({
+    replaceText: { enabled: false, from: '', to: '', replaceAll: false },
+    changeCategory: { enabled: false, categoryId: '' },
+    changeChecked: { enabled: false, checked: false },
+    changeBank: { enabled: false, bankId: '' }
+  });
+  const [bulkEditProgress, setBulkEditProgress] = useState({
+    isProcessing: false,
+    processed: 0,
+    total: 0,
+    errors: [] as string[]
   });
 
   useEffect(() => {
@@ -91,11 +138,6 @@ export default function Transactions() {
     
     initializeData();
   }, []);
-
-  // Recharger les transactions quand la banque sélectionnée change
-  useEffect(() => {
-    loadTransactions();
-  }, [selectedBank?.id]);
   
   // Log transactions changes
   useEffect(() => {
@@ -266,7 +308,12 @@ export default function Transactions() {
       });
 
       if (response.ok) {
-        await loadTransactions(); // Recharger les transactions
+        const newTransaction = await response.json();
+        
+        // Ajouter la transaction directement au store
+        addTransaction(newTransaction);
+        
+        // Reset du formulaire
         setEditingTransaction({
           id: '',
           amount: 0,
@@ -276,6 +323,8 @@ export default function Transactions() {
           categoryId: categories[0]?.id || '',
           bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
         });
+      } else {
+        console.error('Error creating transaction:', await response.text());
       }
     } catch (error) {
       console.error('Error creating transaction:', error);
@@ -315,6 +364,11 @@ export default function Transactions() {
       return false;
     }
     
+    // Filtre par recherche de texte
+    if (filters.searchText && !transaction.description.toLowerCase().includes(filters.searchText.toLowerCase())) {
+      return false;
+    }
+    
     return true;
   });
   
@@ -328,6 +382,474 @@ export default function Transactions() {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR');
   };
+
+  // Fonction pour afficher les avatars des utilisateurs
+  const renderUserAvatars = (users: any[]) => {
+    if (!users || users.length === 0) return <span className="text-gray-400">-</span>;
+    
+    return (
+      <div className="flex -space-x-2">
+        {users.map((user, index) => (
+          <div key={user.id || index} className="relative group">
+            {user.avatar ? (
+              <img
+                src={user.avatar}
+                alt={user.name}
+                className="inline-block h-8 w-8 rounded-full ring-2 ring-white hover:ring-blue-300 transition-all object-cover"
+                title={user.name}
+              />
+            ) : (
+              <div
+                className="inline-block h-8 w-8 rounded-full bg-gray-400 ring-2 ring-white hover:ring-blue-300 transition-all flex items-center justify-center text-white text-sm font-medium"
+                title={user.name}
+              >
+                {user.name?.charAt(0)?.toUpperCase() || '?'}
+              </div>
+            )}
+            {/* Tooltip */}
+            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+              {user.name}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Fonction pour obtenir les transactions concernées par la modification en lot
+  const getBulkEditTargetTransactions = () => {
+    return transactions.filter(transaction => {
+      // Filtre par recherche de texte
+      if (bulkEditFilters.searchText && !transaction.description.toLowerCase().includes(bulkEditFilters.searchText.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtre par catégorie
+      if (bulkEditFilters.categoryId) {
+        if (bulkEditFilters.categoryId === 'undefined') {
+          if (transaction.categoryId) return false;
+        } else {
+          if (transaction.categoryId !== bulkEditFilters.categoryId) return false;
+        }
+      }
+      
+      // Filtre par banque
+      if (bulkEditFilters.bankId && transaction.bankId !== bulkEditFilters.bankId) {
+        return false;
+      }
+      
+      // Filtre par statut pointé
+      if (bulkEditFilters.checked !== '' && transaction.checked.toString() !== bulkEditFilters.checked) {
+        return false;
+      }
+      
+      // Filtre par date de début
+      if (bulkEditFilters.startDate && transaction.date < bulkEditFilters.startDate) {
+        return false;
+      }
+      
+      // Filtre par date de fin
+      if (bulkEditFilters.endDate && transaction.date > bulkEditFilters.endDate) {
+        return false;
+      }
+      
+      return true;
+    });
+  };
+
+  // Fonction pour appliquer les modifications en lot
+  const handleBulkEdit = async () => {
+    const targetTransactions = getBulkEditTargetTransactions();
+    
+    if (targetTransactions.length === 0) {
+      alert('Aucune transaction ne correspond aux critères de sélection.');
+      return;
+    }
+
+    // Vérifier qu'au moins une action est activée
+    const hasActions = bulkEditActions.replaceText.enabled || 
+                      bulkEditActions.changeCategory.enabled || 
+                      bulkEditActions.changeChecked.enabled || 
+                      bulkEditActions.changeBank.enabled;
+    
+    if (!hasActions) {
+      alert('Veuillez sélectionner au moins une action à effectuer.');
+      return;
+    }
+
+    if (!confirm(`Voulez-vous vraiment modifier ${targetTransactions.length} transaction(s) ?`)) {
+      return;
+    }
+
+    setBulkEditProgress({
+      isProcessing: true,
+      processed: 0,
+      total: targetTransactions.length,
+      errors: []
+    });
+
+    const errors: string[] = [];
+
+    for (let i = 0; i < targetTransactions.length; i++) {
+      const transaction = targetTransactions[i];
+      
+      try {
+        let updateData: any = {};
+        
+        // Remplacement de texte dans la description
+        if (bulkEditActions.replaceText.enabled) {
+          if (bulkEditActions.replaceText.replaceAll) {
+            // Remplacer toute la description
+            if (bulkEditActions.replaceText.to) {
+              updateData.description = bulkEditActions.replaceText.to;
+            }
+          } else {
+            // Remplacement partiel (mode existant)
+            if (bulkEditActions.replaceText.from) {
+              const newDescription = transaction.description.replace(
+                new RegExp(bulkEditActions.replaceText.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
+                bulkEditActions.replaceText.to
+              );
+              if (newDescription !== transaction.description) {
+                updateData.description = newDescription;
+              }
+            }
+          }
+        }
+        
+        // Changement de catégorie
+        if (bulkEditActions.changeCategory.enabled) {
+          updateData.categoryId = bulkEditActions.changeCategory.categoryId || null;
+        }
+        
+        // Changement du statut pointé
+        if (bulkEditActions.changeChecked.enabled) {
+          updateData.checked = bulkEditActions.changeChecked.checked;
+        }
+        
+        // Changement de banque
+        if (bulkEditActions.changeBank.enabled && bulkEditActions.changeBank.bankId) {
+          updateData.bankId = bulkEditActions.changeBank.bankId;
+        }
+        
+        // Appliquer les modifications si il y en a
+        if (Object.keys(updateData).length > 0) {
+          const response = await fetch(`/api/transactions/${transaction.id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(updateData),
+          });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            errors.push(`Transaction ${i + 1}: ${errorData.error || 'Erreur lors de la modification'}`);
+          } else {
+            const updatedTransaction = await response.json();
+            updateTransaction(transaction.id, updatedTransaction);
+          }
+        }
+        
+      } catch (error) {
+        errors.push(`Transaction ${i + 1}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      }
+      
+      // Mettre à jour le progrès
+      setBulkEditProgress(prev => ({ ...prev, processed: i + 1, errors }));
+    }
+    
+    // Finaliser
+    setBulkEditProgress(prev => ({ ...prev, isProcessing: false }));
+    
+    if (errors.length === 0) {
+      alert(`✅ Modification en lot terminée!\n${targetTransactions.length} transaction(s) modifiée(s).`);
+      setShowBulkEditModal(false);
+      // Réinitialiser les filtres et actions
+      setBulkEditFilters({
+        searchText: '',
+        categoryId: '',
+        bankId: '',
+        checked: '',
+        startDate: '',
+        endDate: ''
+      });
+      setBulkEditActions({
+        replaceText: { enabled: false, from: '', to: '', replaceAll: false },
+        changeCategory: { enabled: false, categoryId: '' },
+        changeChecked: { enabled: false, checked: false },
+        changeBank: { enabled: false, bankId: '' }
+      });
+    } else {
+      alert(`⚠️ Modification terminée avec ${errors.length} erreur(s).\nConsultez les détails dans la modal.`);
+    }
+  };
+
+  const handleImportCSV = async () => {
+    if (!csvFile || !selectedBank) {
+      alert('Veuillez sélectionner un fichier CSV et une banque');
+      return;
+    }
+
+    setImportProgress({
+      isImporting: true,
+      imported: 0,
+      total: 0,
+      errors: []
+    });
+
+    try {
+      // Parser le CSV
+      Papa.parse(csvFile, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          console.log('📄 CSV parsed:', results);
+          
+          const { data, errors } = results;
+          let importErrors: string[] = [];
+          
+          if (errors.length > 0) {
+            importErrors = errors.map(err => `Ligne ${err.row}: ${err.message}`);
+          }
+          
+          // Afficher les colonnes détectées pour debugging
+          if (data.length > 0) {
+            const firstRow = data[0] as any;
+            console.log('🔍 Colonnes détectées:', Object.keys(firstRow));
+            console.log('🔍 Premier échantillon de données:', firstRow);
+          }
+          
+          setImportProgress(prev => ({ ...prev, total: data.length }));
+          
+          // Traiter chaque ligne
+          for (let i = 0; i < data.length; i++) {
+            const row = data[i] as any;
+            
+            try {
+              // Normaliser les noms de colonnes (enlever espaces, accents, casse)
+              const normalizedRow: any = {};
+              Object.keys(row).forEach(key => {
+                const normalizedKey = key.toLowerCase()
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '')
+                  .replace(/\s+/g, '');
+                normalizedRow[normalizedKey] = row[key];
+              });
+              
+              // Détecter les colonnes de date, description et montant
+              let dateValue, descriptionValue, amountValue;
+              
+              // Essayer différents noms de colonnes couramment utilisés par les banques françaises
+              const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop'];
+              const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label'];
+              const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur'];
+              
+              // Chercher la colonne de date
+              for (const key of dateKeys) {
+                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                  dateValue = normalizedRow[key];
+                  break;
+                }
+              }
+              
+              // Chercher la colonne de description
+              for (const key of descriptionKeys) {
+                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                  descriptionValue = normalizedRow[key];
+                  break;
+                }
+              }
+              
+              // Chercher la colonne de montant
+              for (const key of amountKeys) {
+                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                  amountValue = normalizedRow[key];
+                  break;
+                }
+              }
+              
+              // Si on n'a pas trouvé de montant, essayer de combiner débit et crédit
+              if (amountValue === undefined) {
+                const debitValue = normalizedRow['debit'] || normalizedRow['debits'];
+                const creditValue = normalizedRow['credit'] || normalizedRow['credits'];
+                
+                if (debitValue !== undefined && debitValue !== '') {
+                  amountValue = `-${Math.abs(parseFloat(String(debitValue).replace(/[^0-9.,-]/g, '').replace(',', '.')))}`; 
+                } else if (creditValue !== undefined && creditValue !== '') {
+                  amountValue = Math.abs(parseFloat(String(creditValue).replace(/[^0-9.,-]/g, '').replace(',', '.')));
+                }
+              }
+              
+              console.log(`🔍 Ligne ${i + 1} - Date: "${dateValue}", Description: "${descriptionValue}", Montant: "${amountValue}"`);
+              
+              if (!dateValue || !descriptionValue || amountValue === undefined) {
+                const missingFields = [];
+                if (!dateValue) missingFields.push('date');
+                if (!descriptionValue) missingFields.push('description');
+                if (amountValue === undefined) missingFields.push('montant');
+                
+                importErrors.push(`Ligne ${i + 2}: Données manquantes (${missingFields.join(', ')}) - Colonnes disponibles: ${Object.keys(normalizedRow).join(', ')}`);
+                continue;
+              }
+              
+              // Parser la date
+              let parsedDate: Date;
+              const dateStr = String(dateValue).trim();
+              
+              // Essayer différents formats de date
+              if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // Format YYYY-MM-DD
+                parsedDate = new Date(dateStr);
+              } else if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                // Format DD/MM/YYYY
+                const [day, month, year] = dateStr.split('/');
+                parsedDate = new Date(`${year}-${month}-${day}`);
+              } else if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                // Format DD-MM-YYYY
+                const [day, month, year] = dateStr.split('-');
+                parsedDate = new Date(`${year}-${month}-${day}`);
+              } else {
+                importErrors.push(`Ligne ${i + 2}: Format de date non reconnu (${dateStr})`);
+                continue;
+              }
+              
+              if (isNaN(parsedDate.getTime())) {
+                importErrors.push(`Ligne ${i + 2}: Date invalide (${dateStr})`);
+                continue;
+              }
+              
+              // Parser le montant
+              let amount: number;
+              const amountStr = String(amountValue).trim().replace(/\s/g, '');
+              
+              // Gérer les différents formats de montant
+              if (amountStr.includes(',') && !amountStr.includes('.')) {
+                // Format français: 1 234,56
+                amount = parseFloat(amountStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+              } else {
+                // Format anglais: 1,234.56 ou simple: 1234.56
+                amount = parseFloat(amountStr.replace(/[^0-9.-]/g, ''));
+              }
+              
+              if (isNaN(amount)) {
+                importErrors.push(`Ligne ${i + 2}: Montant invalide (${amountStr})`);
+                continue;
+              }
+              
+              // Créer la transaction
+              const transactionData = {
+                amount,
+                description: String(descriptionValue).trim(),
+                date: parsedDate.toISOString(),
+                createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
+                bankId: selectedBank.id,
+                categoryId: null,
+                checked: false
+              };
+              
+              console.log(`📝 Creating transaction ${i + 1}:`, transactionData);
+              
+              // Appel API pour créer la transaction
+              const response = await fetch('/api/transactions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(transactionData),
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                importErrors.push(`Ligne ${i + 2}: ${errorData.error || 'Erreur lors de la création'}`);
+              }
+              
+            } catch (error) {
+              console.error(`Error processing row ${i + 1}:`, error);
+              importErrors.push(`Ligne ${i + 2}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+            }
+            
+            // Mettre à jour le progrès
+            setImportProgress(prev => ({ ...prev, imported: i + 1, errors: importErrors }));
+          }
+          
+          // Recharger les transactions
+          await loadTransactions();
+          
+          // Finaliser l'import
+          setImportProgress(prev => ({ 
+            ...prev, 
+            isImporting: false,
+            errors: importErrors 
+          }));
+          
+          if (importErrors.length === 0) {
+            alert(`✅ Import terminé avec succès!\n${data.length} transaction(s) importée(s).`);
+            setShowImportModal(false);
+            setCsvFile(null);
+          } else {
+            alert(`⚠️ Import terminé avec ${importErrors.length} erreur(s).\nConsultez les détails dans la modal.`);
+          }
+        },
+        error: (error) => {
+          console.error('CSV parsing error:', error);
+          setImportProgress(prev => ({ 
+            ...prev, 
+            isImporting: false, 
+            errors: [`Erreur de parsing CSV: ${error.message}`] 
+          }));
+        }
+      });
+      
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportProgress({
+        isImporting: false,
+        imported: 0,
+        total: 0,
+        errors: [`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`]
+      });
+    }
+  };
+
+  // Fonction pour charger plus de transactions
+  const loadMoreData = async () => {
+    if (loadingMore || !hasMore) return;
+    
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE);
+      
+      if (result.newTransactions.length > 0) {
+        appendTransactions(result.newTransactions);
+        setPage(nextPage);
+      }
+      
+      setHasMore(result.hasMore);
+    } catch (error) {
+      console.error('Error loading more transactions:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Fonction de détection du scroll
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    
+    // Si on est proche du bas (100px), charger plus de données
+    if (scrollHeight - scrollTop <= clientHeight + 100) {
+      loadMoreData();
+    }
+  };
+
+  // Réinitialiser la pagination quand les filtres changent
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    loadTransactions(); // Recharger les transactions depuis le début
+  }, [filters, selectedBank]); // Retirer loadTransactions des dépendances
 
   if (loading) {
     return (
@@ -346,11 +868,31 @@ export default function Transactions() {
             Transactions
           </h2>
         </div>
+        <div className="mt-4 flex gap-3 md:mt-0 md:ml-4">
+          <button
+            onClick={() => setShowBulkEditModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Modification en lot
+          </button>
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            Importer CSV
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700">Banque</label>
             <select
@@ -364,16 +906,26 @@ export default function Transactions() {
               <option value="">Toutes les banques</option>
               {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
                 // Récupérer les utilisateurs associés à cette banque
-                const bankUsers = bank.userBanks?.map(ub => ub.user?.name).filter(Boolean) || [];
+                const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                 const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                 
                 return (
                   <option key={bank.id} value={bank.id}>
-                    {bank.name}{allUsersSelected && bankUsersText}
+                    {bank.name}{bankUsersText}
                   </option>
                 );
               })}
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700">Recherche</label>
+            <input
+              type="text"
+              placeholder="Rechercher..."
+              value={filters.searchText}
+              onChange={(e) => setFilters({...filters, searchText: e.target.value})}
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700">Catégorie</label>
@@ -396,6 +948,7 @@ export default function Transactions() {
               value={filters.startDate}
               onChange={(e) => setFilters({...filters, startDate: e.target.value})}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              data-date-format="dd/mm/yyyy"
             />
           </div>
           <div>
@@ -405,6 +958,7 @@ export default function Transactions() {
               value={filters.endDate}
               onChange={(e) => setFilters({...filters, endDate: e.target.value})}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              data-date-format="dd/mm/yyyy"
             />
           </div>
           <div>
@@ -424,28 +978,36 @@ export default function Transactions() {
 
       {/* Transactions Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200 table-fixed">
-          <thead className="bg-gray-50">
+        <div 
+          className="overflow-y-auto"
+          style={{ maxHeight: '70vh' }}
+          onScroll={handleScroll}
+        >
+          <table className="w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                 Date
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-1/4">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-80">
                 Description
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                 Catégorie
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                 Banque
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                Propriétaires
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-28">
                 Montant
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                 Pointé
               </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
+              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
                 Actions
               </th>
             </tr>
@@ -492,10 +1054,29 @@ export default function Transactions() {
                   required
                 >
                   <option value="">Sélectionnez une banque</option>
-                  {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
-                    <option key={bank.id} value={bank.id}>{bank.name}</option>
-                  ))}
+                  {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
+                    const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
+                    const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+                    
+                    return (
+                      <option key={bank.id} value={bank.id}>
+                        {bank.name}{bankUsersText}
+                      </option>
+                    );
+                  })}
                 </select>
+              </td>
+              <td className="px-6 py-4">
+                <span className="text-sm text-gray-500">
+                  {editingTransaction?.bankId ? 
+                    (() => {
+                      const selectedBankObj = banks.find(b => b.id === editingTransaction.bankId);
+                      const users = selectedBankObj?.users?.map(u => u.name).filter(Boolean) || [];
+                      return users.length > 0 ? users.join(', ') : '-';
+                    })()
+                    : '-'
+                  }
+                </span>
               </td>
               <td className="px-6 py-4">
                 <input
@@ -676,19 +1257,12 @@ export default function Transactions() {
                       )}
                       <div className="ml-2">
                         <div className="font-medium">{transaction.bank.name}</div>
-                        {(() => {
-                          const bankWithUsers = transaction.bank as Bank & { userBanks?: Array<{ user?: { name: string } }> };
-                          const userNames = bankWithUsers.userBanks?.map(ub => ub.user?.name).filter(Boolean).join(', ');
-                          
-                          return userNames ? (
-                            <div className="text-xs text-gray-500">
-                              {userNames}
-                            </div>
-                          ) : null;
-                        })()}
                       </div>
                     </div>
                   )}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {renderUserAvatars(transaction.bank.users || [])}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {editingId === transaction.id ? (
@@ -789,6 +1363,15 @@ export default function Transactions() {
             ))}
           </tbody>
         </table>
+        </div>
+        
+        {/* Indicateur de chargement pour le scroll infini */}
+        {loadingMore && (
+          <div className="flex justify-center py-4">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-sm text-gray-600">Chargement...</span>
+          </div>
+        )}
         
         {filteredTransactions.length === 0 && (
           <div className="text-center py-12">
@@ -800,6 +1383,539 @@ export default function Transactions() {
           </div>
         )}
       </div>
+
+      {/* Modal d'import CSV */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              {/* En-tête */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Importer des transactions depuis un fichier CSV
+                </h3>
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Sélection de la banque */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Banque de destination *
+                </label>
+                <select
+                  value={selectedBank?.id || ''}
+                  onChange={(e) => {
+                    const bank = banks.find(b => b.id === e.target.value);
+                    setSelectedBank(bank || null);
+                  }}
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Sélectionnez une banque...</option>
+                  {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
+                    const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
+                    const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+                    
+                    return (
+                      <option key={bank.id} value={bank.id}>
+                        {bank.name}{bankUsersText}
+                      </option>
+                    );
+                  })}
+                </select>
+                {!selectedBank && (
+                  <p className="mt-1 text-sm text-red-600">
+                    Veuillez sélectionner une banque avant d'importer
+                  </p>
+                )}
+              </div>
+
+              {/* Zone de drop de fichier */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Fichier CSV *
+                </label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
+                  <div className="space-y-1 text-center">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <div className="flex text-sm text-gray-600">
+                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                        <span>Choisir un fichier</span>
+                        <input
+                          id="csv-upload"
+                          name="csv-upload"
+                          type="file"
+                          accept=".csv"
+                          className="sr-only"
+                          onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                        />
+                      </label>
+                      <p className="pl-1">ou glisser-déposer</p>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      CSV uniquement (max 10MB)
+                    </p>
+                  </div>
+                </div>
+                {csvFile && (
+                  <div className="mt-2 text-sm text-green-600">
+                    ✓ Fichier sélectionné: {csvFile.name}
+                  </div>
+                )}
+              </div>
+
+              {/* Format attendu */}
+              <div className="mb-6 p-4 bg-blue-50 rounded-md">
+                <h4 className="text-sm font-medium text-blue-900 mb-2">Format CSV attendu:</h4>
+                <div className="text-xs text-blue-800 font-mono bg-white p-2 rounded border">
+                  Date,Description,Montant<br/>
+                  2025-01-15,"Achat supermarché",-45.67<br/>
+                  2025-01-16,"Virement salaire",2500.00
+                </div>
+                <p className="text-xs text-blue-700 mt-2">
+                  • Date au format YYYY-MM-DD, DD/MM/YYYY ou DD-MM-YYYY<br/>
+                  • Montant: nombres décimaux (négatif = débit, positif = crédit)
+                </p>
+              </div>
+
+              {/* Boutons d'action */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleImportCSV}
+                  disabled={!csvFile || !selectedBank || importProgress.isImporting}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {importProgress.isImporting ? 'Import en cours...' : 'Importer'}
+                </button>
+              </div>
+
+              {/* Barre de progression */}
+              {importProgress.isImporting && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Import en cours...</span>
+                    <span>{importProgress.imported}/{importProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${importProgress.total > 0 ? (importProgress.imported / importProgress.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Erreurs */}
+              {importProgress.errors.length > 0 && (
+                <div className="mt-4 p-4 bg-red-50 rounded-md">
+                  <h4 className="text-sm font-medium text-red-900 mb-2">Erreurs rencontrées:</h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    {importProgress.errors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de modification en lot */}
+      {showBulkEditModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-5 border w-11/12 md:w-4/5 lg:w-3/4 xl:w-2/3 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              {/* En-tête */}
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Modification en lot des transactions
+                </h3>
+                <button
+                  onClick={() => setShowBulkEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Section 1: Critères de sélection */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900 border-b pb-2">
+                    1. Quelles transactions modifier ?
+                  </h4>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contient le texte
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="ex: abonnement"
+                      value={bulkEditFilters.searchText}
+                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, searchText: e.target.value})}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Catégorie
+                    </label>
+                    <select
+                      value={bulkEditFilters.categoryId}
+                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, categoryId: e.target.value})}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    >
+                      <option value="">Toutes les catégories</option>
+                      <option value="undefined">Non défini</option>
+                      {categories.map(category => (
+                        <option key={category.id} value={category.id}>{category.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Banque
+                    </label>
+                    <select
+                      value={bulkEditFilters.bankId}
+                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, bankId: e.target.value})}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    >
+                      <option value="">Toutes les banques</option>
+                      {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
+                        <option key={bank.id} value={bank.id}>{bank.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Date début
+                      </label>
+                      <input
+                        type="date"
+                        value={bulkEditFilters.startDate}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, startDate: e.target.value})}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Date fin
+                      </label>
+                      <input
+                        type="date"
+                        value={bulkEditFilters.endDate}
+                        onChange={(e) => setBulkEditFilters({...bulkEditFilters, endDate: e.target.value})}
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Statut pointé
+                    </label>
+                    <select
+                      value={bulkEditFilters.checked}
+                      onChange={(e) => setBulkEditFilters({...bulkEditFilters, checked: e.target.value})}
+                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                    >
+                      <option value="">Tous</option>
+                      <option value="true">Pointé</option>
+                      <option value="false">Non pointé</option>
+                    </select>
+                  </div>
+
+                  {/* Aperçu des transactions concernées */}
+                  <div className="mt-4 p-3 bg-blue-50 rounded-md">
+                    <p className="text-sm font-medium text-blue-900">
+                      Aperçu: {getBulkEditTargetTransactions().length} transaction(s) seront modifiées
+                    </p>
+                  </div>
+                </div>
+
+                {/* Section 2: Actions à effectuer */}
+                <div className="space-y-4">
+                  <h4 className="text-md font-medium text-gray-900 border-b pb-2">
+                    2. Quelles modifications appliquer ?
+                  </h4>
+
+                  {/* Remplacement de texte */}
+                  <div className="border rounded-md p-4">
+                    <div className="flex items-center mb-3">
+                      <input
+                        type="checkbox"
+                        id="replaceText"
+                        checked={bulkEditActions.replaceText.enabled}
+                        onChange={(e) => setBulkEditActions({
+                          ...bulkEditActions,
+                          replaceText: { ...bulkEditActions.replaceText, enabled: e.target.checked }
+                        })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="replaceText" className="ml-2 text-sm font-medium text-gray-700">
+                        Modifier la description
+                      </label>
+                    </div>
+                    {bulkEditActions.replaceText.enabled && (
+                      <div className="space-y-3">
+                        {/* Mode de remplacement */}
+                        <div className="flex items-center space-x-4">
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="replaceMode"
+                              checked={!bulkEditActions.replaceText.replaceAll}
+                              onChange={() => setBulkEditActions({
+                                ...bulkEditActions,
+                                replaceText: { ...bulkEditActions.replaceText, replaceAll: false }
+                              })}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Remplacement partiel</span>
+                          </label>
+                          <label className="flex items-center">
+                            <input
+                              type="radio"
+                              name="replaceMode"
+                              checked={bulkEditActions.replaceText.replaceAll}
+                              onChange={() => setBulkEditActions({
+                                ...bulkEditActions,
+                                replaceText: { ...bulkEditActions.replaceText, replaceAll: true }
+                              })}
+                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">Remplacer toute la description</span>
+                          </label>
+                        </div>
+
+                        {/* Champs de saisie */}
+                        {!bulkEditActions.replaceText.replaceAll ? (
+                          // Mode remplacement partiel
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Remplacer</label>
+                              <input
+                                type="text"
+                                placeholder="abonnement"
+                                value={bulkEditActions.replaceText.from}
+                                onChange={(e) => setBulkEditActions({
+                                  ...bulkEditActions,
+                                  replaceText: { ...bulkEditActions.replaceText, from: e.target.value }
+                                })}
+                                className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Par</label>
+                              <input
+                                type="text"
+                                placeholder="Abonnement Netflix"
+                                value={bulkEditActions.replaceText.to}
+                                onChange={(e) => setBulkEditActions({
+                                  ...bulkEditActions,
+                                  replaceText: { ...bulkEditActions.replaceText, to: e.target.value }
+                                })}
+                                className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          // Mode remplacement total
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Nouvelle description</label>
+                            <input
+                              type="text"
+                              placeholder="Abonnement Netflix"
+                              value={bulkEditActions.replaceText.to}
+                              onChange={(e) => setBulkEditActions({
+                                ...bulkEditActions,
+                                replaceText: { ...bulkEditActions.replaceText, to: e.target.value }
+                              })}
+                              className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              Toutes les descriptions des transactions sélectionnées seront remplacées par ce texte
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Changement de catégorie */}
+                  <div className="border rounded-md p-4">
+                    <div className="flex items-center mb-3">
+                      <input
+                        type="checkbox"
+                        id="changeCategory"
+                        checked={bulkEditActions.changeCategory.enabled}
+                        onChange={(e) => setBulkEditActions({
+                          ...bulkEditActions,
+                          changeCategory: { ...bulkEditActions.changeCategory, enabled: e.target.checked }
+                        })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="changeCategory" className="ml-2 text-sm font-medium text-gray-700">
+                        Changer la catégorie
+                      </label>
+                    </div>
+                    {bulkEditActions.changeCategory.enabled && (
+                      <select
+                        value={bulkEditActions.changeCategory.categoryId}
+                        onChange={(e) => setBulkEditActions({
+                          ...bulkEditActions,
+                          changeCategory: { ...bulkEditActions.changeCategory, categoryId: e.target.value }
+                        })}
+                        className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      >
+                        <option value="">Non défini</option>
+                        {categories.map(category => (
+                          <option key={category.id} value={category.id}>{category.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Changement de statut pointé */}
+                  <div className="border rounded-md p-4">
+                    <div className="flex items-center mb-3">
+                      <input
+                        type="checkbox"
+                        id="changeChecked"
+                        checked={bulkEditActions.changeChecked.enabled}
+                        onChange={(e) => setBulkEditActions({
+                          ...bulkEditActions,
+                          changeChecked: { ...bulkEditActions.changeChecked, enabled: e.target.checked }
+                        })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="changeChecked" className="ml-2 text-sm font-medium text-gray-700">
+                        Modifier le statut pointé
+                      </label>
+                    </div>
+                    {bulkEditActions.changeChecked.enabled && (
+                      <select
+                        value={bulkEditActions.changeChecked.checked.toString()}
+                        onChange={(e) => setBulkEditActions({
+                          ...bulkEditActions,
+                          changeChecked: { ...bulkEditActions.changeChecked, checked: e.target.value === 'true' }
+                        })}
+                        className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      >
+                        <option value="true">Pointé</option>
+                        <option value="false">Non pointé</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {/* Changement de banque */}
+                  <div className="border rounded-md p-4">
+                    <div className="flex items-center mb-3">
+                      <input
+                        type="checkbox"
+                        id="changeBank"
+                        checked={bulkEditActions.changeBank.enabled}
+                        onChange={(e) => setBulkEditActions({
+                          ...bulkEditActions,
+                          changeBank: { ...bulkEditActions.changeBank, enabled: e.target.checked }
+                        })}
+                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="changeBank" className="ml-2 text-sm font-medium text-gray-700">
+                        Changer de banque
+                      </label>
+                    </div>
+                    {bulkEditActions.changeBank.enabled && (
+                      <select
+                        value={bulkEditActions.changeBank.bankId}
+                        onChange={(e) => setBulkEditActions({
+                          ...bulkEditActions,
+                          changeBank: { ...bulkEditActions.changeBank, bankId: e.target.value }
+                        })}
+                        className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                      >
+                        <option value="">Sélectionner une banque</option>
+                        {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
+                          <option key={bank.id} value={bank.id}>{bank.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Boutons d'action */}
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                <button
+                  onClick={() => setShowBulkEditModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleBulkEdit}
+                  disabled={bulkEditProgress.isProcessing}
+                  className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {bulkEditProgress.isProcessing ? 'Modification en cours...' : 'Appliquer les modifications'}
+                </button>
+              </div>
+
+              {/* Barre de progression */}
+              {bulkEditProgress.isProcessing && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Modification en cours...</span>
+                    <span>{bulkEditProgress.processed}/{bulkEditProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${bulkEditProgress.total > 0 ? (bulkEditProgress.processed / bulkEditProgress.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Erreurs */}
+              {bulkEditProgress.errors.length > 0 && (
+                <div className="mt-4 p-4 bg-red-50 rounded-md">
+                  <h4 className="text-sm font-medium text-red-900 mb-2">Erreurs rencontrées:</h4>
+                  <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
+                    {bulkEditProgress.errors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

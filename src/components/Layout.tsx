@@ -33,6 +33,35 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { users, selectedUser, setSelectedUser } = useAppStore();
 
+  // Fonction pour afficher un avatar utilisateur
+  const renderUserAvatar = (user: any, isSelected: boolean = false) => {
+    if (user.avatar) {
+      return (
+        <img
+          src={user.avatar}
+          alt={user.name}
+          className={`h-8 w-8 rounded-full ring-2 transition-all cursor-pointer object-cover ${
+            isSelected ? 'ring-indigo-500' : 'ring-gray-300 hover:ring-indigo-300'
+          }`}
+          title={user.name}
+        />
+      );
+    } else {
+      return (
+        <div
+          className={`h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium ring-2 transition-all cursor-pointer ${
+            isSelected 
+              ? 'bg-indigo-600 ring-indigo-500' 
+              : 'bg-gray-400 ring-gray-300 hover:ring-indigo-300 hover:bg-indigo-400'
+          }`}
+          title={user.name}
+        >
+          {user.name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+      );
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -42,31 +71,46 @@ export default function Layout({ children }: LayoutProps) {
             <h1 className="text-xl font-bold text-gray-900">💰 Finance Duo</h1>
           </div>
           
-          {/* User Selector */}
+          {/* User Selector with Avatars */}
           <div className="px-4 mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 mb-3">
               <UserIcon className="w-4 h-4 inline mr-1" />
               Utilisateur
             </label>
-            <select
-              value={selectedUser?.id || 'all'}
-              onChange={(e) => {
-                if (e.target.value === 'all') {
-                  setSelectedUser(null);
-                } else {
-                  const user = users.find(u => u.id === e.target.value);
-                  if (user) setSelectedUser(user);
-                }
-              }}
-              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value="all">Tous les utilisateurs</option>
+            <div className="flex flex-wrap gap-2">
+              {/* Bouton "Tous les utilisateurs" */}
+              <button
+                onClick={() => setSelectedUser(null)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                  selectedUser === null
+                    ? 'bg-indigo-100 text-indigo-900 border-2 border-indigo-300'
+                    : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:bg-indigo-50 hover:border-indigo-200'
+                }`}
+              >
+                <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                  selectedUser === null ? 'bg-indigo-600 text-white' : 'bg-gray-400 text-white'
+                }`}>
+                  ∀
+                </div>
+                Tous
+              </button>
+              
+              {/* Avatars des utilisateurs */}
               {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
+                <button
+                  key={user.id}
+                  onClick={() => setSelectedUser(user)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedUser?.id === user.id
+                      ? 'bg-indigo-100 text-indigo-900 border-2 border-indigo-300'
+                      : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:bg-indigo-50 hover:border-indigo-200'
+                  }`}
+                >
+                  {renderUserAvatar(user, selectedUser?.id === user.id)}
+                  <span className="truncate max-w-[100px]">{user.name}</span>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           <nav className="mt-8 flex-1 px-2 space-y-1">
@@ -109,7 +153,7 @@ export default function Layout({ children }: LayoutProps) {
       <div className="flex flex-col flex-1 overflow-hidden">
         <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
           <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+            <div className="max-w-full mx-auto px-4 sm:px-6 md:px-8">
               {children}
             </div>
           </div>

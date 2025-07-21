@@ -59,6 +59,7 @@ export interface Transaction {
     color: string;
     image?: string;
     balance: number;
+    users?: User[];
   };
   categoryId?: string;
   category?: {

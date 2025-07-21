@@ -740,7 +740,12 @@ app.delete('/api/categories/:id', async (req, res) => {
 
 app.get('/api/transactions', async (req, res) => {
   try {
-    const { bankId, categoryId, shared, startDate, endDate, accountType } = req.query;
+    const { bankId, categoryId, shared, startDate, endDate, accountType, page, limit } = req.query;
+    
+    // Pagination
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 0; // 0 = pas de limite (comportement actuel)
+    const skip = limitNum > 0 ? (pageNum - 1) * limitNum : 0;
     
     const where: any = {};
     if (bankId) where.bankId = bankId;
@@ -767,18 +772,23 @@ app.get('/api/transactions', async (req, res) => {
         };
       }
     }
-    
-    const transactions = await prisma.transaction.findMany({
+
+    const queryOptions: any = {
       where,
       include: {
         bank: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            color: true,
-            image: true,
-            balance: true
+          include: {
+            userBanks: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    avatar: true
+                  }
+                }
+              }
+            }
           }
         },
         category: {
@@ -794,8 +804,42 @@ app.get('/api/transactions', async (req, res) => {
       orderBy: {
         date: 'desc'
       }
-    });
-    res.json(transactions);
+    };
+
+    // Ajouter la pagination si demandée
+    if (limitNum > 0) {
+      queryOptions.skip = skip;
+      queryOptions.take = limitNum;
+    }
+    
+    const transactions = await prisma.transaction.findMany(queryOptions);
+    
+    // Transformer les données pour inclure users dans bank
+    const transformedTransactions = transactions.map((transaction: any) => ({
+      ...transaction,
+      bank: {
+        ...transaction.bank,
+        users: transaction.bank.userBanks?.map((ub: any) => ub.user) || []
+      }
+    }));
+    
+    // Si pagination demandée, retourner un objet avec hasMore
+    if (limitNum > 0) {
+      // Vérifier s'il y a plus de transactions
+      const totalCount = await prisma.transaction.count({ where });
+      const hasMore = skip + limitNum < totalCount;
+      
+      res.json({
+        transactions: transformedTransactions,
+        hasMore,
+        total: totalCount,
+        page: pageNum,
+        limit: limitNum
+      });
+    } else {
+      // Comportement actuel pour la rétrocompatibilité
+      res.json(transformedTransactions);
+    }
   } catch (error) {
     console.error('Error fetching transactions:', error);
     res.status(500).json({ error: 'Failed to fetch transactions' });
@@ -805,7 +849,7 @@ app.get('/api/transactions', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { amount, description, date, checked, bankId, categoryId } = req.body;
+    const { amount, description, date, checked, bankId, categoryId, createdAt } = req.body;
     
     if (!amount || !description || !bankId) {
       return res.status(400).json({ 
@@ -826,16 +870,23 @@ app.post('/api/transactions', async (req, res) => {
         return res.status(404).json({ error: 'Category not found' });
       }
     }
+
+    const transactionData: any = {
+      amount: parseFloat(amount),
+      description,
+      date: date ? new Date(date) : new Date(),
+      checked: checked || false,
+      bankId,
+      categoryId: categoryId || null
+    };
+
+    // Si createdAt est fourni, l'utiliser (pour l'import CSV)
+    if (createdAt) {
+      transactionData.createdAt = new Date(createdAt);
+    }
     
     const transaction = await prisma.transaction.create({
-      data: {
-        amount: parseFloat(amount),
-        description,
-        date: date ? new Date(date) : new Date(),
-        checked: checked || false,
-        bankId,
-        categoryId: categoryId || null
-      },
+      data: transactionData,
       include: {
         bank: {
           select: {
