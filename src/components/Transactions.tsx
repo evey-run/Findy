@@ -469,9 +469,8 @@ export default function Transactions() {
   };
 
   // Fonction pour afficher les avatars des utilisateurs
-  const renderUserAvatars = (users: any[]) => {
+  const renderUserAvatars = (users: any[], style?: React.CSSProperties) => {
     if (!users || users.length === 0) return <span className="text-gray-400">-</span>;
-    
     return (
       <div className="flex -space-x-2">
         {users.map((user, index) => (
@@ -480,18 +479,19 @@ export default function Transactions() {
               <img
                 src={user.avatar}
                 alt={user.name}
-                className="inline-block h-8 w-8 rounded-full ring-2 ring-white hover:ring-blue-300 transition-all object-cover"
+                className="inline-block h-8 w-8 rounded-full object-cover"
                 title={user.name}
+                style={{ border: '2px solid #1f2226', ...style }}
               />
             ) : (
               <div
-                className="inline-block h-8 w-8 rounded-full bg-gray-400 ring-2 ring-white hover:ring-blue-300 transition-all flex items-center justify-center text-white text-sm font-medium"
+                className="inline-block h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-medium"
                 title={user.name}
+                style={{ border: '2px solid #1f2226', ...style }}
               >
                 {user.name?.charAt(0)?.toUpperCase() || '?'}
               </div>
             )}
-            {/* Tooltip supprimé */}
           </div>
         ))}
       </div>
@@ -1388,7 +1388,7 @@ export default function Transactions() {
                   )}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300">
-                  {renderUserAvatars(transaction.bank.users || [])}
+                  {renderUserAvatars(transaction.bank.users || [], { border: '2px solid #1f2226' })}
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
