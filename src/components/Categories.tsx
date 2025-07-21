@@ -640,13 +640,7 @@ export default function Categories() {
                            categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
                            categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}
                           </span>
-                        </div>
-                        
-                        <div className="flex justify-between text-2xl font-bold mb-3">
-                          <span className="text-red-400">
-                            {formatCurrency(categorySpending.totalSpent)}
-                          </span>
-                          <span className="text-violet-400">
+                          <span className={`text-2xl font-bold ${categorySpending.isOverBudget ? 'text-red-400' : 'text-violet-400'}`}>
                             {Math.round(categorySpending.percentage)}%
                           </span>
                         </div>
@@ -656,15 +650,15 @@ export default function Categories() {
                             className="h-3 rounded-full transition-all duration-300"
                             style={{ 
                               width: `${Math.min(categorySpending.percentage, 100)}%`,
-                              backgroundColor: '#6226fa'
+                              backgroundColor: categorySpending.isOverBudget ? '#ef4444' : '#6226fa'
                             }}
                           />
                         </div>
                         
                         <div className="flex justify-between text-sm text-gray-400 mt-2">
-                          <span>Dépensé: {formatCurrency(categorySpending.totalSpent)}</span>
-                          <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-green-400'}>
-                            {categorySpending.isOverBudget ? 'Budget dépassé !' : `${formatCurrency(categorySpending.remaining)} restant`}
+                          <span></span>
+                          <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-gray-400'}>
+                            {categorySpending.isOverBudget ? 'Budget dépassé !' : `${formatCurrency(categorySpending.totalSpent)}/${formatCurrency(categoryBudget.amount)}`}
                           </span>
                         </div>
                       </div>
