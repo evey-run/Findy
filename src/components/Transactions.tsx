@@ -481,12 +481,14 @@ export default function Transactions() {
               <img
                 src={user.avatar}
                 alt={user.name}
-                className="inline-block h-8 w-8 rounded-full ring-2 ring-white hover:ring-blue-300 transition-all object-cover"
+                className="inline-block h-8 w-8 rounded-full ring-2 transition-all object-cover"
+                style={{ ringColor: '#1f2226', borderColor: '#1f2226', boxShadow: `0 0 0 2px #1f2226` }}
                 title={user.name}
               />
             ) : (
               <div
-                className="inline-block h-8 w-8 rounded-full bg-gray-400 ring-2 ring-white hover:ring-blue-300 transition-all flex items-center justify-center text-white text-sm font-medium"
+                className="inline-block h-8 w-8 rounded-full bg-gray-400 ring-2 transition-all flex items-center justify-center text-white text-sm font-medium"
+                style={{ ringColor: '#1f2226', borderColor: '#1f2226', boxShadow: `0 0 0 2px #1f2226` }}
                 title={user.name}
               >
                 {user.name?.charAt(0)?.toUpperCase() || '?'}
@@ -1219,11 +1221,14 @@ export default function Transactions() {
                       e.preventDefault();
                       handleAddTransaction(e);
                     }}
-                    className="px-2 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                    style={{ backgroundColor: '#22c55e' }}
-                    title="Sauvegarder"
+                    className="px-2 py-1 text-xs font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center gap-1"
+                    style={{ backgroundColor: '#6226fa', minWidth: '0' }}
+                    title="Ajouter"
                   >
-                    ✓
+                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 3.5v9m4.5-4.5h-9" />
+                    </svg>
+                    Ajouter
                   </button>
                 </div>
               </td>
