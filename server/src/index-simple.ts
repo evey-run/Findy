@@ -357,7 +357,7 @@ app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
     console.log('🔧 PUT /api/banks/' + bankId + ' called with body:', req.body);
     
     // Récupérer les données du formulaire
-    let { name, shortName, iban, balance, data } = req.body;
+    let { name, shortName, iban, balance, accountType, createdAt, data } = req.body;
     let userIds: string[] = [];
     
     // Vérifier si les données sont envoyées dans le champ 'data' (format JSON)
@@ -377,6 +377,10 @@ app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
         if (parsedData.shortName) shortName = parsedData.shortName;
         if (parsedData.iban) iban = parsedData.iban;
         if (parsedData.balance !== undefined) balance = parsedData.balance;
+        if (parsedData.accountType !== undefined) accountType = parsedData.accountType;
+        if (parsedData.createdAt) createdAt = parsedData.createdAt;
+        
+        console.log('🔧 Final values after parsing:', { name, shortName, iban, balance, accountType, createdAt });
       } catch (error) {
         console.error('Error parsing data field:', error);
       }
@@ -387,8 +391,19 @@ app.put('/api/banks/:id', upload.single('image'), async (req, res) => {
       name,
       shortName,
       iban,
-      balance: parseFloat(balance)
+      balance: parseFloat(balance) || 0
     };
+    
+    // Ajouter accountType s'il est fourni
+    if (accountType !== undefined) {
+      updateData.accountType = accountType;
+      console.log('🔧 Setting accountType to:', accountType);
+    }
+    
+    // Ajouter createdAt s'il est fourni
+    if (createdAt) {
+      updateData.createdAt = new Date(createdAt);
+    }
     
     // Ajouter l'image si elle est téléchargée
     if (req.file) {

@@ -225,7 +225,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
         color = parsedData.color || color;
         iban = parsedData.iban || iban;
         balance = parsedData.balance !== undefined ? parseFloat(parsedData.balance) : balance;
-        accountType = parsedData.accountType || accountType || 'CURRENT';
+        accountType = parsedData.accountType !== undefined ? parsedData.accountType : (accountType || 'CURRENT');
         createdAt = parsedData.createdAt || createdAt;
         
         console.log('🔍 Extracted values:', { name, shortName, color, iban, balance, accountType, userIds });
@@ -248,7 +248,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       color,
       iban,
       balance: parseFloat(balance),
-      accountType: accountType || 'CURRENT' // S'assurer que accountType a une valeur par défaut
+      accountType: accountType // Utiliser directement accountType sans fallback ici
     };
     
     console.log('📝 Final update data before DB update:');
