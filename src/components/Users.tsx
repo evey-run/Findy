@@ -188,73 +188,99 @@ export default function Users() {
         {users.map((user) => (
           <div
             key={user.id}
-            className={`shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80 ${selectedUserId === user.id ? 'ring-2 ring-blue-500' : ''}`}
+            className={`shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow h-80 ${selectedUserId === user.id ? 'ring-2 ring-blue-500' : ''}`}
             style={{ backgroundColor: '#272a2f' }}
           >
             {editingId === user.id ? (
-              <form onSubmit={handleSubmitEdit} className="flex flex-col h-full justify-center items-center">
-                <div className="flex flex-col items-center justify-center flex-1">
-                  {avatarPreview ? (
-                    <img
-                      src={avatarPreview}
-                      alt={editingUser?.name}
-                      className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 mb-4"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded-full bg-gray-600 flex items-center justify-center text-white text-3xl font-bold mb-4">
-                      {formData.name ? formData.name[0].toUpperCase() : '?'}
+              <form onSubmit={handleSubmitEdit} className="h-full w-full flex flex-col">
+                <div className="flex-1 flex flex-col justify-center p-6 w-full">
+                  <div className="flex flex-col items-center w-full">
+                    {/* Avatar */}
+                    <div className="mb-4">
+                      {avatarPreview ? (
+                        <div className="relative">
+                          <img
+                            src={avatarPreview}
+                            alt={editingUser?.name}
+                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemoveAvatar}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center text-white text-2xl font-bold">
+                          {formData.name ? formData.name[0].toUpperCase() : '?'}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="text-xl font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full text-center mb-2"
-                    placeholder="Nom de l'utilisateur"
-                    required
-                  />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mt-2"
-                  />
-                  {avatarPreview && (
-                    <button
-                      type="button"
-                      onClick={handleRemoveAvatar}
-                      className="mt-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                    >
-                      ×
-                    </button>
-                  )}
-                  <div className="pt-4 flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={isSaving}
-                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
-                    </button>
-                    <button
-                      type="button"
-                      className="px-4 py-2 border border-gray-500 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-700"
-                      onClick={() => { setEditingId(null); setEditingUser(null); }}
-                    >
-                      Annuler
-                    </button>
+                    {/* Champ nom */}
+                    <div className="w-full mb-4">
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        className="text-lg font-medium text-white border border-gray-500 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2 bg-gray-700 w-full text-center"
+                        placeholder="Nom de l'utilisateur"
+                        required
+                      />
+                    </div>
+                    {/* Upload d'avatar */}
+                    <div className="w-full mb-4">
+                      <label className="block w-full">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          className="block w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-gray-600 file:text-gray-200 hover:file:bg-gray-500"
+                        />
+                      </label>
+                    </div>
                   </div>
+                </div>
+                {/* Zone des boutons - toujours en bas, pleine largeur */}
+                <div className="px-6 py-3 rounded-b-lg flex justify-end items-center gap-2 w-full" style={{ backgroundColor: '#1f2226' }}>
+                  <button
+                    type="button"
+                    className="px-4 py-2 border border-gray-500 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-700"
+                    onClick={() => { 
+                      setEditingId(null); 
+                      setEditingUser(null); 
+                      setAvatarFile(null);
+                      setAvatarPreview(null);
+                    }}
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                  </button>
                 </div>
               </form>
             ) : (
-              <div className="flex flex-col items-center justify-center flex-1 relative">
+              /* AFFICHAGE NORMAL */
+              <div className="h-full flex flex-col items-center justify-center relative">
                 <button
                   type="button"
                   className="absolute top-4 right-4 transition-colors z-10"
                   style={{ color: '#616875' }}
                   onMouseEnter={e => e.currentTarget.style.color = '#6226fa'}
                   onMouseLeave={e => e.currentTarget.style.color = '#616875'}
-                  onClick={() => { setEditingId(user.id); setEditingUser(user); setFormData({ name: user.name }); setAvatarPreview(user.avatar ? `http://localhost:3001${user.avatar}` : null); setAvatarFile(null); }}
+                  onClick={() => { 
+                    setEditingId(user.id); 
+                    setEditingUser(user); 
+                    setFormData({ name: user.name }); 
+                    setAvatarPreview(user.avatar ? `http://localhost:3001${user.avatar}` : null); 
+                    setAvatarFile(null); 
+                  }}
                   title="Modifier l'utilisateur"
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -272,7 +298,7 @@ export default function Users() {
                     {user.name ? user.name[0].toUpperCase() : '?'}
                   </div>
                 )}
-                <h4 className="text-xl font-medium text-white text-center">{user.name}</h4>
+                <h4 className="text-xl font-medium text-white text-center px-4">{user.name}</h4>
               </div>
             )}
           </div>
