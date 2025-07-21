@@ -993,7 +993,7 @@ export default function Transactions() {
                 const bank = banks.find(b => b.id === e.target.value);
                 setSelectedBank(bank || null);
               }}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
             >
               <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes les banques</option>
@@ -1017,7 +1017,7 @@ export default function Transactions() {
               placeholder="Rechercher..."
               value={filters.searchText}
               onChange={(e) => setFilters({...filters, searchText: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
             />
           </div>
@@ -1026,7 +1026,7 @@ export default function Transactions() {
             <select
               value={filters.categoryId}
               onChange={(e) => setFilters({...filters, categoryId: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
             >
               <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes</option>
@@ -1042,7 +1042,7 @@ export default function Transactions() {
               type="date"
               value={filters.startDate}
               onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
             />
           </div>
@@ -1052,7 +1052,7 @@ export default function Transactions() {
               type="date"
               value={filters.endDate}
               onChange={(e) => setFilters({...filters, endDate: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
             />
           </div>
@@ -1061,7 +1061,7 @@ export default function Transactions() {
             <select
               value={filters.checked}
               onChange={(e) => setFilters({...filters, checked: e.target.value})}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
             >
               <option value="" style={{ backgroundColor: '#1f2226' }}>Tous</option>
@@ -1310,11 +1310,18 @@ export default function Transactions() {
                   ) : (
                     <span 
                       onDoubleClick={() => handleInlineEdit(transaction.id, 'category')}
-                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium" 
-                      style={{ 
-                        backgroundColor: transaction.category ? transaction.category.color + '20' : '#e5e7eb', 
-                        color: transaction.category ? transaction.category.color : '#6b7280' 
-                      }}
+                      className="cursor-pointer rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      style={
+                        transaction.category
+                          ? {
+                              backgroundColor: transaction.category.color + '20',
+                              color: transaction.category.color
+                            }
+                          : {
+                              backgroundColor: '#2b2f37',
+                              color: '#a1a1aa'
+                            }
+                      }
                       title="Double-cliquez pour éditer"
                     >
                       {transaction.category ? transaction.category.name : 'Non défini'}
