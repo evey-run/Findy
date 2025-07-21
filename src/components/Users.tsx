@@ -10,6 +10,8 @@ export default function Users() {
   const [formData, setFormData] = useState({
     name: ''
   });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -47,7 +49,6 @@ export default function Users() {
   const handleSelectUser = (userId: string) => {
     setSelectedUserId(userId);
     loadUserBanks(userId);
-    
     // Initialiser les données du formulaire avec les données de l'utilisateur sélectionné
     const selectedUser = users.find(u => u.id === userId);
     if (selectedUser) {
@@ -57,6 +58,8 @@ export default function Users() {
       setAvatarPreview(selectedUser.avatar ? `http://localhost:3001${selectedUser.avatar}` : null);
       setAvatarFile(null);
     }
+    setEditingId(null);
+    setEditingUser(null);
   };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,7 +96,7 @@ export default function Users() {
   const handleSubmitEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedUserId) return;
+    if (!editingId) return;
     
     setIsSaving(true);
     
@@ -180,48 +183,100 @@ export default function Users() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
         {/* Liste des utilisateurs */}
-        <div className="lg:col-span-1">
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">
-                Utilisateurs ({users.length})
-              </h3>
-            </div>
-            
-            <div className="divide-y divide-gray-200">
-              {users.map((user) => (
-                <div
-                  key={user.id}
-                  className={`p-4 cursor-pointer hover:bg-gray-50 ${
-                    selectedUserId === user.id ? 'bg-blue-50 border-r-4 border-blue-500' : ''
-                  }`}
-                  onClick={() => handleSelectUser(user.id)}
-                >
-                  <div className="flex items-center">
-                    {user.avatar ? (
-                      <img
-                        src={`http://localhost:3001${user.avatar}`}
-                        alt={user.name}
-                        className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                    )}
-                    <div className="ml-3">
-                      <h4 className="text-sm font-medium text-gray-900">{user.name}</h4>
+        {users.map((user) => (
+          <div
+            key={user.id}
+            className={`shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80 ${selectedUserId === user.id ? 'ring-2 ring-blue-500' : ''}`}
+            style={{ backgroundColor: '#272a2f' }}
+          >
+            {editingId === user.id ? (
+              <form onSubmit={handleSubmitEdit} className="flex flex-col h-full justify-center items-center">
+                <div className="flex flex-col items-center justify-center flex-1">
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt={editingUser?.name}
+                      className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 mb-4"
+                    />
+                  ) : (
+                    <div className="w-24 h-24 rounded-full bg-gray-600 flex items-center justify-center text-white text-3xl font-bold mb-4">
+                      {formData.name ? formData.name[0].toUpperCase() : '?'}
                     </div>
+                  )}
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="text-xl font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full text-center mb-2"
+                    placeholder="Nom de l'utilisateur"
+                    required
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarChange}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mt-2"
+                  />
+                  {avatarPreview && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      className="mt-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  )}
+                  <div className="pt-4 flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={isSaving}
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
+                    </button>
+                    <button
+                      type="button"
+                      className="px-4 py-2 border border-gray-500 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-700"
+                      onClick={() => { setEditingId(null); setEditingUser(null); }}
+                    >
+                      Annuler
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              </form>
+            ) : (
+              <div className="flex flex-col items-center justify-center flex-1 relative">
+                <button
+                  type="button"
+                  className="absolute top-4 right-4 transition-colors z-10"
+                  style={{ color: '#616875' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#6226fa'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#616875'}
+                  onClick={() => { setEditingId(user.id); setEditingUser(user); setFormData({ name: user.name }); setAvatarPreview(user.avatar ? `http://localhost:3001${user.avatar}` : null); setAvatarFile(null); }}
+                  title="Modifier l'utilisateur"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+                {user.avatar ? (
+                  <img
+                    src={`http://localhost:3001${user.avatar}`}
+                    alt={user.name}
+                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 mb-4"
+                  />
+                ) : (
+                  <div className="w-24 h-24 rounded-full bg-gray-600 flex items-center justify-center text-white text-3xl font-bold mb-4">
+                    {user.name ? user.name[0].toUpperCase() : '?'}
+                  </div>
+                )}
+                <h4 className="text-xl font-medium text-white text-center">{user.name}</h4>
+              </div>
+            )}
           </div>
-        </div>
+        ))}
 
         {/* Détails de l'utilisateur sélectionné */}
         <div className="lg:col-span-2">
