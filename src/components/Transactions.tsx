@@ -80,6 +80,15 @@ const scrollbarStyles = `
     scrollbar-width: thin;
     scrollbar-color: #6226fa #1f2226;
   }
+  
+  /* Couleur des séparateurs de lignes */
+  .divide-y > * + * {
+    border-top-color: #1f2226 !important;
+  }
+  
+  .divide-gray-600 > * + * {
+    border-top-color: #1f2226 !important;
+  }
 `;
 
 // Injecter les styles dans le document
@@ -1070,39 +1079,39 @@ export default function Transactions() {
           style={{ maxHeight: '70vh' }}
           onScroll={handleScroll}
         >
-          <table className="w-full divide-y" style={{ backgroundColor: '#272a2f', borderColor: '#1f2226' }}>
+          <table className="w-full divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                 Date
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-80">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-80">
                 Description
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
                 Catégorie
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
                 Banque
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
                 Propriétaires
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                 Montant
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
                 Pointé
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
+              <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y" style={{ backgroundColor: '#272a2f', borderColor: '#1f2226' }}>
+          <tbody className="divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
             {/* Add form row - always visible as first row */}
             <tr className="border-l-4" style={{ backgroundColor: '#1f2226', borderLeftColor: '#6226fa' }}>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <input
                   type="date"
                   value={editingTransaction?.date || ''}
@@ -1112,7 +1121,7 @@ export default function Transactions() {
                   required
                 />
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <input
                   type="text"
                   value={editingTransaction?.description || ''}
@@ -1123,7 +1132,7 @@ export default function Transactions() {
                   required
                 />
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <select
                   value={editingTransaction?.categoryId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
@@ -1136,7 +1145,7 @@ export default function Transactions() {
                   ))}
                 </select>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <select
                   value={editingTransaction?.bankId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
@@ -1157,7 +1166,7 @@ export default function Transactions() {
                   })}
                 </select>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <span className="text-sm text-gray-300">
                   {editingTransaction?.bankId ? 
                     (() => {
@@ -1169,7 +1178,7 @@ export default function Transactions() {
                   }
                 </span>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <input
                   type="number"
                   step="1"
@@ -1181,7 +1190,7 @@ export default function Transactions() {
                   required
                 />
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <label className="flex items-center text-xs text-gray-300">
                   <input
                     type="checkbox"
@@ -1193,7 +1202,7 @@ export default function Transactions() {
                   <span className="ml-1 text-gray-300">Pointé</span>
                 </label>
               </td>
-              <td className="px-6 py-4">
+              <td className="px-4 py-2">
                 <div className="flex justify-center">
                   <button
                     type="button"
@@ -1212,7 +1221,7 @@ export default function Transactions() {
             </tr>
             {filteredTransactions.map((transaction) => (
               <tr key={transaction.id} className="hover:opacity-80 transition-opacity" style={{ backgroundColor: '#272a2f' }}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="date"
@@ -1242,7 +1251,7 @@ export default function Transactions() {
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="text"
@@ -1312,14 +1321,15 @@ export default function Transactions() {
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'bank' ? (
                     <select
                       value={inlineEditValue}
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                       autoFocus
                     >
                       {banks
@@ -1331,7 +1341,7 @@ export default function Transactions() {
                           const displayText = userNames ? `${bank.name} (${userNames})` : bank.name;
                           
                           return (
-                            <option key={bank.id} value={bank.id}>
+                            <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1f2226' }}>
                               {displayText}
                             </option>
                           );
@@ -1340,7 +1350,7 @@ export default function Transactions() {
                   ) : (
                     <div 
                       onDoubleClick={() => handleInlineEdit(transaction.id, 'bank')}
-                      className="cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell flex items-center"
+                      className="cursor-pointer rounded px-1 py-0.5 editable-cell flex items-center hover:opacity-80"
                       title="Double-cliquez pour éditer"
                     >
                       {transaction.bank.image ? (
@@ -1355,22 +1365,23 @@ export default function Transactions() {
                         </div>
                       )}
                       <div className="ml-2">
-                        <div className="font-medium">{transaction.bank.name}</div>
+                        <div className="font-medium text-white">{transaction.bank.name}</div>
                       </div>
                     </div>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300">
                   {renderUserAvatars(transaction.bank.users || [])}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="number"
                       step="1"
                       value={editingTransaction?.amount || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
                     <input
@@ -1380,26 +1391,28 @@ export default function Transactions() {
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                       autoFocus
                     />
                   ) : (
                     <span 
                       onDoubleClick={() => handleInlineEdit(transaction.id, 'amount')}
-                      className={`cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                      className={`cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80 ${transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}
                       title="Double-cliquez pour éditer"
                     >
                       {formatAmount(transaction.amount)}
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="checkbox"
                       checked={editingTransaction?.checked || false}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 rounded"
+                      style={{ accentColor: '#6226fa' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'checked' ? (
                     <select
@@ -1407,16 +1420,17 @@ export default function Transactions() {
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                       autoFocus
                     >
-                      <option value="true">Oui</option>
-                      <option value="false">Non</option>
+                      <option value="true" style={{ backgroundColor: '#1f2226' }}>Oui</option>
+                      <option value="false" style={{ backgroundColor: '#1f2226' }}>Non</option>
                     </select>
                   ) : (
                     <span 
                       onDoubleClick={() => handleInlineEdit(transaction.id, 'checked')}
-                      className={`cursor-pointer hover:bg-gray-100 rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      className={`cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         transaction.checked ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
                       }`}
                       title="Double-cliquez pour éditer"
@@ -1425,7 +1439,7 @@ export default function Transactions() {
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
                   {editingId === transaction.id ? (
                     <div className="flex space-x-2">
                       <button
