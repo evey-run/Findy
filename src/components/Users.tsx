@@ -195,50 +195,54 @@ export default function Users() {
               <form onSubmit={handleSubmitEdit} className="h-full w-full flex flex-col">
                 <div className="flex-1 flex flex-col justify-center p-6 w-full">
                   <div className="flex flex-col items-center w-full">
-                    {/* Avatar */}
-                    <div className="mb-4">
-                      {avatarPreview ? (
-                        <div className="relative">
-                          <img
-                            src={avatarPreview}
-                            alt={editingUser?.name}
-                            className="w-20 h-20 rounded-full object-cover border-2 border-gray-200"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleRemoveAvatar}
-                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center text-white text-2xl font-bold">
-                          {formData.name ? formData.name[0].toUpperCase() : '?'}
-                        </div>
-                      )}
+                    {/* Avatar cliquable avec contour pointillé et icône plus */}
+                    <div className="mb-4 flex justify-center w-full">
+                      <label className="relative cursor-pointer mx-auto block" htmlFor={`avatar-upload-${user.id}`}> 
+                        <span className="absolute inset-0 w-20 h-20 rounded-full border-2 border-dashed pointer-events-none" style={{ borderColor: '#6226fa' }}></span>
+                        {avatarPreview ? (
+                          <>
+                            <img
+                              src={avatarPreview}
+                              alt={editingUser?.name}
+                              className="w-20 h-20 rounded-full object-cover border-2 border-transparent hover:opacity-80 transition"
+                              style={{ position: 'relative', zIndex: 1 }}
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRemoveAvatar}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                              tabIndex={-1}
+                              style={{ zIndex: 3 }}
+                            >
+                              ×
+                            </button>
+                          </>
+                        ) : (
+                          <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center text-white text-2xl font-bold mx-auto hover:opacity-80 transition relative">
+                            {formData.name ? formData.name[0].toUpperCase() : '?'}
+                          </div>
+                        )}
+                        <input
+                          id={`avatar-upload-${user.id}`}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleAvatarChange}
+                          className="hidden"
+                        />
+                      </label>
                     </div>
                     {/* Champ nom */}
-                    <div className="w-full mb-4">
+                    <div className="mb-4 flex justify-center w-full">
                       <input
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="text-lg font-medium text-white border border-gray-500 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 p-2 bg-gray-700 w-full text-center"
+                        className="mt-1 block rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem] text-white text-base text-center"
+                        style={{ backgroundColor: '#1f2226', color: 'white', minWidth: '180px', maxWidth: '220px', border: 'none', padding: '0.5rem 0.75rem' }}
                         placeholder="Nom de l'utilisateur"
                         required
+                        maxLength={20}
                       />
-                    </div>
-                    {/* Upload d'avatar */}
-                    <div className="w-full mb-4">
-                      <label className="block w-full">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleAvatarChange}
-                          className="block w-full text-xs text-gray-400 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:font-medium file:bg-gray-600 file:text-gray-200 hover:file:bg-gray-500"
-                        />
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -259,7 +263,8 @@ export default function Users() {
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: '#6226fa' }}
                   >
                     {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
                   </button>
