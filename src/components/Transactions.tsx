@@ -1676,7 +1676,7 @@ export default function Transactions() {
       {/* Modal de modification en lot */}
       {showBulkEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-24 mx-auto p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl" style={{ background: '#272a2f' }}>
+          <div className="relative top-24 mx-auto p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
             <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
               {/* En-tête */}
               <h3 className="text-lg font-bold text-white">
@@ -1803,7 +1803,7 @@ export default function Transactions() {
                         })}
                         className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="replaceText" className="ml-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="replaceText" className="ml-2 text-sm font-medium text-white">
                         Modifier la description
                       </label>
                     </div>
@@ -1822,7 +1822,7 @@ export default function Transactions() {
                               })}
                               className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
                             />
-                            <span className="ml-2 text-sm text-gray-700">Remplacement partiel</span>
+                          <span className="ml-2 text-sm text-white">Remplacement partiel</span>
                           </label>
                           <label className="flex items-center">
                             <input
@@ -1835,16 +1835,16 @@ export default function Transactions() {
                               })}
                               className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
                             />
-                            <span className="ml-2 text-sm text-gray-700">Remplacer toute la description</span>
+                          <span className="ml-2 text-sm text-white">Remplacer toute la description</span>
                           </label>
                         </div>
 
                         {/* Champs de saisie */}
                         {!bulkEditActions.replaceText.replaceAll ? (
                           // Mode remplacement partiel
-                          <div className="flex gap-4">
+                          <div className="flex flex-col gap-2">
                             <div className="flex-1 min-w-[180px]">
-                              <label className="block text-xs text-gray-600 mb-1">Remplacer</label>
+                              <label className="block text-xs text-white mb-1">Remplacer</label>
                               <input
                                 type="text"
                                 placeholder="abonnement"
@@ -1853,11 +1853,12 @@ export default function Transactions() {
                                   ...bulkEditActions,
                                   replaceText: { ...bulkEditActions.replaceText, from: e.target.value }
                                 })}
-                                className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                                className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                                style={{ backgroundColor: '#1f2226' }}
                               />
                             </div>
                             <div className="flex-1 min-w-[180px]">
-                              <label className="block text-xs text-gray-600 mb-1">Par</label>
+                              <label className="block text-xs text-white mb-1">Par</label>
                               <input
                                 type="text"
                                 placeholder="Abonnement Netflix"
@@ -1866,14 +1867,15 @@ export default function Transactions() {
                                   ...bulkEditActions,
                                   replaceText: { ...bulkEditActions.replaceText, to: e.target.value }
                                 })}
-                                className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                                className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                                style={{ backgroundColor: '#1f2226' }}
                               />
                             </div>
                           </div>
                         ) : (
                           // Mode remplacement total
                           <div>
-                            <label className="block text-xs text-gray-600 mb-1">Nouvelle description</label>
+                            <label className="block text-xs text-white mb-1">Nouvelle description</label>
                             <input
                               type="text"
                               placeholder="Abonnement Netflix"
@@ -1882,7 +1884,8 @@ export default function Transactions() {
                                 ...bulkEditActions,
                                 replaceText: { ...bulkEditActions.replaceText, to: e.target.value }
                               })}
-                              className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                              className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                              style={{ backgroundColor: '#1f2226' }}
                             />
                             <p className="text-xs text-gray-500 mt-1">
                               Toutes les descriptions des transactions sélectionnées seront remplacées par ce texte
@@ -1906,7 +1909,7 @@ export default function Transactions() {
                         })}
                         className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="changeCategory" className="ml-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="changeCategory" className="ml-2 text-sm font-medium text-white">
                         Changer la catégorie
                       </label>
                     </div>
@@ -1917,7 +1920,8 @@ export default function Transactions() {
                           ...bulkEditActions,
                           changeCategory: { ...bulkEditActions.changeCategory, categoryId: e.target.value }
                         })}
-                        className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Non défini</option>
                         {categories.map(category => (
@@ -1940,7 +1944,7 @@ export default function Transactions() {
                         })}
                         className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="changeChecked" className="ml-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="changeChecked" className="ml-2 text-sm font-medium text-white">
                         Modifier le statut pointé
                       </label>
                     </div>
@@ -1951,7 +1955,8 @@ export default function Transactions() {
                           ...bulkEditActions,
                           changeChecked: { ...bulkEditActions.changeChecked, checked: e.target.value === 'true' }
                         })}
-                        className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="true">Pointé</option>
                         <option value="false">Non pointé</option>
@@ -1972,7 +1977,7 @@ export default function Transactions() {
                         })}
                         className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="changeBank" className="ml-2 text-sm font-medium text-gray-700">
+                      <label htmlFor="changeBank" className="ml-2 text-sm font-medium text-white">
                         Changer de banque
                       </label>
                     </div>
@@ -1983,7 +1988,8 @@ export default function Transactions() {
                           ...bulkEditActions,
                           changeBank: { ...bulkEditActions.changeBank, bankId: e.target.value }
                         })}
-                        className="block w-full text-sm rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500"
+                        className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
+                        style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Sélectionner une banque</option>
                         {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
@@ -1996,7 +2002,7 @@ export default function Transactions() {
               </div>
 
               {/* Boutons d'action */}
-              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+              <div className="flex justify-end space-x-3 mt-6 pt-4">
                 <button
                   onClick={() => setShowBulkEditModal(false)}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
