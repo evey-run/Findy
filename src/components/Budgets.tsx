@@ -538,7 +538,7 @@ export default function Budgets() {
                           className="text-xl font-bold"
                           style={{ color: isCompleted ? '#10b981' : '#6226fa' }}
                         >
-                          {percentage.toFixed(1)}%
+                          {Math.round(percentage)}%
                         </span>
                       </div>
                       
