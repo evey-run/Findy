@@ -646,26 +646,23 @@ export default function Categories() {
                           <span className="text-red-400">
                             {formatCurrency(categorySpending.totalSpent)}
                           </span>
-                          <span className="text-white">
-                            {formatCurrency(categoryBudget.amount)}
+                          <span className="text-violet-400">
+                            {Math.round(categorySpending.percentage)}%
                           </span>
                         </div>
                         
                         <div className="w-full rounded-full h-3" style={{ backgroundColor: '#1f2226' }}>
                           <div
-                            className={`h-3 rounded-full transition-all duration-300 ${
-                              categorySpending.isOverBudget
-                                ? 'bg-red-500'
-                                : categorySpending.percentage > 80
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
-                            }`}
-                            style={{ width: `${Math.min(categorySpending.percentage, 100)}%` }}
+                            className="h-3 rounded-full transition-all duration-300"
+                            style={{ 
+                              width: `${Math.min(categorySpending.percentage, 100)}%`,
+                              backgroundColor: '#6226fa'
+                            }}
                           />
                         </div>
                         
                         <div className="flex justify-between text-sm text-gray-400 mt-2">
-                          <span>{Math.round(categorySpending.percentage)}%</span>
+                          <span>Dépensé: {formatCurrency(categorySpending.totalSpent)}</span>
                           <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-green-400'}>
                             {categorySpending.isOverBudget ? 'Budget dépassé !' : `${formatCurrency(categorySpending.remaining)} restant`}
                           </span>
