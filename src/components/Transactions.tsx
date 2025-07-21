@@ -1584,7 +1584,7 @@ export default function Transactions() {
                     </svg>
                     <div className="flex text-sm text-gray-300">
                       <label htmlFor="csv-upload" className="relative cursor-pointer bg-transparent rounded-md font-medium text-purple-400 hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500">
-                        <span>Choisir un fichier</span>
+                        <span style={{ color: '#6226fa' }}>Choisir un fichier</span>
                         <input
                           id="csv-upload"
                           name="csv-upload"
