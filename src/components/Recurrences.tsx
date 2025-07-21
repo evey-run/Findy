@@ -118,7 +118,7 @@ export default function Recurrences() {
           description: newRecurrence.description,
           active: newRecurrence.active,
           bankId: newRecurrence.bankId,
-          categoryId: newRecurrence.categoryId
+          categoryId: newRecurrence.categoryId === '' ? undefined : newRecurrence.categoryId
         }),
       });
 
@@ -371,9 +371,8 @@ export default function Recurrences() {
                   onChange={(e) => setNewRecurrence(prev => ({...prev, categoryId: e.target.value}))}
                   className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3"
                   style={{ backgroundColor: '#1f2226' }}
-                  required
                 >
-                  <option value="" style={{ backgroundColor: '#1f2226' }}>Sélectionnez une catégorie</option>
+                  <option value="" style={{ backgroundColor: '#1f2226' }}>Non défini</option>
                   {categories.map(category => (
                     <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
                   ))}
@@ -428,9 +427,13 @@ export default function Recurrences() {
               <tr
                 key={recurrence.id}
                 className={`border-l-4 transition-opacity ${!recurrence.active ? 'opacity-50' : ''}`}
-                style={{ backgroundColor: '#1f2226', borderLeftColor: recurrence.active ? '#6226fa' : '#616875' }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = '#2d235a'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = '#1f2226'}
+                style={{ backgroundColor: '#23272b', borderLeftColor: '#23272b' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderLeftColor = '#6226fa';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderLeftColor = '#23272b';
+                }}
               >
                 <td className="px-6 py-4 whitespace-nowrap text-white">
                   {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'description' ? (
@@ -599,27 +602,24 @@ export default function Recurrences() {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {inlineEditCell?.recurrenceId === recurrence.id && inlineEditCell?.field === 'active' ? (
-                    <select
-                      value={inlineEditValue}
-                      onChange={(e) => setInlineEditValue(e.target.value)}
+                    <input
+                      type="checkbox"
+                      checked={inlineEditValue === 'true' || inlineEditValue === true}
+                      onChange={e => setInlineEditValue(e.target.checked ? 'true' : 'false')}
                       onBlur={handleInlineSave}
-                      onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="h-4 w-4 rounded"
+                      style={{ accentColor: '#6226fa' }}
                       autoFocus
-                    >
-                      <option value="true">Active</option>
-                      <option value="false">Inactive</option>
-                    </select>
+                    />
                   ) : (
-                    <span 
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium cursor-pointer hover:bg-gray-100 editable-cell text-white ${
-                        recurrence.active ? 'bg-green-100' : 'bg-gray-100'
-                      }`}
-                      onDoubleClick={() => handleInlineEdit(recurrence.id, 'active')}
+                    <input
+                      type="checkbox"
+                      checked={recurrence.active}
+                      onChange={e => handleInlineEdit(recurrence.id, 'active')}
+                      className="h-4 w-4 rounded cursor-pointer"
+                      style={{ accentColor: '#6226fa' }}
                       title="Double-cliquez pour éditer"
-                    >
-                      {recurrence.active ? 'Active' : 'Inactive'}
-                    </span>
+                    />
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">

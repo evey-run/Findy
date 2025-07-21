@@ -1234,7 +1234,17 @@ export default function Transactions() {
               </td>
             </tr>
             {filteredTransactions.map((transaction) => (
-              <tr key={transaction.id} className="hover:opacity-80 transition-opacity" style={{ backgroundColor: '#272a2f' }}>
+              <tr
+                key={transaction.id}
+                className={`border-l-4 transition-opacity ${!transaction.checked ? 'opacity-50' : ''}`}
+                style={{ backgroundColor: '#23272b', borderLeftColor: '#23272b' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderLeftColor = '#6226fa';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderLeftColor = '#23272b';
+                }}
+              >
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
