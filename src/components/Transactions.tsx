@@ -1663,7 +1663,7 @@ export default function Transactions() {
       {showBulkEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
           <div className="relative p-0 w-full max-w-lg shadow-2xl rounded-xl mx-auto" style={{ background: '#272a2f' }}>
-            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
+            <div className="rounded-t-xl px-6 py-2 flex items-center justify-between" style={{ background: '#1f2226' }}>
               {/* En-tête */}
               <h3 className="text-lg font-bold text-white">
                 Modification en lot des transactions
@@ -1677,16 +1677,16 @@ export default function Transactions() {
                 </svg>
               </button>
             </div>
-            <div className="px-6 py-6">
+            <div className="px-6 py-4">
 
-              <div className="flex flex-col space-y-8">
+              <div className="flex flex-col space-y-4">
                 {/* Section 1: Critères de sélection */}
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <h4 className="text-md font-bold text-white border-b border-gray-700 pb-2">
                     1. Quelles transactions modifier ?
                   </h4>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-sm font-medium text-white mb-2">Contient le texte</label>
                       <input
@@ -1766,12 +1766,12 @@ export default function Transactions() {
                 </div>
 
                 {/* Section 2: Actions à effectuer */}
-                <div className="space-y-4">
+                <div className="space-y-2">
                   <h4 className="text-md font-bold text-white border-b border-gray-700 pb-2">
                     2. Quelles modifications appliquer ?
                   </h4>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {/* Remplacement de texte */}
                     <div className="border rounded-md p-4 h-full flex flex-col justify-between">
                     <div className="flex items-center mb-3">
@@ -1984,14 +1984,14 @@ export default function Transactions() {
               </div>
 
               {/* Aperçu des transactions concernées (déplacé ici) */}
-              <div className="mt-4 p-3 rounded-md" style={{ background: '#1f2226' }}>
+              <div className="mt-2 p-2 rounded-md" style={{ background: '#1f2226' }}>
                 <p className="text-sm font-medium text-blue-300">
                   Aperçu : {getBulkEditTargetTransactions().length} transaction(s) seront modifiées
                 </p>
               </div>
 
               {/* Boutons d'action */}
-              <div className="flex justify-end space-x-3 mt-6 pt-4" style={{ borderTop: 'none' }}>
+              <div className="flex justify-end space-x-3 mt-4 pt-2" style={{ borderTop: 'none' }}>
                 <button
                   onClick={() => setShowBulkEditModal(false)}
                   className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
