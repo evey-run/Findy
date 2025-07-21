@@ -7,11 +7,10 @@ import Papa from 'papaparse';
 const editableCellStyle = `
   .editable-cell {
     position: relative;
-    transition: background-color 0.15s ease-in-out;
+    transition: background-color 0.15s;
   }
-  
   .editable-cell:hover {
-    background-color: #f3f4f6;
+    background-color: #23272b;
   }
 `;
 
@@ -492,10 +491,7 @@ export default function Transactions() {
                 {user.name?.charAt(0)?.toUpperCase() || '?'}
               </div>
             )}
-            {/* Tooltip */}
-            <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-              {user.name}
-            </div>
+            {/* Tooltip supprimé */}
           </div>
         ))}
       </div>
@@ -1229,7 +1225,13 @@ export default function Transactions() {
               </td>
             </tr>
             {filteredTransactions.map((transaction) => (
-              <tr key={transaction.id} className="hover:opacity-80 transition-opacity" style={{ backgroundColor: '#272a2f' }}>
+              <tr
+                key={transaction.id}
+                className="transition-colors cursor-pointer bg-[#272a2f] group"
+                style={{ borderLeft: '4px solid transparent' }}
+                onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #6226fa'}
+                onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
+              >
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
