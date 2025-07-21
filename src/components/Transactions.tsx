@@ -1523,8 +1523,8 @@ export default function Transactions() {
 
       {/* Modal d'import CSV */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-24 mx-auto p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+          <div className="p-0 w-80 md:w-[24rem] lg:w-[28rem] xl:w-[32rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
             <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
               <h3 className="text-lg font-bold text-white">
                 Importer des transactions depuis un fichier CSV
@@ -1582,7 +1582,7 @@ export default function Transactions() {
                       <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                     <div className="flex text-sm text-gray-400">
-                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-[#1f2226] rounded-md font-medium text-purple-400 hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 px-2 py-1">
+                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-[#1f2226] rounded-md font-medium hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 px-2 py-1" style={{ color: '#6226fa' }}>
                         <span>Choisir un fichier</span>
                         <input
                           id="csv-upload"
@@ -1607,19 +1607,6 @@ export default function Transactions() {
                 )}
               </div>
 
-              {/* Format attendu */}
-              <div className="mb-6 p-4 rounded-md" style={{ background: '#23262b' }}>
-                <h4 className="text-sm font-medium text-purple-300 mb-2">Format CSV attendu:</h4>
-                <div className="text-xs text-purple-200 font-mono bg-[#1f2226] p-2 rounded border border-gray-700">
-                  Date,Description,Montant<br/>
-                  2025-01-15,"Achat supermarché",-45.67<br/>
-                  2025-01-16,"Virement salaire",2500.00
-                </div>
-                <p className="text-xs text-purple-200 mt-2">
-                  • Date au format YYYY-MM-DD, DD/MM/YYYY ou DD-MM-YYYY<br/>
-                  • Montant: nombres décimaux (négatif = débit, positif = crédit)
-                </p>
-              </div>
 
               {/* Boutons d'action */}
               <div className="flex justify-end space-x-3">
