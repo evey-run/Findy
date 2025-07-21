@@ -501,104 +501,120 @@ export default function Categories() {
             <div key={category.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f' }}>
               {editingId === category.id ? (
                 /* Edit Form Card - appears in place of the category being edited */
-                <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full p-6">
-                  <h3 className="text-lg font-medium text-white mb-4">Modifier la catégorie</h3>
-                  
-                  <div className="space-y-3 flex-1">
-                    <input
-                      type="text"
-                      value={editingCategory?.name || ''}
-                      onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
-                      className="w-full px-3 py-2 border border-gray-600 rounded focus:outline-none focus:ring-1 text-white"
-                      style={{ backgroundColor: '#1f2226', borderColor: '#272a2f', '--tw-ring-color': '#6226fa' } as any}
-                      placeholder="Nom"
-                      required
-                    />
-                    
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        value={editingCategory?.icon || ''}
-                        onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                        className="w-full px-3 py-2 border border-gray-600 rounded focus:outline-none focus:ring-1 text-white"
-                        style={{ backgroundColor: '#1f2226', borderColor: '#272a2f', '--tw-ring-color': '#6226fa' } as any}
-                        placeholder="🛒"
-                      />
-                      
-                      <select
-                        value={editingCategory?.type || ''}
-                        onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                        className="w-full px-3 py-2 border border-gray-600 rounded focus:outline-none focus:ring-1 text-white"
-                        style={{ backgroundColor: '#1f2226', borderColor: '#272a2f', '--tw-ring-color': '#6226fa' } as any}
-                        required
-                      >
-                        {categoryTypes.map(type => (
-                          <option key={type.value} value={type.value} style={{ backgroundColor: '#1f2226' }}>{type.label}</option>
-                        ))}
-                      </select>
+                <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full">
+                  <div className="p-6 flex-1">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center">
+                        <div 
+                          className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
+                          style={{ borderColor: '#6226fa', backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
+                          title="Couleur de la catégorie"
+                        >
+                          <span className="text-lg font-bold">
+                            {editingCategory?.icon || editingCategory?.name?.charAt(0).toUpperCase() || ''}
+                          </span>
+                        </div>
+                        
+                        <div className="ml-4 flex-1">
+                          <input
+                            type="text"
+                            value={editingCategory?.name || ''}
+                            onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
+                            className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
+                            placeholder="Nom de la catégorie"
+                            required
+                          />
+                          
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={editingCategory?.icon || ''}
+                              onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
+                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent w-16"
+                              placeholder="🛒"
+                            />
+                            
+                            <select
+                              value={editingCategory?.type || ''}
+                              onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
+                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                              required
+                            >
+                              {categoryTypes.map(type => (
+                                <option key={type.value} value={type.value} style={{ backgroundColor: '#1f2226' }}>{type.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     
-                    <div className="flex flex-wrap gap-1">
-                      {predefinedColors.slice(0, 16).map(color => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
-                          className={`w-5 h-5 rounded-full border-2 ${
-                            editingCategory?.color === color ? 'border-white' : 'border-gray-600'
-                          }`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
+                    <div className="mb-4">
+                      <label className="block text-sm text-gray-300 mb-2">Couleur</label>
+                      <div className="flex flex-wrap gap-1">
+                        {predefinedColors.slice(0, 16).map(color => (
+                          <button
+                            key={color}
+                            type="button"
+                            onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
+                            className={`w-5 h-5 rounded-full border-2 ${
+                              editingCategory?.color === color ? 'border-white' : 'border-gray-600'
+                            }`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
                     </div>
 
                     {/* Budget section - Only for EXPENSE categories */}
                     {editingCategory?.type === 'EXPENSE' && (
-                      <div className="border-t pt-3" style={{ borderColor: '#3a3d42' }}>
-                        <p className="text-sm font-medium text-gray-300 mb-2">Budget</p>
-                        <input
-                          type="number"
-                          step="1"
-                          value={editingCategory?.budget?.amount || ''}
-                          onChange={(e) => setEditingCategory(prev => prev ? {
-                            ...prev,
-                            budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
-                              amount: e.target.value,
-                              period: 'MONTHLY',
-                              startDate: new Date().toISOString().split('T')[0]
-                            }
-                          } : null)}
-                          className="w-full px-3 py-2 border border-gray-600 rounded focus:outline-none focus:ring-1 text-white mb-2"
-                          style={{ backgroundColor: '#1f2226', borderColor: '#272a2f', '--tw-ring-color': '#6226fa' } as any}
-                          placeholder="Montant (€)"
-                        />
-                        
-                        <select
-                          value={editingCategory?.budget?.period || 'MONTHLY'}
-                          onChange={(e) => setEditingCategory(prev => prev ? {
-                            ...prev,
-                            budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
-                              amount: '',
-                              period: e.target.value as any,
-                              startDate: new Date().toISOString().split('T')[0]
-                            }
-                          } : null)}
-                          className="w-full px-3 py-2 border border-gray-600 rounded focus:outline-none focus:ring-1 text-white"
-                          style={{ backgroundColor: '#1f2226', borderColor: '#272a2f', '--tw-ring-color': '#6226fa' } as any}
-                        >
-                          <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
-                          <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>
-                          <option value="QUARTERLY" style={{ backgroundColor: '#1f2226' }}>Trimestre</option>
-                          <option value="YEARLY" style={{ backgroundColor: '#1f2226' }}>Annuel</option>
-                        </select>
+                      <div className="mt-4">
+                        <div className="text-sm text-gray-300 mb-2">
+                          Budget (optionnel)
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <input
+                            type="number"
+                            step="1"
+                            value={editingCategory?.budget?.amount || ''}
+                            onChange={(e) => setEditingCategory(prev => prev ? {
+                              ...prev,
+                              budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
+                                amount: e.target.value,
+                                period: 'MONTHLY',
+                                startDate: new Date().toISOString().split('T')[0]
+                              }
+                            } : null)}
+                            className="text-lg font-bold text-white border-none focus:ring-0 p-0 bg-transparent"
+                            placeholder="0 €"
+                          />
+                          
+                          <select
+                            value={editingCategory?.budget?.period || 'MONTHLY'}
+                            onChange={(e) => setEditingCategory(prev => prev ? {
+                              ...prev,
+                              budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
+                                amount: '',
+                                period: e.target.value as any,
+                                startDate: new Date().toISOString().split('T')[0]
+                              }
+                            } : null)}
+                            className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                          >
+                            <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
+                            <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>
+                            <option value="QUARTERLY" style={{ backgroundColor: '#1f2226' }}>Trimestre</option>
+                            <option value="YEARLY" style={{ backgroundColor: '#1f2226' }}>Annuel</option>
+                          </select>
+                        </div>
                       </div>
                     )}
                   </div>
-
+                  
                   <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-500">
-                        Modification
+                        Modifier la catégorie
                       </div>
                       <div className="flex space-x-2">
                         <button
@@ -768,7 +784,7 @@ export default function Categories() {
                       title="Couleur de la catégorie"
                     >
                       <span className="text-lg font-bold">
-                        {editingCategory?.icon || editingCategory?.name?.charAt(0).toUpperCase() || '+'}
+                        {editingCategory?.icon || editingCategory?.name?.charAt(0).toUpperCase() || ''}
                       </span>
                     </div>
                     
