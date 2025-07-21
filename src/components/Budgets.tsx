@@ -390,7 +390,7 @@ export default function Budgets() {
         </div>
 
         {/* Liste des objectifs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
           {objectives.map(objective => {
             const progress = objectiveProgress[objective.id];
             const percentage = progress ? progress.percentage : 0;

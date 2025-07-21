@@ -493,7 +493,7 @@ export default function Categories() {
       </div>
 
       {/* Categories List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">{categories.map((category) => {
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">{categories.map((category) => {
           const categorySpending = getCategorySpending(category.id);
           const categoryBudget = getCategoryBudget(category.id);
           
