@@ -218,7 +218,7 @@ export default function Categories() {
         budget,
         totalSpent,
         remaining,
-        percentage: Math.min(percentage, 100),
+        percentage: percentage, // Suppression du Math.min pour permettre >100%
         isOverBudget: totalSpent > budget.amount,
         periodStart: startDate.toISOString().split('T')[0],
         periodEnd: endDate.toISOString().split('T')[0]
