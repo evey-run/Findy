@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
+import { useState, useEffect, useRef } from 'react';
 import {
   HomeIcon,
   CreditCardIcon,
@@ -9,6 +10,8 @@ import {
   ArrowPathIcon,
   BuildingLibraryIcon,
   UserIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -32,84 +35,138 @@ function classNames(...classes: string[]) {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const { users, selectedUser, setSelectedUser } = useAppStore();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fermer le menu quand on clique en dehors
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Fonction pour afficher un avatar utilisateur
-  const renderUserAvatar = (user: any, isSelected: boolean = false) => {
-    if (user.avatar) {
+  const renderUserAvatar = (user: any, size: string = "h-8 w-8") => {
+    if (user?.avatar) {
       return (
         <img
-          src={user.avatar}
+          src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:3001${user.avatar}`}
           alt={user.name}
-          className={`h-8 w-8 rounded-full ring-2 transition-all cursor-pointer object-cover ${
-            isSelected ? 'ring-indigo-500' : 'ring-gray-300 hover:ring-indigo-300'
-          }`}
-          title={user.name}
+          className={`${size} rounded-full object-cover`}
         />
       );
     } else {
       return (
         <div
-          className={`h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium ring-2 transition-all cursor-pointer ${
-            isSelected 
-              ? 'bg-indigo-600 ring-indigo-500' 
-              : 'bg-gray-400 ring-gray-300 hover:ring-indigo-300 hover:bg-indigo-400'
-          }`}
-          title={user.name}
+          className={`${size} rounded-full flex items-center justify-center text-white text-sm font-medium bg-green-600`}
         >
-          {user.name?.charAt(0)?.toUpperCase() || '?'}
+          {user?.name?.charAt(0)?.toUpperCase() || '?'}
         </div>
       );
     }
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen" style={{ backgroundColor: '#202427' }}>
       {/* Sidebar */}
       <div className="hidden md:flex md:w-64 md:flex-col">
-        <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto bg-white border-r border-gray-200">
-          <div className="flex items-center flex-shrink-0 px-4">
-            <h1 className="text-xl font-bold text-gray-900">💰 Finance Duo</h1>
-          </div>
+        <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto" style={{ backgroundColor: '#272a2f' }}>
           
-          {/* User Selector with Avatars */}
+          {/* Section utilisateur avec avatar et menu déroulant */}
           <div className="px-4 mt-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              <UserIcon className="w-4 h-4 inline mr-1" />
-              Utilisateur
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {/* Bouton "Tous les utilisateurs" */}
+            <div className="relative" ref={menuRef}>
+              {/* Bouton principal avec avatar au-dessus du nom */}
               <button
-                onClick={() => setSelectedUser(null)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                  selectedUser === null
-                    ? 'bg-indigo-100 text-indigo-900 border-2 border-indigo-300'
-                    : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:bg-indigo-50 hover:border-indigo-200'
-                }`}
+                onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                className="w-full flex flex-col items-center py-3 hover:bg-white/5 rounded-lg transition-all"
               >
-                <div className={`h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  selectedUser === null ? 'bg-indigo-600 text-white' : 'bg-gray-400 text-white'
-                }`}>
-                  ∀
-                </div>
-                Tous
+                {selectedUser ? (
+                  <>
+                    {renderUserAvatar(selectedUser, "h-20 w-20")}
+                    <div className="text-center mt-2">
+                      <p className="text-white font-medium text-sm">{selectedUser.name}</p>
+                      <div className="flex items-center justify-center space-x-1 mt-1">
+                        <p className="text-gray-400 text-xs">Utilisateur actuel</p>
+                        {isUserMenuOpen ? (
+                          <ChevronUpIcon className="h-3 w-3 text-gray-400" />
+                        ) : (
+                          <ChevronDownIcon className="h-3 w-3 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="h-12 w-12 rounded-full flex items-center justify-center bg-green-600 text-white font-bold">
+                      ∀
+                    </div>
+                    <div className="text-center mt-2">
+                      <p className="text-white font-medium text-sm">Tous les utilisateurs</p>
+                      <div className="flex items-center justify-center space-x-1 mt-1">
+                        <p className="text-gray-400 text-xs">Vue globale</p>
+                        {isUserMenuOpen ? (
+                          <ChevronUpIcon className="h-3 w-3 text-gray-400" />
+                        ) : (
+                          <ChevronDownIcon className="h-3 w-3 text-gray-400" />
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
               </button>
-              
-              {/* Avatars des utilisateurs */}
-              {users.map((user) => (
-                <button
-                  key={user.id}
-                  onClick={() => setSelectedUser(user)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedUser?.id === user.id
-                      ? 'bg-indigo-100 text-indigo-900 border-2 border-indigo-300'
-                      : 'bg-gray-100 text-gray-700 border-2 border-gray-200 hover:bg-indigo-50 hover:border-indigo-200'
-                  }`}
-                >
-                  {renderUserAvatar(user, selectedUser?.id === user.id)}
-                  <span className="truncate max-w-[100px]">{user.name}</span>
-                </button>
-              ))}
+
+              {/* Menu déroulant */}
+              {isUserMenuOpen && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-gray-800 rounded-lg shadow-xl z-50">
+                  {/* Option "Tous les utilisateurs" */}
+                  <button
+                    onClick={() => {
+                      setSelectedUser(null);
+                      setIsUserMenuOpen(false);
+                    }}
+                    className={`w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-white/10 transition-colors first:rounded-t-lg ${
+                      selectedUser === null ? 'bg-green-600/20' : ''
+                    }`}
+                  >
+                    <div className="h-8 w-8 rounded-full flex items-center justify-center bg-green-600 text-white font-bold text-xs">
+                      ∀
+                    </div>
+                    <div>
+                      <p className="text-white text-sm">Tous les utilisateurs</p>
+                      <p className="text-gray-400 text-xs">Vue globale</p>
+                    </div>
+                  </button>
+
+                  {/* Options utilisateurs */}
+                  {users.map((user, index) => (
+                    <button
+                      key={user.id}
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setIsUserMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center space-x-3 px-3 py-2 text-left hover:bg-white/10 transition-colors ${
+                        index === users.length - 1 ? 'rounded-b-lg' : ''
+                      } ${
+                        selectedUser?.id === user.id ? 'bg-green-600/20' : ''
+                      }`}
+                    >
+                      {renderUserAvatar(user, "h-8 w-8")}
+                      <div>
+                        <p className="text-white text-sm">{user.name}</p>
+                        <p className="text-gray-400 text-xs">Utilisateur personnel</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -122,21 +179,28 @@ export default function Layout({ children }: LayoutProps) {
                   to={item.href}
                   className={classNames(
                     isActive
-                      ? 'bg-indigo-100 text-indigo-900'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md'
+                      ? 'text-white relative'
+                      : 'text-gray-400 hover:text-white',
+                    'group flex items-center px-4 py-3 text-sm font-medium transition-all duration-200 rounded-r-md'
                   )}
                 >
+                  {/* Barre violette à gauche pour l'élément actif */}
+                  {isActive && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 rounded-r-full" style={{ backgroundColor: '#6226fa' }}></div>
+                  )}
                   <item.icon
                     className={classNames(
                       isActive
-                        ? 'text-indigo-500'
-                        : 'text-gray-400 group-hover:text-gray-500',
+                        ? 'text-white'
+                        : 'text-gray-400 group-hover:text-gray-200',
                       'mr-3 flex-shrink-0 h-6 w-6'
                     )}
+                    style={isActive ? { color: '#6226fa' } : {}}
                     aria-hidden="true"
                   />
-                  {item.name}
+                  <span style={isActive ? { color: '#6226fa' } : {}} className={isActive ? '' : ''}>
+                    {item.name}
+                  </span>
                 </Link>
               );
             })}

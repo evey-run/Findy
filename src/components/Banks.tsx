@@ -3,13 +3,90 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Bank } from '../types/index.js';
 
+// Styles pour la barre de scroll personnalisée
+const scrollbarStyles = `
+  /* Webkit browsers (Chrome, Safari, Edge) */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #1f2226;
+    border-radius: 8px;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #6226fa;
+    border-radius: 8px;
+    border: 1px solid #1f2226;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed;
+    border: 1px solid #1f2226;
+  }
+  
+  ::-webkit-scrollbar-thumb:active {
+    background: #6226fa;
+    border: 1px solid #1f2226;
+  }
+  
+  /* Firefox */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: #6226fa #1f2226;
+  }
+  
+  /* Styles spécifiques pour les conteneurs avec scroll */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #1f2226;
+    border-radius: 8px;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #6226fa !important;
+    border-radius: 8px;
+    border: 1px solid #1f2226;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #7c3aed !important;
+    border: 1px solid #1f2226;
+  }
+  
+  .custom-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #6226fa !important;
+    border: 1px solid #1f2226;
+  }
+  
+  /* Force pour tous les scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #6226fa #1f2226;
+  }
+`;
+
+// Injecter les styles dans le document
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = scrollbarStyles;
+  if (!document.head.querySelector('style[data-scrollbar-custom]')) {
+    styleElement.setAttribute('data-scrollbar-custom', 'true');
+    document.head.appendChild(styleElement);
+  }
+}
+
 // Helper function pour obtenir les informations du type de compte
 const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
   switch (accountType) {
     case 'CURRENT':
       return {
         label: 'Compte courant',
-        color: 'bg-blue-100 text-blue-800'
+        color: 'text-white'
       };
     case 'SAVINGS':
       return {
@@ -24,7 +101,7 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
     default:
       return {
         label: 'Compte courant',
-        color: 'bg-blue-100 text-blue-800'
+        color: 'text-white'
       };
   }
 };
@@ -329,13 +406,13 @@ export default function Banks() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             {selectedUser ? `Banques de ${selectedUser.name}` : 'Toutes les banques'}
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-300 mt-1">
             {showArchived 
               ? 'Gérer les banques archivées - Cliquez sur "Restaurer" pour remettre une banque en service'
               : 'Cliquez sur une banque pour voir ses transactions'
@@ -350,7 +427,8 @@ export default function Banks() {
                     loadArchivedBanks();
                   }
                 }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                className="inline-flex items-center px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 hover:text-white hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors"
+                style={{ backgroundColor: '#272a2f' }}
               >
                 <svg className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8l6 6m0 0l6-6m-6 6V3" />
@@ -364,15 +442,15 @@ export default function Banks() {
       {showArchived && (
         <div className="space-y-4">
           <div className="border-t pt-6">
-            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+            <div className="border-l-4 border-yellow-500 p-4 mb-4" style={{ backgroundColor: '#3a3d42' }}>
               <div className="flex">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <svg className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
+                  <p className="text-sm text-yellow-200">
                     <strong>Attention :</strong> La suppression définitive d'une banque archivée effacera également toutes ses transactions, budgets et récurrences associés. Cette action est irréversible.
                   </p>
                 </div>
@@ -393,7 +471,7 @@ export default function Banks() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
                 {archivedBanks.slice().reverse().map((bank) => (
-                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75 flex flex-col h-full min-h-[240px]">
+                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75 flex flex-col h-80">
                     <div className="p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
@@ -418,7 +496,8 @@ export default function Banks() {
                         <div className="flex flex-col space-y-2">
                           <button
                             onClick={() => handleRestore(bank.id)}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2"
+                            style={{ backgroundColor: '#6226fa' }}
                             title="Restaurer cette banque"
                           >
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -461,7 +540,7 @@ export default function Banks() {
           <div key={bank.id}>
             {/* Si la banque est en cours d'édition, afficher le formulaire d'édition */}
             {editingBank?.id === bank.id ? (
-              <div className="bg-white shadow rounded-lg border-2 border-blue-300 flex flex-col h-full min-h-[365px]">
+              <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
                 <form onSubmit={handleSubmit} className="flex flex-col h-full">
                   {/* Section principale - même structure qu'une carte de banque */}
                   <div className="p-6 flex-1">
@@ -470,7 +549,8 @@ export default function Banks() {
                       <div className="flex items-center">
                         {/* Logo/Image - même taille que les cartes (w-12 h-12) */}
                         <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                          className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
+                          style={{ borderColor: '#6226fa', backgroundColor: '#f0f0ff' }}
                           onClick={() => document.getElementById('imageInput-edit')?.click()}
                           title="Cliquez pour choisir une image"
                         >
@@ -481,7 +561,7 @@ export default function Banks() {
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
-                            <span className="text-lg font-bold text-blue-600">
+                            <span className="text-lg font-bold" style={{ color: '#6226fa' }}>
                               {formData.shortName || 'LOGO'}
                             </span>
                           )}
@@ -501,7 +581,7 @@ export default function Banks() {
                             type="text"
                             value={formData.name}
                             onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="text-lg font-medium text-gray-900 border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
+                            className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1 placeholder-gray-300"
                             placeholder="Nom de la banque"
                             required
                           />
@@ -514,7 +594,7 @@ export default function Banks() {
                                 console.log('🔧 Selected account type:', e.target.value);
                                 setFormData({...formData, accountType: e.target.value as any});
                               }}
-                              className="text-sm text-gray-500 border-none focus:ring-0 p-0 bg-transparent"
+                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
                             >
                               <option value="CURRENT">Compte courant</option>
                               <option value="SAVINGS">Livret d'épargne</option>
@@ -528,7 +608,7 @@ export default function Banks() {
                             type="text"
                             value={formData.iban}
                             onChange={(e) => setFormData({...formData, iban: e.target.value})}
-                            className="text-xs text-gray-400 font-mono border-none focus:ring-0 p-0 bg-transparent w-full"
+                            className="text-xs text-gray-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
                             placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
                           />
                         </div>
@@ -557,7 +637,8 @@ export default function Banks() {
                           type="text"
                           value={formData.shortName}
                           onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
+                          style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
                           placeholder="Nom court (BNP)"
                           maxLength={3}
                           required
@@ -566,7 +647,8 @@ export default function Banks() {
                           type="date"
                           value={formData.createdAt}
                           onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
+                          style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
                           required
                         />
                       </div>
@@ -577,7 +659,7 @@ export default function Banks() {
                           <label className="block text-xs font-medium text-gray-700 mb-1">
                             Utilisateurs ayant accès *
                           </label>
-                          <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded max-h-16 overflow-y-auto">
+                          <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded max-h-16 overflow-y-auto custom-scrollbar">
                             {users.map(user => (
                               <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded text-xs">
                                 <input
@@ -596,7 +678,8 @@ export default function Banks() {
                                       });
                                     }
                                   }}
-                                  className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  className="w-3 h-3 rounded border-gray-300 focus:ring-2"
+                                  style={{ color: '#6226fa', accentColor: '#6226fa' }}
                                 />
                                 <div className="flex items-center space-x-1">
                                   {user.avatar ? (
@@ -606,7 +689,7 @@ export default function Banks() {
                                       className="w-3 h-3 rounded-full object-cover"
                                     />
                                   ) : (
-                                    <div className="w-3 h-3 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
+                                    <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#6226fa' }}>
                                       {user.name.charAt(0).toUpperCase()}
                                     </div>
                                   )}
@@ -621,7 +704,7 @@ export default function Banks() {
                     
                     {/* Solde - même position et style que les cartes */}
                     <div className="mt-4">
-                      <div className="text-sm text-gray-500 mb-1">
+                      <div className="text-sm text-gray-300 mb-1">
                         Solde actuel
                       </div>
                       <input
@@ -629,7 +712,7 @@ export default function Banks() {
                         step="1"
                         value={formData.balance}
                         onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                        className="text-2xl font-bold text-gray-900 border-none focus:ring-0 p-0 bg-transparent w-full"
+                        className="text-2xl font-bold text-white border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
                         placeholder="0,00 €"
                         required
                       />
@@ -637,7 +720,7 @@ export default function Banks() {
                   </div>
                   
                   {/* Footer - même style que les cartes */}
-                  <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
+                  <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-500">
                         Modification
@@ -653,7 +736,8 @@ export default function Banks() {
                         <button
                           type="submit"
                           disabled={!formData.name.trim() || !formData.shortName.trim() || formData.userIds.length === 0}
-                          className="px-3 py-1 text-xs border border-transparent rounded text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                          style={{ backgroundColor: '#6227f5' }}
                         >
                           Sauvegarder
                         </button>
@@ -664,8 +748,8 @@ export default function Banks() {
               </div>
             ) : (
               /* Carte normale de banque */
-              <div className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full min-h-[365px]">
-                <div className="p-6 flex-1">
+              <div className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f' }}>
+                <div className="p-6 flex-1 flex flex-col">
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
@@ -673,21 +757,22 @@ export default function Banks() {
                         <img
                           src={`http://localhost:3001${bank.image}`}
                           alt={bank.name}
-                          className="w-12 h-12 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
+                          className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                         />
                       ) : (
                         <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold bg-blue-600 flex-shrink-0"
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
+                          style={{ backgroundColor: '#6226fa' }}
                         >
                           {bank.shortName}
                         </div>
                       )}
                       <div className="ml-4">
-                        <h3 className="text-lg font-medium text-gray-900">{bank.name}</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="text-lg font-medium text-white">{bank.name}</h3>
+                        <p className="text-sm text-gray-300">
                           {getAccountTypeInfo(bank.accountType).label}
                           {!selectedUser && bank.users && bank.users.length > 0 && (
-                            <span className="ml-2 text-blue-600">
+                            <span className="ml-2 text-violet-400">
                               • {bank.users.map(u => u.name).join(', ')}
                             </span>
                           )}
@@ -705,7 +790,8 @@ export default function Banks() {
                             e.stopPropagation();
                             handleEdit(bank);
                           }}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-violet-400 hover:text-violet-300"
+                          style={{ color: '#6226fa' }}
                           title="Modifier"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -717,7 +803,7 @@ export default function Banks() {
                             e.stopPropagation();
                             handleDelete(bank.id);
                           }}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-400 hover:text-red-300"
                           title="Supprimer"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -727,85 +813,92 @@ export default function Banks() {
                       </div>
                   </div>
                   <div className="mt-4">
-                    <div className="text-sm text-gray-500 mb-1">
+                    <div className="text-sm text-gray-300 mb-1">
                       Solde actuel
                     </div>
-                    <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-2xl font-bold text-white">
                       {formatAmount(bank.balance)}
                     </div>
                   </div>
                 </div>
-                <div className="bg-gray-50 px-6 py-4">
+                <div className="px-6 py-4" style={{ backgroundColor: '#1f2226' }}>
                   {/* Section des transactions agrandie */}
                   {transactions.filter(t => t.bankId === bank.id).length > 0 ? (
                     <div>
-                      <p className="text-sm font-medium text-gray-700 mb-3">
-                        Dernières transactions
-                      </p>
+                      <div 
+                        className={`flex items-center justify-between mb-3 ${
+                          bank.accountType === 'CURRENT' 
+                            ? 'cursor-pointer hover:bg-white/5 rounded px-2 py-1 -mx-2 -my-1' 
+                            : ''
+                        }`}
+                        onClick={bank.accountType === 'CURRENT' 
+                          ? (e) => {
+                              e.stopPropagation();
+                              handleBankClick(bank);
+                            }
+                          : undefined
+                        }
+                      >
+                        <p className="text-sm font-medium text-gray-300">
+                          Dernières transactions
+                        </p>
+                        {bank.accountType === 'CURRENT' && (
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        )}
+                      </div>
                       <div className="space-y-2 mb-4">
                         {transactions
                           .filter(t => t.bankId === bank.id)
-                          .slice(0, 4)
+                          .slice(0, 3)
                           .map((transaction) => (
-                            <div key={transaction.id} className="flex justify-between items-center text-sm">
-                              <span className="text-gray-700 truncate flex-1 mr-2">
+                            <div 
+                              key={transaction.id} 
+                              className="flex justify-between items-center text-sm"
+                            >
+                              <span className="text-gray-400 truncate flex-1 mr-2">
                                 {transaction.description}
                               </span>
-                              <span className={`font-semibold ${
-                                transaction.amount > 0 ? 'text-green-600' : 'text-red-600'
-                              }`}>
-                                {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                              </span>
+                              <div className="flex items-center space-x-2">
+                                <span className={`font-semibold ${
+                                  transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
+                                }`}>
+                                  {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
+                                </span>
+                              </div>
                             </div>
                           ))}
                       </div>
-                      
-                      {/* Bouton "Voir tout" avec flèche */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBankClick(bank);
-                        }}
-                        className={`w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                          bank.accountType === 'CURRENT'
-                            ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                        }`}
-                        disabled={bank.accountType !== 'CURRENT'}
-                      >
-                        <span>Voir tout</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
                     </div>
                   ) : (
                     <div>
-                      <p className="text-sm font-medium text-gray-700 mb-3">
-                        Transactions
-                      </p>
-                      <div className="text-sm text-gray-500 mb-4">
+                      <div 
+                        className={`flex items-center justify-between mb-3 ${
+                          bank.accountType === 'CURRENT' 
+                            ? 'cursor-pointer hover:bg-white/5 rounded px-2 py-1 -mx-2 -my-1' 
+                            : ''
+                        }`}
+                        onClick={bank.accountType === 'CURRENT' 
+                          ? (e) => {
+                              e.stopPropagation();
+                              handleBankClick(bank);
+                            }
+                          : undefined
+                        }
+                      >
+                        <p className="text-sm font-medium text-gray-300">
+                          Transactions
+                        </p>
+                        {bank.accountType === 'CURRENT' && (
+                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="text-sm text-gray-400 mb-4">
                         Aucune transaction récente
                       </div>
-                      
-                      {/* Bouton "Voir tout" avec flèche */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleBankClick(bank);
-                        }}
-                        className={`w-full flex items-center justify-center space-x-2 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                          bank.accountType === 'CURRENT'
-                            ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                            : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                        }`}
-                        disabled={bank.accountType !== 'CURRENT'}
-                      >
-                        <span>Voir tout</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
                     </div>
                   )}
                 </div>
@@ -817,25 +910,42 @@ export default function Banks() {
         {/* Carte d'ajout de banque - toujours visible */}
         {!showAddForm ? (
           <div 
-            className="bg-white shadow rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors flex flex-col h-full min-h-[365px] cursor-pointer"
+            className="shadow rounded-lg border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
+            style={{ 
+              borderColor: '#9ca3af' // même couleur que text-gray-400
+            } as React.CSSProperties}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#6226fa';
+              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
+              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
+              if (icon) icon.style.color = '#6226fa';
+              if (text) text.style.color = '#6226fa';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#9ca3af';
+              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
+              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
+              if (icon) icon.style.color = '#9ca3af';
+              if (text) text.style.color = '#9ca3af';
+            }}
             onClick={() => {
               setShowAddForm(true);
               setEditingBank(null); // Annuler l'édition si en cours
             }}
           >
             <div className="flex flex-col items-center justify-center h-full p-6">
-              <div className="text-gray-400 mb-4">
+              <div className="mb-4 transition-colors icon-plus" style={{ color: '#9ca3af' }}>
                 <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
               </div>
-              <p className="text-gray-500 text-center font-medium">
+              <p className="text-center font-medium transition-colors text-add" style={{ color: '#9ca3af' }}>
                 Ajouter une banque
               </p>
             </div>
           </div>
         ) : (
-          <div className="bg-white shadow rounded-lg border-2 border-blue-300 flex flex-col h-full min-h-[365px]">
+          <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
               {/* Section principale - même structure qu'une carte de banque */}
               <div className="p-6 flex-1">
@@ -844,7 +954,8 @@ export default function Banks() {
                   <div className="flex items-center">
                     {/* Logo/Image - même taille que les cartes (w-12 h-12) */}
                     <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center bg-blue-100 border-2 border-dashed border-blue-300 flex-shrink-0 cursor-pointer hover:bg-blue-200 transition-colors"
+                      className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
+                      style={{ borderColor: '#6226fa', backgroundColor: '#f0f0ff' }}
                       onClick={() => document.getElementById('imageInput-add')?.click()}
                       title="Cliquez pour choisir une image"
                     >
@@ -855,7 +966,7 @@ export default function Banks() {
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
-                        <span className="text-lg font-bold text-blue-600">
+                        <span className="text-lg font-bold" style={{ color: '#6226fa' }}>
                           {formData.shortName || '+'}
                         </span>
                       )}
@@ -941,7 +1052,8 @@ export default function Banks() {
                       type="text"
                       value={formData.shortName}
                       onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
+                      style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
                       placeholder="Nom court (BNP)"
                       maxLength={3}
                       required
@@ -950,7 +1062,8 @@ export default function Banks() {
                       type="date"
                       value={formData.createdAt}
                       onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
+                      style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
                       required
                     />
                   </div>
@@ -961,7 +1074,7 @@ export default function Banks() {
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Utilisateurs ayant accès *
                       </label>
-                      <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded max-h-16 overflow-y-auto">
+                      <div className="flex flex-wrap gap-1 p-2 border border-gray-300 rounded max-h-16 overflow-y-auto custom-scrollbar">
                         {users.map(user => (
                           <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded text-xs">
                             <input
@@ -980,7 +1093,8 @@ export default function Banks() {
                                   });
                                 }
                               }}
-                              className="w-3 h-3 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              className="w-3 h-3 rounded border-gray-300 focus:ring-2"
+                              style={{ color: '#6226fa', accentColor: '#6226fa' }}
                             />
                             <div className="flex items-center space-x-1">
                               {user.avatar ? (
@@ -990,7 +1104,7 @@ export default function Banks() {
                                   className="w-3 h-3 rounded-full object-cover"
                                 />
                               ) : (
-                                <div className="w-3 h-3 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
+                                <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#6226fa' }}>
                                   {user.name.charAt(0).toUpperCase()}
                                 </div>
                               )}
@@ -1050,7 +1164,8 @@ export default function Banks() {
                     <button
                       type="submit"
                       disabled={!formData.name.trim() || !formData.shortName.trim() || formData.userIds.length === 0}
-                      className="px-3 py-1 text-xs border border-transparent rounded text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ backgroundColor: '#6227f5' }}
                     >
                       Ajouter
                     </button>

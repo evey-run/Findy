@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Fond global du site */
+body {
+  background-color: #202427;
+  min-height: 100vh;
+}
+
+#root {
+  background-color: #202427;
+  min-height: 100vh;
+}
+
 /* Force French date format for all date inputs */
 input[type="date"] {
   position: relative;
