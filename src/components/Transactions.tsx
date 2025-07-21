@@ -1523,27 +1523,26 @@ export default function Transactions() {
 
       {/* Modal d'import CSV */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              {/* En-tête */}
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Importer des transactions depuis un fichier CSV
-                </h3>
-                <button
-                  onClick={() => setShowImportModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-24 mx-auto p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
+            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
+              <h3 className="text-lg font-bold text-white">
+                Importer des transactions depuis un fichier CSV
+              </h3>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-6">
 
               {/* Sélection de la banque */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Banque de destination *
                 </label>
                 <select
@@ -1552,18 +1551,16 @@ export default function Transactions() {
                     const bank = banks.find(b => b.id === e.target.value);
                     setSelectedBank(bank || null);
                   }}
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
+                  style={{ backgroundColor: '#1f2226' }}
                   required
                 >
                   <option value="">Sélectionnez une banque...</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
                     const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                     const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
-                    
                     return (
-                      <option key={bank.id} value={bank.id}>
-                        {bank.name}{bankUsersText}
-                      </option>
+                      <option key={bank.id} value={bank.id}>{bank.name}{bankUsersText}</option>
                     );
                   })}
                 </select>
@@ -1576,16 +1573,16 @@ export default function Transactions() {
 
               {/* Zone de drop de fichier */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
                   Fichier CSV *
                 </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-gray-400 transition-colors">
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-700 border-dashed rounded-md hover:border-gray-400 transition-colors" style={{ backgroundColor: '#23262b' }}>
                   <div className="space-y-1 text-center">
                     <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                       <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <div className="flex text-sm text-gray-600">
-                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                    <div className="flex text-sm text-gray-400">
+                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-[#1f2226] rounded-md font-medium text-purple-400 hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 px-2 py-1">
                         <span>Choisir un fichier</span>
                         <input
                           id="csv-upload"
@@ -1604,21 +1601,21 @@ export default function Transactions() {
                   </div>
                 </div>
                 {csvFile && (
-                  <div className="mt-2 text-sm text-green-600">
+                  <div className="mt-2 text-sm text-green-400">
                     ✓ Fichier sélectionné: {csvFile.name}
                   </div>
                 )}
               </div>
 
               {/* Format attendu */}
-              <div className="mb-6 p-4 bg-blue-50 rounded-md">
-                <h4 className="text-sm font-medium text-blue-900 mb-2">Format CSV attendu:</h4>
-                <div className="text-xs text-blue-800 font-mono bg-white p-2 rounded border">
+              <div className="mb-6 p-4 rounded-md" style={{ background: '#23262b' }}>
+                <h4 className="text-sm font-medium text-purple-300 mb-2">Format CSV attendu:</h4>
+                <div className="text-xs text-purple-200 font-mono bg-[#1f2226] p-2 rounded border border-gray-700">
                   Date,Description,Montant<br/>
                   2025-01-15,"Achat supermarché",-45.67<br/>
                   2025-01-16,"Virement salaire",2500.00
                 </div>
-                <p className="text-xs text-blue-700 mt-2">
+                <p className="text-xs text-purple-200 mt-2">
                   • Date au format YYYY-MM-DD, DD/MM/YYYY ou DD-MM-YYYY<br/>
                   • Montant: nombres décimaux (négatif = débit, positif = crédit)
                 </p>
@@ -1628,14 +1625,15 @@ export default function Transactions() {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="px-4 py-2 text-sm font-medium text-gray-300 bg-[#23262b] border border-gray-700 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleImportCSV}
                   disabled={!csvFile || !selectedBank || importProgress.isImporting}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: '#6226fa' }}
                 >
                   {importProgress.isImporting ? 'Import en cours...' : 'Importer'}
                 </button>
