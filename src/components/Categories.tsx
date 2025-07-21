@@ -685,7 +685,10 @@ export default function Categories() {
                              categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
                              categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}
                             </span>
-                            <span className={`text-xl font-bold ${categorySpending.isOverBudget ? 'text-red-400' : 'text-violet-400'}`}>
+                            <span 
+                              className="text-xl font-bold"
+                              style={{ color: categorySpending.isOverBudget ? '#ef4444' : '#6226fa' }}
+                            >
                               {Math.round(categorySpending.percentage)}%
                             </span>
                           </div>
