@@ -620,126 +620,136 @@ export default function Categories() {
                   </div>
                 </form>
               ) : (
-                <div className="p-6 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div 
-                        className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                        style={{ backgroundColor: category.color }}
-                      >
-                        {category.icon || category.name.charAt(0).toUpperCase()}
+                <>
+                  <div className="p-6 flex-1 flex flex-col">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div 
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
+                          style={{ backgroundColor: category.color }}
+                        >
+                          {category.icon || category.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="ml-4">
+                          <h3 className="text-lg font-medium text-white">{category.name}</h3>
+                          <p className="text-sm text-gray-300">
+                            {getTypeLabel(category.type)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="ml-4">
-                        <h3 className="text-lg font-medium text-white">{category.name}</h3>
-                        <p className="text-sm text-gray-300">
-                          {getTypeLabel(category.type)}
-                        </p>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleEdit(category)}
+                          className="text-gray-500 hover:text-violet-400 transition-colors"
+                          title="Modifier"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(category.id)}
+                          className="text-gray-500 hover:text-red-400 transition-colors"
+                          title="Supprimer"
+                        >
+                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(category)}
-                        className="text-gray-500 hover:text-violet-400 transition-colors"
-                        title="Modifier"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                      </button>
-                      <button
-                        onClick={() => handleDelete(category.id)}
-                        className="text-gray-500 hover:text-red-400 transition-colors"
-                        title="Supprimer"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
+
+                    <div className="mt-4">
+                      {/* Budget progress for EXPENSE categories */}
+                      {category.type === 'EXPENSE' && categoryBudget && categorySpending && (
+                        <div>
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-sm font-medium text-gray-300">
+                              Budget {categoryBudget.period === 'MONTHLY' ? 'Mensuel' : 
+                             categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
+                             categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}
+                            </span>
+                            <span className={`text-2xl font-bold ${categorySpending.isOverBudget ? 'text-red-400' : 'text-violet-400'}`}>
+                              {Math.round(categorySpending.percentage)}%
+                            </span>
+                          </div>
+                          
+                          <div className="w-full rounded-full h-3" style={{ backgroundColor: '#1f2226' }}>
+                            <div
+                              className="h-3 rounded-full transition-all duration-300"
+                              style={{ 
+                                width: `${Math.min(categorySpending.percentage, 100)}%`,
+                                backgroundColor: categorySpending.isOverBudget ? '#ef4444' : '#6226fa'
+                              }}
+                            />
+                          </div>
+                          
+                          <div className="flex justify-between text-sm text-gray-400 mt-2">
+                            <span></span>
+                            <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-gray-400'}>
+                              {formatCurrency(categorySpending.totalSpent)}/{formatCurrency(categoryBudget.amount)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* No budget message for EXPENSE categories */}
+                      {category.type === 'EXPENSE' && !categoryBudget && (
+                        <div className="p-3 rounded-md" style={{ backgroundColor: '#1f2226' }}>
+                          <div className="flex items-center justify-center text-gray-400 mb-2">
+                            <ChartBarIcon className="h-4 w-4 mr-1" />
+                            <span className="text-sm">Pas de budget défini</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="mt-4 flex-1">
-                    {/* Budget progress for EXPENSE categories */}
-                    {category.type === 'EXPENSE' && categoryBudget && categorySpending && (
+                  <div className="px-6 py-4" style={{ backgroundColor: '#1f2226' }}>
+                    {/* Section des transactions - identique à Banks */}
+                    {transactions.filter(t => t.categoryId === category.id).length > 0 ? (
                       <div>
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="text-sm font-medium text-gray-300">
-                            Budget {categoryBudget.period === 'MONTHLY' ? 'Mensuel' : 
-                           categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
-                           categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}
-                          </span>
-                          <span className={`text-2xl font-bold ${categorySpending.isOverBudget ? 'text-red-400' : 'text-violet-400'}`}>
-                            {Math.round(categorySpending.percentage)}%
-                          </span>
-                        </div>
-                        
-                        <div className="w-full rounded-full h-3" style={{ backgroundColor: '#1f2226' }}>
-                          <div
-                            className="h-3 rounded-full transition-all duration-300"
-                            style={{ 
-                              width: `${Math.min(categorySpending.percentage, 100)}%`,
-                              backgroundColor: categorySpending.isOverBudget ? '#ef4444' : '#6226fa'
-                            }}
-                          />
-                        </div>
-                        
-                        <div className="flex justify-between text-sm text-gray-400 mt-2">
-                          <span></span>
-                          <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-gray-400'}>
-                            {formatCurrency(categorySpending.totalSpent)}/{formatCurrency(categoryBudget.amount)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Transactions section */}
-                    <div className={`${category.type === 'EXPENSE' && categoryBudget && categorySpending ? 'mt-4 pt-4' : 'mt-2'}`} 
-                         style={{ borderTop: category.type === 'EXPENSE' && categoryBudget && categorySpending ? '1px solid #3a3d42' : 'none' }}>
-                      
-                      {transactions.filter(t => t.categoryId === category.id).length > 0 ? (
-                        <div>
-                          <p className="text-sm text-gray-400 mb-3">
-                            Transactions récentes
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-medium text-gray-300">
+                            Dernières transactions
                           </p>
-                          <div className="space-y-2">
-                            {transactions
-                              .filter(t => t.categoryId === category.id)
-                              .slice(0, 3)
-                              .map((transaction) => (
-                                <div key={transaction.id} className="flex justify-between items-center text-sm">
-                                  <span className="text-gray-400 truncate flex-1 mr-2">
-                                    {transaction.description}
-                                  </span>
+                        </div>
+                        <div className="space-y-2 mb-4">
+                          {transactions
+                            .filter(t => t.categoryId === category.id)
+                            .slice(0, 3)
+                            .map((transaction) => (
+                              <div 
+                                key={transaction.id} 
+                                className="flex justify-between items-center text-sm"
+                              >
+                                <span className="text-gray-400 truncate flex-1 mr-2">
+                                  {transaction.description}
+                                </span>
+                                <div className="flex items-center space-x-2">
                                   <span className={`font-semibold ${
                                     transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
                                   }`}>
                                     {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
                                   </span>
                                 </div>
-                              ))}
-                          </div>
+                              </div>
+                            ))}
                         </div>
-                      ) : (
-                        <div className="text-center py-4">
-                          <ChartBarIcon className="h-8 w-8 text-gray-600 mx-auto mb-2" />
-                          <p className="text-sm text-gray-500">
-                            Aucune transaction pour cette catégorie
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-medium text-gray-300">
+                            Transactions
                           </p>
                         </div>
-                      )}
-                    </div>
-
-                    {/* No budget message for EXPENSE categories */}
-                    {category.type === 'EXPENSE' && !categoryBudget && (
-                      <div className="mt-4 p-3 rounded-md" style={{ backgroundColor: '#1f2226' }}>
-                        <div className="flex items-center justify-center text-gray-400 mb-2">
-                          <ChartBarIcon className="h-4 w-4 mr-1" />
-                          <span className="text-sm">Pas de budget défini</span>
+                        <div className="text-sm text-gray-400 mb-4">
+                          Aucune transaction récente
                         </div>
                       </div>
                     )}
                   </div>
-                </div>
+                </>
               )}
             </div>
           );
