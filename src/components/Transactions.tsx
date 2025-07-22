@@ -1695,8 +1695,8 @@ export default function Transactions() {
 
       {/* Modal de modification en lot */}
       {showBulkEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-24 mx-auto p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+          <div className="relative p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
             <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
               {/* En-tête */}
               <h3 className="text-lg font-bold text-white">
@@ -1742,7 +1742,7 @@ export default function Transactions() {
                       >
                         <option value="">Toutes les catégories</option>
                         <option value="undefined">Non défini</option>
-                        {categories.map(category => (
+                                               {categories.map(category => (
                           <option key={category.id} value={category.id}>{category.name}</option>
                         ))}
                       </select>
@@ -1794,13 +1794,6 @@ export default function Transactions() {
                         <option value="false">Non pointé</option>
                       </select>
                     </div>
-                  </div>
-
-                  {/* Aperçu des transactions concernées */}
-                  <div className="mt-4 p-3 rounded-md" style={{ background: '#1f2226' }}>
-                    <p className="text-sm font-medium text-blue-300">
-                      Aperçu : {bulkEditTransactions.length} transaction(s) seront modifiées
-                    </p>
                   </div>
                 </div>
 
