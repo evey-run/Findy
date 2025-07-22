@@ -188,6 +188,7 @@ export default function Transactions() {
     changeChecked: { enabled: false, checked: false },
     changeBank: { enabled: false, bankId: '' }
   });
+  const [bulkEditTransactions, setBulkEditTransactions] = useState([]);
   const [bulkEditProgress, setBulkEditProgress] = useState({
     isProcessing: false,
     processed: 0,
@@ -953,6 +954,24 @@ export default function Transactions() {
       console.error('Erreur lors de la recherche:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fonction pour rechercher des transactions dans le formulaire de modification en lot
+  const handleBulkSearch = async () => {
+    setBulkEditProgress(p => ({ ...p, isProcessing: true }));
+    try {
+      // Appel à l'API backend pour récupérer toutes les transactions correspondant aux filtres
+      const res = await fetch('/api/transactions/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(bulkEditFilters)
+      });
+      const data = await res.json();
+      setBulkEditTransactions(data.transactions || []);
+      setBulkEditProgress(p => ({ ...p, isProcessing: false, errors: [] }));
+    } catch (err) {
+      setBulkEditProgress(p => ({ ...p, isProcessing: false, errors: [err.message || 'Erreur lors de la recherche'] }));
     }
   };
 
@@ -1780,7 +1799,7 @@ export default function Transactions() {
                   {/* Aperçu des transactions concernées */}
                   <div className="mt-4 p-3 rounded-md" style={{ background: '#1f2226' }}>
                     <p className="text-sm font-medium text-blue-300">
-                      Aperçu : {getBulkEditTargetTransactions().length} transaction(s) seront modifiées
+                      Aperçu : {bulkEditTransactions.length} transaction(s) seront modifiées
                     </p>
                   </div>
                 </div>

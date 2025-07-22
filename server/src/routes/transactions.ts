@@ -19,11 +19,15 @@ router.get('/', async (req, res) => {
     }
     // Ajout du filtre de recherche par mot-clé
     if (search && typeof search === 'string' && search.trim() !== '') {
+      // Nettoyage des espaces et normalisation
+      const normalizedSearch = search.trim().toLowerCase();
       where.description = {
-        contains: search,
+        contains: normalizedSearch,
         mode: 'insensitive'
       };
+      console.log('🔍 Recherche description (normalisée):', normalizedSearch);
     }
+    console.log('🔍 Filtre where:', JSON.stringify(where));
     
     // Forcer le rechargement - incluant image pour les banques
     const transactions = await prisma.transaction.findMany({
