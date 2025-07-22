@@ -944,6 +944,18 @@ export default function Transactions() {
     );
   }
 
+  const handleSearch = async () => {
+    setFilters({ ...filters, searchText: searchInput });
+    setLoading(true);
+    try {
+      await loadTransactions({ searchText: searchInput });
+    } catch (error) {
+      console.error('Erreur lors de la recherche:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
       <style>{`
@@ -1031,7 +1043,7 @@ export default function Transactions() {
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
-                  setFilters({ ...filters, searchText: searchInput });
+                  handleSearch();
                 }
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"

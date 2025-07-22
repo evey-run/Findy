@@ -37,7 +37,7 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: () => Promise<void>;
+  loadTransactions: (options?: { searchText?: string }) => Promise<void>;
   loadMoreTransactions: (page: number, itemsPerPage: number) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
@@ -191,35 +191,33 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      loadTransactions: async () => {
+      loadTransactions: async (options?: { searchText?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
-            accountType: 'CURRENT', // Toujours filtrer par comptes courants
-            page: '1',
-            limit: '50'
+            accountType: 'CURRENT',
+            page: '1'
           });
-          
-          // Ajouter les filtres de dates seulement s'ils sont définis et non vides
+          if (!options?.searchText) {
+            params.append('limit', '50');
+          }
           if (state.dateRange.startDate && state.dateRange.startDate !== '') {
             params.append('startDate', state.dateRange.startDate);
           }
           if (state.dateRange.endDate && state.dateRange.endDate !== '') {
             params.append('endDate', state.dateRange.endDate);
           }
-          
           if (state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
-          
+          if (options?.searchText) {
+            params.append('search', options.searchText);
+          }
           const response = await fetch(`/api/transactions?${params}`);
           const data = await response.json();
-          
-          // Gérer la nouvelle structure de réponse avec pagination
           if (data.transactions) {
             set({ transactions: data.transactions });
           } else {
-            // Rétrocompatibilité avec l'ancienne API
             set({ transactions: data });
           }
         } catch (error) {

@@ -7,10 +7,8 @@ const prisma = new PrismaClient();
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
   try {
-    const { bankId, categoryId, shared, startDate, endDate, limit, offset } = req.query;
-    
+    const { bankId, categoryId, shared, startDate, endDate, limit, offset, search } = req.query;
     const where: any = {};
-    
     if (bankId) where.bankId = bankId;
     if (categoryId) where.categoryId = categoryId;
     if (shared !== undefined) where.shared = shared === 'true';
@@ -18,6 +16,13 @@ router.get('/', async (req, res) => {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate as string);
       if (endDate) where.date.lte = new Date(endDate as string);
+    }
+    // Ajout du filtre de recherche par mot-clé
+    if (search && typeof search === 'string' && search.trim() !== '') {
+      where.description = {
+        contains: search,
+        mode: 'insensitive'
+      };
     }
     
     // Forcer le rechargement - incluant image pour les banques
