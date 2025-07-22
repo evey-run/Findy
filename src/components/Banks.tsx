@@ -107,7 +107,7 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
 };
 
 export default function Banks() {
-  const { banks, transactions, users, loadBanks, loadTransactions, setSelectedBank, selectedUser } = useAppStore();
+  const { banks, transactions, users, loadBanks, loadTransactions, selectedUser } = useAppStore();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -127,14 +127,12 @@ export default function Banks() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
-    // Réinitialiser la banque sélectionnée quand on arrive sur la page banques
-    setSelectedBank(null);
-    // Forcer le rechargement des banques
+    // Charger toutes les transactions sans filtre
     const initBanks = async () => {
       setLoading(true);
       try {
         await loadBanks();
-        await loadTransactions();
+        await loadTransactions({ forceLoadAll: true }); // Forcer le chargement global
         if (showArchived) {
           await loadArchivedBanks();
         }
@@ -144,7 +142,6 @@ export default function Banks() {
         setLoading(false);
       }
     };
-    
     initBanks();
   }, [loadBanks, loadTransactions, showArchived, selectedUser]);
 
@@ -188,8 +185,8 @@ export default function Banks() {
       return;
     }
     
-    setSelectedBank(bank);
-    console.log('🏦 Selected bank set, navigating to transactions...');
+    // Navigation vers la page Transactions sans modifier selectedBank
+    console.log('🏦 Navigating to transactions...');
     navigate('/transactions');
   };
 

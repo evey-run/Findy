@@ -37,7 +37,7 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string }) => Promise<void>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean }) => Promise<void>;
   loadMoreTransactions: (page: number, itemsPerPage: number) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
@@ -191,23 +191,22 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      loadTransactions: async (options?: { searchText?: string }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
             accountType: 'CURRENT',
             page: '1'
           });
-          if (!options?.searchText) {
-            params.append('limit', '50');
-          }
+          // Ajouter les filtres de dates
           if (state.dateRange.startDate && state.dateRange.startDate !== '') {
             params.append('startDate', state.dateRange.startDate);
           }
           if (state.dateRange.endDate && state.dateRange.endDate !== '') {
             params.append('endDate', state.dateRange.endDate);
           }
-          if (state.selectedBank) {
+          // Ne pas filtrer par banque si forceLoadAll est true
+          if (!options?.forceLoadAll && state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
           if (options?.searchText) {
