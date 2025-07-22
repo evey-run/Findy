@@ -397,6 +397,12 @@ export default function Banks() {
     }
   };
 
+  const getCurrentBalance = (bankId: string, initialBalance: number) => {
+    const bankTransactions = transactions.filter(t => t.bankId === bankId);
+    const transactionsSum = bankTransactions.reduce((sum, t) => sum + t.amount, 0);
+    return initialBalance + transactionsSum;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -823,7 +829,7 @@ export default function Banks() {
                       Solde actuel
                     </div>
                     <div className="text-2xl font-bold text-white">
-                      {formatAmount(bank.balance)}
+                      {formatAmount(getCurrentBalance(bank.id, bank.balance))}
                     </div>
                   </div>
                 </div>
