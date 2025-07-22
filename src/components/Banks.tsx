@@ -127,6 +127,8 @@ export default function Banks() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
+    // Réinitialiser la banque sélectionnée quand on arrive sur la page banques
+    setSelectedBank(null);
     // Forcer le rechargement des banques
     const initBanks = async () => {
       setLoading(true);
