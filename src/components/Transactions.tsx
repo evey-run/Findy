@@ -195,6 +195,9 @@ export default function Transactions() {
     errors: [] as string[]
   });
 
+  // État local pour la saisie du texte de recherche
+  const [searchInput, setSearchInput] = useState('');
+
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
@@ -1024,8 +1027,13 @@ export default function Transactions() {
             <input
               type="text"
               placeholder="Rechercher..."
-              value={filters.searchText}
-              onChange={(e) => setFilters({...filters, searchText: e.target.value})}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setFilters({ ...filters, searchText: searchInput });
+                }
+              }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
             />
