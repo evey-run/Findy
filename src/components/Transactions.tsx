@@ -421,9 +421,9 @@ export default function Transactions() {
   };
 
   // Filtrer les transactions selon la banque sélectionnée et autres filtres
+  // Filtering transactions (update comparison to be type-safe)
   const filteredTransactions = transactions.filter(transaction => {
-    // Filtre par banque sélectionnée
-    if (selectedBank && transaction.bankId !== selectedBank.id) {
+    if (selectedBank && String(transaction.bankId) !== String(selectedBank.id)) {
       return false;
     }
     

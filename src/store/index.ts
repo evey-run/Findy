@@ -195,7 +195,6 @@ export const useAppStore = create<AppState>()(
         try {
           const state = get();
           const params = new URLSearchParams({
-            accountType: 'CURRENT',
             page: '1'
           });
           // Ajouter les filtres de dates
