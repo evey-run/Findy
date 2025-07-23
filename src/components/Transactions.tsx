@@ -216,7 +216,7 @@ export default function Transactions() {
           date: new Date().toISOString().split('T')[0],
           checked: false,
           categoryId: categories[0]?.id || '',
-          bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
+          bankId: banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id || ''
         });
       } catch (error) {
         console.error('Error initializing data:', error);
@@ -410,7 +410,7 @@ export default function Transactions() {
           date: new Date().toISOString().split('T')[0],
           checked: false,
           categoryId: categories[0]?.id || '',
-          bankId: banks.filter(bank => bank.accountType === 'CURRENT')[0]?.id || ''
+          bankId: banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id || ''
         });
       } else {
         console.error('Error creating transaction:', await response.text());
@@ -1040,7 +1040,7 @@ export default function Transactions() {
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
             >
               <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes les banques</option>
-              {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
+              {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
                 // Récupérer les utilisateurs associés à cette banque
                 const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                 const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
@@ -1198,7 +1198,7 @@ export default function Transactions() {
                   required
                 >
                   <option value="" style={{ backgroundColor: '#272a2f' }}>Sélectionnez une banque</option>
-                  {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
+                  {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
                     const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                     const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                     
@@ -1591,7 +1591,7 @@ export default function Transactions() {
                   required
                 >
                   <option value="">Sélectionnez une banque...</option>
-                  {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => {
+                  {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
                     const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                     const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                     return (
@@ -1756,7 +1756,7 @@ export default function Transactions() {
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Toutes les banques</option>
-                        {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
+                        {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => (
                           <option key={bank.id} value={bank.id}>{bank.name}</option>
                         ))}
                       </select>
@@ -2005,7 +2005,7 @@ export default function Transactions() {
                         style={{ backgroundColor: '#1f2226' }}
                       >
                         <option value="">Sélectionner une banque</option>
-                        {banks.filter(bank => bank.accountType === 'CURRENT').map(bank => (
+                        {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => (
                           <option key={bank.id} value={bank.id}>{bank.name}</option>
                         ))}
                       </select>
