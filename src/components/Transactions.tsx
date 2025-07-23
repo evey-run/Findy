@@ -152,6 +152,10 @@ export default function Transactions() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const ITEMS_PER_PAGE = 50;
+  
+  // États pour la sélection multiple
+  const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
 
   // Vérifie si tous les utilisateurs sont sélectionnés (selectedUser est null)
   // const allUsersSelected = selectedUser === null;
@@ -929,6 +933,104 @@ export default function Transactions() {
       loadMoreData();
     }
   };
+  
+  // Fonctions pour la sélection multiple
+  const handleToggleSelect = (id: string) => {
+    setSelectedTransactions(prev => {
+      if (prev.includes(id)) {
+        return prev.filter(transactionId => transactionId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+  
+  const handleToggleSelectAll = () => {
+    if (selectAll) {
+      setSelectedTransactions([]);
+    } else {
+      setSelectedTransactions(filteredTransactions.map(t => t.id));
+    }
+    setSelectAll(!selectAll);
+  };
+  
+  // États pour suivre la progression de la suppression
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState({
+    total: 0,
+    processed: 0,
+    success: 0,
+    errors: 0
+  });
+  
+  const handleDeleteSelected = async () => {
+    if (selectedTransactions.length === 0) return;
+    
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer ${selectedTransactions.length} transaction(s) ?`)) {
+      return;
+    }
+    
+    try {
+      // Initialiser l'indicateur de progression
+      setDeleteProgress({
+        total: selectedTransactions.length,
+        processed: 0,
+        success: 0,
+        errors: 0
+      });
+      
+      // Afficher l'indicateur de progression
+      setIsDeleting(true);
+      
+      // Supprimer chaque transaction sélectionnée
+      for (const id of selectedTransactions) {
+        try {
+          const response = await fetch(`/api/transactions/${id}`, {
+            method: 'DELETE',
+          });
+          
+          if (response.ok) {
+            removeTransaction(id);
+            setDeleteProgress(prev => ({
+              ...prev,
+              processed: prev.processed + 1,
+              success: prev.success + 1
+            }));
+          } else {
+            setDeleteProgress(prev => ({
+              ...prev,
+              processed: prev.processed + 1,
+              errors: prev.errors + 1
+            }));
+            console.error(`Échec de la suppression de la transaction ${id}:`, response.status);
+          }
+        } catch (error) {
+          setDeleteProgress(prev => ({
+            ...prev,
+            processed: prev.processed + 1,
+            errors: prev.errors + 1
+          }));
+          console.error(`Erreur lors de la suppression de la transaction ${id}:`, error);
+        }
+      }
+      
+      // Réinitialiser la sélection
+      setSelectedTransactions([]);
+      setSelectAll(false);
+      setIsDeleting(false);
+      
+      // Afficher un message de résultat
+      if (deleteProgress.errors === 0) {
+        alert(`${deleteProgress.success} transaction(s) supprimée(s) avec succès.`);
+      } else {
+        alert(`${deleteProgress.success} transaction(s) supprimée(s) avec succès. ${deleteProgress.errors} échec(s).`);
+      }
+    } catch (error) {
+      console.error('Erreur lors de la suppression multiple:', error);
+      alert('Une erreur est survenue lors de la suppression multiple.');
+      setIsDeleting(false);
+    }
+  };
 
   // Réinitialiser la pagination quand les filtres changent
   useEffect(() => {
@@ -1021,6 +1123,17 @@ export default function Transactions() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
             </svg>
             Importer CSV
+          </button>
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedTransactions.length === 0 || isDeleting}
+            className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${selectedTransactions.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
+            style={{ backgroundColor: '#dc2626' }}
+          >
+            <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            {isDeleting ? `Suppression... ${deleteProgress.processed}/${deleteProgress.total}` : `Supprimer (${selectedTransactions.length})`}
           </button>
         </div>
       </div>
@@ -1130,6 +1243,14 @@ export default function Transactions() {
           <table className="w-full divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
             <tr>
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-10">
+                <input
+                  type="checkbox"
+                  checked={selectAll}
+                  onChange={handleToggleSelectAll}
+                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                />
+              </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
                 Date
               </th>
@@ -1159,6 +1280,8 @@ export default function Transactions() {
           <tbody className="divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
             {/* Add form row - always visible as first row */}
             <tr className="border-l-4" style={{ backgroundColor: '#1f2226', borderLeftColor: '#6226fa' }}>
+              {/* Cellule vide pour aligner avec la colonne de checkbox */}
+              <td className="px-4 py-2"></td>
               <td className="px-4 py-2">
                 <input
                   type="date"
@@ -1274,6 +1397,15 @@ export default function Transactions() {
                 onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #6226fa'}
                 onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
               >
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                  <input
+                    type="checkbox"
+                    checked={selectedTransactions.includes(transaction.id)}
+                    onChange={() => handleToggleSelect(transaction.id)}
+                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
                     <input
