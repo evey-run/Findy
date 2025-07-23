@@ -1338,8 +1338,7 @@ export default function Transactions() {
                     <select
                       value={editingTransaction?.categoryId || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
                     >
                       {categories.map(category => (
                         <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
@@ -1351,12 +1350,13 @@ export default function Transactions() {
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      style={{ backgroundColor: '#1f2226' }}
                       autoFocus
                     >
                       <option value="">Non défini</option>
                       {categories.map(category => (
-                        <option key={category.id} value={category.id}>{category.name}</option>
+                        <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
                       ))}
                     </select>
                   ) : (
@@ -1392,7 +1392,7 @@ export default function Transactions() {
                       autoFocus
                     >
                       {banks
-                        .filter((bank: Bank) => bank.accountType === 'CURRENT')
+                        .filter((bank: Bank) => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')
                         .map((bank: Bank) => {
                           // Vérifier si la banque a des utilisateurs
                           const bankWithUsers = bank as Bank & { userBanks?: Array<{ user?: { name: string } }> };
