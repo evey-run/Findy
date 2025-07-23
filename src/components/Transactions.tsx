@@ -115,6 +115,19 @@ interface InlineEditCell {
   field: 'amount' | 'description' | 'date' | 'category' | 'bank' | 'checked';
 }
 
+// Fonction de formatage du montant
+const formatAmount = (amount: number) => {
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR'
+  }).format(amount);
+};
+
+// Fonction de formatage de la date
+const formatDate = (dateString: string) => {
+  return new Date(dateString).toLocaleDateString('fr-FR');
+};
+
 export default function Transactions() {
   const { 
     transactions, 
@@ -423,10 +436,10 @@ export default function Transactions() {
       console.error('Error creating transaction:', error);
     }
   };
-
-  // Filtrer les transactions selon la banque sélectionnée et autres filtres
-  // Filtering transactions (update comparison to be type-safe)
+  
+  // Filtrer les transactions en fonction des critères
   const filteredTransactions = transactions.filter(transaction => {
+    // Filtre par banque sélectionnée
     if (selectedBank && String(transaction.bankId) !== String(selectedBank.id)) {
       return false;
     }
@@ -457,24 +470,26 @@ export default function Transactions() {
       return false;
     }
     
-    // Filtre par recherche de texte
-    if (filters.searchText && !transaction.description.toLowerCase().includes(filters.searchText.toLowerCase())) {
-      return false;
+    // Filtre par recherche de texte ou montant
+    if (filters.searchText) {
+      const searchLower = filters.searchText.toLowerCase();
+      const descriptionMatch = transaction.description.toLowerCase().includes(searchLower);
+      
+      // Recherche dans le montant (convertir le montant en string pour la recherche)
+      const amountStr = transaction.amount.toString();
+      const amountMatch = amountStr.includes(searchLower);
+      
+      // Recherche dans le montant formaté (ex: "123,45 €")
+      const formattedAmount = formatAmount(transaction.amount).toLowerCase();
+      const formattedAmountMatch = formattedAmount.includes(searchLower);
+      
+      if (!descriptionMatch && !amountMatch && !formattedAmountMatch) {
+        return false;
+      }
     }
     
     return true;
   });
-  
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR');
-  };
 
   // Fonction pour afficher les avatars des utilisateurs
   const renderUserAvatars = (users: any[], style?: React.CSSProperties) => {
