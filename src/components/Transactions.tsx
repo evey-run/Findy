@@ -18,7 +18,7 @@ const editableCellStyle = `
 const scrollbarStyles = `
   /* Webkit browsers (Chrome, Safari, Edge) */
   ::-webkit-scrollbar {
-    width: 8px;
+    width: 12px;
   }
   
   ::-webkit-scrollbar-track {
@@ -27,30 +27,30 @@ const scrollbarStyles = `
   }
   
   ::-webkit-scrollbar-thumb {
-    background: #6226fa;
+    background: #272a2f;
     border-radius: 8px;
     border: 1px solid #1f2226;
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed;
+    background: #6227f5;
     border: 1px solid #1f2226;
   }
   
   ::-webkit-scrollbar-thumb:active {
-    background: #6226fa;
+    background: #6227f5;
     border: 1px solid #1f2226;
   }
   
   /* Firefox */
   html {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
+    scrollbar-width: auto;
+    scrollbar-color: #272a2f #1f2226;
   }
   
   /* Styles spécifiques pour les conteneurs avec scroll */
   .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
+    width: 12px;
   }
   
   .custom-scrollbar::-webkit-scrollbar-track {
@@ -59,25 +59,25 @@ const scrollbarStyles = `
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #6226fa !important;
+    background: #272a2f !important;
     border-radius: 8px;
     border: 1px solid #1f2226;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed !important;
+    background: #6227f5 !important;
     border: 1px solid #1f2226;
   }
   
   .custom-scrollbar::-webkit-scrollbar-thumb:active {
-    background: #6226fa !important;
+    background: #6227f5 !important;
     border: 1px solid #1f2226;
   }
   
   /* Force pour tous les scrollbars */
   * {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
+    scrollbar-width: auto;
+    scrollbar-color: #272a2f #1f2226;
   }
   
   /* Couleur des séparateurs de lignes */
@@ -1258,7 +1258,7 @@ export default function Transactions() {
           <table className="w-full divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
           <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-10">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-8">
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -1266,28 +1266,28 @@ export default function Transactions() {
                   className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                 />
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
                 Date
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-80">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-64">
                 Description
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
                 Catégorie
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-40">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
                 Banque
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
                 Propriétaires
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-28">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
                 Montant
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
                 Pointé
               </th>
-              <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-20">
+              <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
                 Actions
               </th>
             </tr>

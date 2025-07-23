@@ -183,9 +183,26 @@ export const useAppStore = create<AppState>()(
         })),
       updateTransaction: (id: string, updatedTransaction: Partial<Transaction>) =>
         set((state) => ({
-          transactions: state.transactions.map((t) =>
-            t.id === id ? { ...t, ...updatedTransaction } : t
-          ),
+          transactions: state.transactions.map((t) => {
+            if (t.id === id) {
+              // Préserver les informations des utilisateurs de la banque si elles ne sont pas fournies
+              const updatedBank = updatedTransaction.bank 
+                ? {
+                    ...updatedTransaction.bank,
+                    // Si la banque est mise à jour mais que les utilisateurs ne sont pas fournis, conserver les utilisateurs existants
+                    users: updatedTransaction.bank.users || (t.bank ? t.bank.users : [])
+                  }
+                : t.bank;
+              
+              return { 
+                ...t, 
+                ...updatedTransaction,
+                // S'assurer que les informations de la banque sont correctement fusionnées
+                bank: updatedBank
+              };
+            }
+            return t;
+          }),
         })),
       removeTransaction: (id: string) =>
         set((state) => ({
