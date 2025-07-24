@@ -739,6 +739,9 @@ export default function Categories() {
                           <p className="text-sm font-medium text-gray-300">
                             Dernières transactions
                           </p>
+                          <span className="text-gray-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                            &gt;
+                          </span>
                         </div>
                         <div className="space-y-2 mb-4">
                           {transactions
@@ -769,6 +772,9 @@ export default function Categories() {
                           <p className="text-sm font-medium text-gray-300">
                             Transactions
                           </p>
+                          <span className="text-gray-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                            &gt;
+                          </span>
                         </div>
                         <div className="text-sm text-gray-400 mb-4">
                           Aucune transaction récente
