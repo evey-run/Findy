@@ -590,18 +590,15 @@ export default function Budgets() {
                                 key={transaction.id} 
                                 className="flex flex-col mb-2 pb-2 border-b border-gray-700 last:border-b-0 last:pb-0 last:mb-0"
                               >
-                                <div className="flex justify-between items-center text-sm">
-                                  <span className="text-gray-400 truncate flex-1 mr-2">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-gray-400 truncate flex-1 mr-2 text-xs">
                                     {transaction.description}
                                   </span>
                                   <div className="flex items-center space-x-2">
-                                    <span className="font-semibold text-green-400">
+                                    <span className="font-semibold text-green-400 text-xs">
                                       +{transaction.amount.toLocaleString('fr-FR')} €
                                     </span>
                                   </div>
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {new Date(transaction.date).toLocaleDateString('fr-FR')}
                                 </div>
                               </div>
                             ))}

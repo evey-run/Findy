@@ -774,7 +774,12 @@ export default function Banks() {
                         </div>
                       )}
                       <div className="ml-4">
-                        <h3 className="text-lg font-medium text-white">{bank.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-medium text-white">{bank.name}</h3>
+                          <span className="text-xs text-gray-400">
+                            Créé le {new Date(bank.createdAt).toLocaleDateString('fr-FR')}
+                          </span>
+                        </div>
                         <p className="text-sm text-gray-300">
                           {getAccountTypeInfo(bank.accountType).label}
                           {!selectedUser && bank.users && bank.users.length > 0 && (
@@ -837,27 +842,12 @@ export default function Banks() {
                   {transactions.filter(t => t.bankId === bank.id).length > 0 ? (
                     <div>
                       <div 
-                        className={`flex items-center justify-between mb-3 ${
-                          bank.accountType === 'CURRENT' 
-                            ? 'cursor-pointer hover:bg-white/5 rounded px-2 py-1 -mx-2 -my-1' 
-                            : ''
-                        }`}
-                        onClick={bank.accountType === 'CURRENT' 
-                          ? (e) => {
-                              e.stopPropagation();
-                              handleBankClick(bank);
-                            }
-                          : undefined
-                        }
+                        className="flex items-center justify-between mb-3"
                       >
                         <p className="text-sm font-medium text-gray-300">
                           Dernières transactions
                         </p>
-                        {bank.accountType === 'CURRENT' && (
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        )}
+
                       </div>
                       <div className="space-y-2 mb-4">
                         {transactions
@@ -868,11 +858,11 @@ export default function Banks() {
                               key={transaction.id} 
                               className="flex justify-between items-center text-sm"
                             >
-                              <span className="text-gray-400 truncate flex-1 mr-2">
+                              <span className="text-gray-400 truncate flex-1 mr-2 text-xs">
                                 {transaction.description}
                               </span>
                               <div className="flex items-center space-x-2">
-                                <span className={`font-semibold ${
+                                <span className={`font-semibold text-xs ${
                                   transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
                                 }`}>
                                   {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
@@ -885,27 +875,12 @@ export default function Banks() {
                   ) : (
                     <div>
                       <div 
-                        className={`flex items-center justify-between mb-3 ${
-                          bank.accountType === 'CURRENT' 
-                            ? 'cursor-pointer hover:bg-white/5 rounded px-2 py-1 -mx-2 -my-1' 
-                            : ''
-                        }`}
-                        onClick={bank.accountType === 'CURRENT' 
-                          ? (e) => {
-                              e.stopPropagation();
-                              handleBankClick(bank);
-                            }
-                          : undefined
-                        }
+                        className="flex items-center justify-between mb-3"
                       >
                         <p className="text-sm font-medium text-gray-300">
                           Transactions
                         </p>
-                        {bank.accountType === 'CURRENT' && (
-                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        )}
+
                       </div>
                       <div className="text-sm text-gray-400 mb-4">
                         Aucune transaction récente

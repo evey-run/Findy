@@ -749,11 +749,11 @@ export default function Categories() {
                                 key={transaction.id} 
                                 className="flex justify-between items-center text-sm"
                               >
-                                <span className="text-gray-400 truncate flex-1 mr-2">
+                                <span className="text-gray-400 truncate flex-1 mr-2 text-xs">
                                   {transaction.description}
                                 </span>
                                 <div className="flex items-center space-x-2">
-                                  <span className={`font-semibold ${
+                                  <span className={`font-semibold text-xs ${
                                     transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
                                   }`}>
                                     {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
