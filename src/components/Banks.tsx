@@ -977,7 +977,7 @@ export default function Banks() {
                         type="text"
                         value={formData.iban}
                         onChange={(e) => setFormData({...formData, iban: e.target.value})}
-                        className="text-xs text-gray-400 font-mono border-none focus:ring-0 p-0 bg-transparent w-full"
+                        className="text-xs text-gray-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
                         placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
                       />
                     </div>

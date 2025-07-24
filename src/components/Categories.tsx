@@ -502,7 +502,7 @@ export default function Categories() {
               {editingId === category.id ? (
                 /* Edit Form Card - appears in place of the category being edited */
                 <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full">
-                  <div className="p-6 flex-1">
+                  <div className="p-4 flex-1">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
                         <div 
@@ -537,8 +537,8 @@ export default function Categories() {
                             <select
                               value={editingCategory?.type || ''}
                               onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                              className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
-                              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+                              className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
+                              style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                               required
                             >
                               {categoryTypes.map(type => (
@@ -600,8 +600,8 @@ export default function Categories() {
                                 startDate: new Date().toISOString().split('T')[0]
                               }
                             } : null)}
-                            className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
-                            style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+                            className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
+                            style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                           >
                             <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
                             <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>
@@ -613,7 +613,7 @@ export default function Categories() {
                     )}
                   </div>
                   
-                  <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+                  <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
                     <div className="flex justify-between items-center">
                       <div className="text-sm text-gray-500">
                         Modifier la catégorie
@@ -784,9 +784,9 @@ export default function Categories() {
 
         {/* Add Category Form Card */}
         {showAddForm ? (
-          <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
+          <div className="shadow rounded-lg border-2 flex flex-col h-72" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
             <form onSubmit={handleAddCategory} className="flex flex-col h-full">
-              <div className="p-6 flex-1">
+              <div className="p-4 flex-1">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
                     <div 
@@ -821,7 +821,8 @@ export default function Categories() {
                         <select
                           value={editingCategory?.type || ''}
                           onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                          className="text-sm text-white border-none focus:ring-0 bg-transparent rounded-md py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+                          className="text-xs text-white border-none focus:ring-0 bg-transparent rounded-md"
+                          style={{ backgroundColor: '#1f2226', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                           required
                         >
                           {categoryTypes.map(type => (
@@ -883,7 +884,8 @@ export default function Categories() {
                             startDate: new Date().toISOString().split('T')[0]
                           }
                         } : null)}
-                        className="text-sm text-white border-none focus:ring-0 bg-transparent rounded-md py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+                        className="text-xs text-white border-none focus:ring-0 bg-transparent rounded-md"
+                        style={{ backgroundColor: '#1f2226', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                       >
                         <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
                         <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>
@@ -895,7 +897,7 @@ export default function Categories() {
                 )}
               </div>
               
-              <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+              <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
                 <div className="flex justify-between items-center">
                   <div className="text-sm text-gray-500">
                     Nouvelle catégorie
