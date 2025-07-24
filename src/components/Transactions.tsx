@@ -456,8 +456,12 @@ export default function Transactions() {
     }
     
     // Filtre par statut pointé
-    if (filters.checked !== '' && transaction.checked.toString() !== filters.checked) {
-      return false;
+    if (filters.checked !== '') {
+      // Conversion explicite en booléen pour la comparaison
+      const isChecked = filters.checked === 'true';
+      if (transaction.checked !== isChecked) {
+        return false;
+      }
     }
     
     // Filtre par date de début
