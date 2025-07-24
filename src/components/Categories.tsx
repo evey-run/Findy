@@ -784,7 +784,7 @@ export default function Categories() {
 
         {/* Add Category Form Card */}
         {showAddForm ? (
-          <div className="shadow rounded-lg border-2 flex flex-col h-72" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
+          <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
             <form onSubmit={handleAddCategory} className="flex flex-col h-full">
               <div className="p-4 flex-1">
                 <div className="flex items-center justify-between mb-4">
