@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Objective, Transaction } from '../types';
-import {
-  TrophyIcon,
-  CheckCircleIcon,
-  ChartBarIcon
+import { 
+  TrophyIcon, 
+  ChartBarIcon 
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -98,13 +97,23 @@ export default function Budgets() {
 
   // Fonction pour filtrer les transactions par objectif
   const getObjectiveTransactions = (objectiveTitle: string): Transaction[] => {
-    const searchPattern = `economie ${objectiveTitle.toLowerCase()}`;
+    // Créer plusieurs patterns possibles pour être plus flexible
+    const possiblePatterns = [
+      `economie ${objectiveTitle.toLowerCase()}`,
+      `économie ${objectiveTitle.toLowerCase()}`,
+      `epargne ${objectiveTitle.toLowerCase()}`,
+      `épargne ${objectiveTitle.toLowerCase()}`,
+      objectiveTitle.toLowerCase()
+    ];
+    
     return transactions
-      .filter(transaction => 
-        transaction.description.toLowerCase().includes(searchPattern)
-      )
+      .filter(transaction => {
+        const lowerDesc = transaction.description.toLowerCase();
+        // Vérifier si au moins un des patterns correspond
+        return possiblePatterns.some(pattern => lowerDesc.includes(pattern));
+      })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 3);
+      .slice(0, 3); // Afficher les 3 dernières transactions
   };
 
   const fetchObjectiveProgress = async (objectiveId: string) => {
@@ -260,28 +269,9 @@ export default function Budgets() {
     setEditingObjective(null);
   };
 
-  const getProgressColor = (percentage: number, isCompleted: boolean) => {
-    if (isCompleted) return 'bg-green-500';
-    if (percentage >= 80) return 'bg-blue-500';
-    if (percentage >= 60) return 'bg-yellow-500';
-    if (percentage >= 40) return 'bg-orange-500';
-    return 'bg-red-500';
-  };
-
-  const getStatusIcon = (percentage: number, isCompleted: boolean) => {
-    if (isCompleted) return <TrophyIcon className="h-6 w-6 text-yellow-500" />;
-    if (percentage >= 80) return <CheckCircleIcon className="h-6 w-6 text-green-500" />;
-    if (percentage >= 40) return <ChartBarIcon className="h-6 w-6 text-blue-500" />;
-    
-    // Utiliser l'icône de trophée pour tous les objectifs
-    return <TrophyIcon className="h-6 w-6 text-gray-600" />;
-  };
-
   const isOverdue = (deadline: string) => {
     return new Date(deadline) < new Date();
   };
-
-
 
   // Calculer les statistiques
   const totalObjectives = objectives.length;
@@ -574,22 +564,35 @@ export default function Budgets() {
                         <div>
                           <div className="flex items-center justify-between mb-3">
                             <p className="text-sm font-medium text-gray-300">
-                              Dernières transactions
+                              Dernières transactions ({objectiveTransactions.length})
                             </p>
+                            {objectiveTransactions.length > 0 && (
+                              <button 
+                                className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                                onClick={() => alert(`Toutes les transactions pour l'objectif ${objective.title} seront affichées dans une future mise à jour.`)}
+                              >
+                                Voir tout
+                              </button>
+                            )}
                           </div>
                           <div className="space-y-2 mb-4">
                             {objectiveTransactions.map((transaction) => (
                               <div 
                                 key={transaction.id} 
-                                className="flex justify-between items-center text-sm"
+                                className="flex flex-col mb-2 pb-2 border-b border-gray-700 last:border-b-0 last:pb-0 last:mb-0"
                               >
-                                <span className="text-gray-400 truncate flex-1 mr-2">
-                                  {transaction.description}
-                                </span>
-                                <div className="flex items-center space-x-2">
-                                  <span className="font-semibold text-green-400">
-                                    +{transaction.amount.toLocaleString('fr-FR')} €
+                                <div className="flex justify-between items-center text-sm">
+                                  <span className="text-gray-400 truncate flex-1 mr-2">
+                                    {transaction.description}
                                   </span>
+                                  <div className="flex items-center space-x-2">
+                                    <span className="font-semibold text-green-400">
+                                      +{transaction.amount.toLocaleString('fr-FR')} €
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {new Date(transaction.date).toLocaleDateString('fr-FR')}
                                 </div>
                               </div>
                             ))}
