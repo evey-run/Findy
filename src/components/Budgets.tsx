@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Objective, Transaction } from '../types';
 import { 
   TrophyIcon, 
-  ChartBarIcon 
+  ChartBarIcon,
+  ArrowRightIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -21,6 +23,7 @@ interface ObjectiveProgress {
 
 
 export default function Budgets() {
+  const navigate = useNavigate();
   const { loadCategories, loadBanks, transactions, loadTransactions } = useAppStore();
   
   const [objectives, setObjectives] = useState<Objective[]>([]);
@@ -568,10 +571,16 @@ export default function Budgets() {
                             </p>
                             {objectiveTransactions.length > 0 && (
                               <button 
-                                className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
-                                onClick={() => alert(`Toutes les transactions pour l'objectif ${objective.title} seront affichées dans une future mise à jour.`)}
+                                className="text-purple-400 hover:text-purple-300 transition-colors flex items-center"
+                                onClick={() => {
+                                  // Créer le pattern de recherche pour la page transactions
+                                  const searchPattern = `Économie ${objective.title}`;
+                                  // Naviguer vers la page transactions avec le paramètre de recherche
+                                  navigate(`/transactions?search=${encodeURIComponent(searchPattern)}`);
+                                }}
+                                title="Voir toutes les transactions"
                               >
-                                Voir tout
+                                <ArrowRightIcon className="h-4 w-4" />
                               </button>
                             )}
                           </div>

@@ -19,13 +19,37 @@ router.get('/', async (req, res) => {
     }
     // Ajout du filtre de recherche par mot-clé
     if (search && typeof search === 'string' && search.trim() !== '') {
-      // Nettoyage des espaces et normalisation
-      const normalizedSearch = search.trim().toLowerCase();
-      where.description = {
-        contains: normalizedSearch,
-        mode: 'insensitive'
-      };
-      console.log('🔍 Recherche description (normalisée):', normalizedSearch);
+      // Nettoyage des espaces et normalisation (suppression des accents)
+      const normalizedSearch = search.trim().toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // Supprime les accents
+      
+      // Utiliser une expression régulière pour la recherche insensible à la casse
+      // Prisma ne supporte pas directement la recherche insensible aux accents
+      // Nous utilisons donc une approche alternative avec plusieurs conditions OR
+      
+      // Créer une version avec accents possibles pour la recherche
+      const searchWithAccents = search.trim();
+      
+      // Recherche avec plusieurs conditions OR pour maximiser les correspondances
+      where.OR = [
+        {
+          // Recherche standard insensible à la casse
+          description: {
+            contains: searchWithAccents,
+            mode: 'insensitive'
+          }
+        },
+        {
+          // Recherche avec la version normalisée (sans accents)
+          description: {
+            contains: normalizedSearch,
+            mode: 'insensitive'
+          }
+        }
+      ];
+      
+      console.log('🔍 Recherche description (normalisée sans accents):', normalizedSearch);
+      console.log('🔍 Recherche description (avec accents possibles):', searchWithAccents);
     }
     console.log('🔍 Filtre where:', JSON.stringify(where));
     

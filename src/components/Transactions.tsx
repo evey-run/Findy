@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import Papa from 'papaparse';
+import { useLocation } from 'react-router-dom';
 
 // CSS pour les cellules éditables
 const editableCellStyle = `
@@ -215,16 +216,37 @@ export default function Transactions() {
 
   // État local pour la saisie du texte de recherche
   const [searchInput, setSearchInput] = useState('');
+  
+  // Récupérer les paramètres d'URL
+  const location = useLocation();
 
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
       try {
-        await Promise.all([
-          loadTransactions(),
-          loadCategories(),
-          loadBanks()
-        ]);
+        // Récupérer le paramètre de recherche depuis l'URL
+        const searchParams = new URLSearchParams(location.search);
+        const searchFromURL = searchParams.get('search');
+        
+        if (searchFromURL) {
+          // Mettre à jour l'input de recherche avec la valeur de l'URL
+          setSearchInput(searchFromURL);
+          // Mettre à jour les filtres affichés
+          setFilters(prev => ({ ...prev, searchText: searchFromURL }));
+          // Charger les transactions avec le filtre de recherche
+          await Promise.all([
+            loadTransactions({ searchText: searchFromURL }),
+            loadCategories(),
+            loadBanks()
+          ]);
+        } else {
+          // Chargement normal sans filtre
+          await Promise.all([
+            loadTransactions(),
+            loadCategories(),
+            loadBanks()
+          ]);
+        }
         // Initialiser le formulaire d'ajout
         setEditingTransaction({
           id: '',
