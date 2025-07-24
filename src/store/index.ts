@@ -221,10 +221,8 @@ export const useAppStore = create<AppState>()(
           if (state.dateRange.endDate && state.dateRange.endDate !== '') {
             params.append('endDate', state.dateRange.endDate);
           }
-          // Ne pas filtrer par banque si forceLoadAll est true
-          if (!options?.forceLoadAll && state.selectedBank) {
-            params.append('bankId', state.selectedBank.id);
-          }
+          // Ne jamais filtrer par banque pour les transactions dans les pages catégories et objectifs
+          // Le filtrage par banque est conservé uniquement dans la page Transactions
           if (options?.searchText) {
             params.append('search', options.searchText);
           }
@@ -301,10 +299,8 @@ export const useAppStore = create<AppState>()(
           const state = get();
           const params = new URLSearchParams();
           
-          // Ne pas filtrer par banque si forceLoadAll est true
-          if (!forceLoadAll && state.selectedBank) {
-            params.append('bankId', state.selectedBank.id);
-          }
+          // Ne jamais filtrer par banque pour les budgets
+          // Même si une banque est sélectionnée
           
           const response = await fetch(`/api/budgets?${params}`);
           const budgets = await response.json();

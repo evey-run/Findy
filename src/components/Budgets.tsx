@@ -4,8 +4,7 @@ import type { Objective, Transaction } from '../types';
 import {
   TrophyIcon,
   CheckCircleIcon,
-  ChartBarIcon,
-  ClockIcon
+  ChartBarIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -23,7 +22,7 @@ interface ObjectiveProgress {
 
 
 export default function Budgets() {
-  const { loadCategories, loadBanks, transactions } = useAppStore();
+  const { loadCategories, loadBanks, transactions, loadTransactions } = useAppStore();
   
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: ObjectiveProgress }>({});
@@ -70,7 +69,9 @@ export default function Budgets() {
     loadObjectives();
     loadCategories();
     loadBanks();
-  }, []);
+    // Charger toutes les transactions sans filtrage par banque
+    loadTransactions({ forceLoadAll: true });
+  }, [loadCategories, loadBanks, loadTransactions]);
 
   useEffect(() => {
     // Charger les données de progression pour chaque objectif
