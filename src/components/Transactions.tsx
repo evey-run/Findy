@@ -1442,7 +1442,7 @@ export default function Transactions() {
                     />
                   ) : (
                     <span 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'date')}
+                      onClick={() => handleInlineEdit(transaction.id, 'date')}
                       className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
                       title="Double-cliquez pour éditer"
                     >
@@ -1472,7 +1472,7 @@ export default function Transactions() {
                     />
                   ) : (
                     <span 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'description')}
+                      onClick={() => handleInlineEdit(transaction.id, 'description')}
                       className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
                       title="Double-cliquez pour éditer"
                     >
@@ -1508,8 +1508,8 @@ export default function Transactions() {
                     </select>
                   ) : (
                     <span 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'category')}
-                      className="cursor-pointer rounded px-1 py-0.5 editable-cell inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      onClick={() => handleInlineEdit(transaction.id, 'category')}
+                      className="cursor-pointer editable-cell inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium"
                       style={
                         transaction.category
                           ? {
@@ -1523,7 +1523,14 @@ export default function Transactions() {
                       }
                       title="Double-cliquez pour éditer"
                     >
-                      {transaction.category ? transaction.category.name : 'Non défini'}
+                      {transaction.category ? (
+                        <>
+                          {transaction.category.icon && (
+                            <span className="mr-1.5 text-base">{transaction.category.icon}</span>
+                          )}
+                          {transaction.category.name}
+                        </>
+                      ) : 'Non défini'}
                     </span>
                   )}
                 </td>
@@ -1555,7 +1562,7 @@ export default function Transactions() {
                     </select>
                   ) : (
                     <div 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'bank')}
+                      onClick={() => handleInlineEdit(transaction.id, 'bank')}
                       className="cursor-pointer rounded px-1 py-0.5 editable-cell flex items-center hover:opacity-80"
                       title="Double-cliquez pour éditer"
                     >
@@ -1576,8 +1583,10 @@ export default function Transactions() {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300">
-                  {renderUserAvatars(transaction.bank.users || [], { border: '2px solid #1f2226' })}
+                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300 text-center">
+                  <div className="flex justify-center">
+                    {renderUserAvatars(transaction.bank.users || [], { border: '2px solid #1f2226' })}
+                  </div>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
@@ -1603,7 +1612,7 @@ export default function Transactions() {
                     />
                   ) : (
                     <span 
-                      onDoubleClick={() => handleInlineEdit(transaction.id, 'amount')}
+                      onClick={() => handleInlineEdit(transaction.id, 'amount')}
                       className={`cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80 ${transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}
                       title="Double-cliquez pour éditer"
                     >
@@ -1624,7 +1633,7 @@ export default function Transactions() {
                       <span className="ml-1 text-gray-300">Pointé</span>
                     </label>
                   ) : (
-                    <label className="flex items-center text-xs text-gray-300">
+                    <label className="flex items-center text-xs text-gray-300 cursor-pointer" onClick={() => handleInlineEdit(transaction.id, 'checked')}>
                       <input
                         type="checkbox"
                         checked={transaction.checked}
