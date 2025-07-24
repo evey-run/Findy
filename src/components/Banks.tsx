@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Bank } from '../types/index.js';
 
@@ -108,7 +107,6 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
 
 export default function Banks() {
   const { banks, transactions, users, loadBanks, loadTransactions, selectedUser } = useAppStore();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -174,20 +172,6 @@ export default function Banks() {
     } catch (error) {
       console.error('Error restoring bank:', error);
     }
-  };
-
-  const handleBankClick = (bank: Bank) => {
-    console.log('🏦 Bank clicked:', bank.name);
-    
-    // Empêcher la sélection des comptes qui ne sont pas des comptes courants
-    if (bank.accountType !== 'CURRENT') {
-      alert(`Ce compte "${bank.name}" est un ${getAccountTypeInfo(bank.accountType).label.toLowerCase()}. Seuls les comptes courants peuvent être sélectionnés pour voir les transactions.`);
-      return;
-    }
-    
-    // Navigation vers la page Transactions sans modifier selectedBank
-    console.log('🏦 Navigating to transactions...');
-    navigate('/transactions');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -599,8 +583,8 @@ export default function Banks() {
                                 console.log('🔧 Selected account type:', e.target.value);
                                 setFormData({...formData, accountType: e.target.value as any});
                               }}
-                              className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
-                              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+                              className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
+                              style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                             >
                               <option value="CURRENT">Compte courant</option>
                               <option value="SAVINGS">Livret d'épargne</option>
@@ -637,14 +621,14 @@ export default function Banks() {
                     
                     {/* Champs supplémentaires en mode compact */}
                     <div className="space-y-2 mb-4">
-                      {/* Nom court et Date sur la même ligne */}
-                      <div className="grid grid-cols-2 gap-2">
+                      {/* Nom court, Date et Solde sur la même ligne */}
+                      <div className="grid grid-cols-3 gap-2">
                         <input
                           type="text"
                           value={formData.shortName}
                           onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
-                          style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
+                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
                           placeholder="Nom court (BNP)"
                           maxLength={3}
                           required
@@ -653,8 +637,18 @@ export default function Banks() {
                           type="date"
                           value={formData.createdAt}
                           onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                          className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
-                          style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
+                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          required
+                        />
+                        <input
+                          type="number"
+                          step="1"
+                          value={formData.balance}
+                          onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold"
+                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          placeholder="Solde initial"
                           required
                         />
                       </div>
@@ -707,22 +701,7 @@ export default function Banks() {
                         </div>
                       )}
                     </div>
-                    
-                    {/* Solde - même position et style que les cartes */}
-                    <div className="mt-4">
-                      <div className="text-sm text-gray-300 mb-1">
-                        Solde actuel
-                      </div>
-                      <input
-                        type="number"
-                        step="1"
-                        value={formData.balance}
-                        onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                        className="text-2xl font-bold text-white border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
-                        placeholder="0,00 €"
-                        required
-                      />
-                    </div>
+
                   </div>
                   
                   {/* Footer - même style que les cartes */}
@@ -735,7 +714,8 @@ export default function Banks() {
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                          className="px-3 py-1 text-xs border rounded hover:opacity-80"
+                          style={{ backgroundColor: '#1f2226', color: '#a0aec0', borderColor: '#3a3d42' }}
                         >
                           Annuler
                         </button>
@@ -972,7 +952,7 @@ export default function Banks() {
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="text-lg font-medium text-gray-900 border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
+                        className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
                         placeholder="Nom de la banque"
                         required
                       />
@@ -982,8 +962,8 @@ export default function Banks() {
                         <select
                           value={formData.accountType}
                           onChange={(e) => setFormData({...formData, accountType: e.target.value as any})}
-                          className="text-sm border-none focus:ring-0 bg-transparent rounded-md py-2 px-3"
-                          style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+                          className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
+                          style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                         >
                           <option value="CURRENT">Compte courant</option>
                           <option value="SAVINGS">Livret d'épargne</option>
@@ -1033,14 +1013,14 @@ export default function Banks() {
                 
                 {/* Champs supplémentaires en mode compact */}
                 <div className="space-y-2 mb-4">
-                  {/* Nom court et Date sur la même ligne */}
-                  <div className="grid grid-cols-2 gap-2">
+                  {/* Nom court, Date et Solde sur la même ligne */}
+                  <div className="grid grid-cols-3 gap-2">
                     <input
                       type="text"
                       value={formData.shortName}
                       onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
-                      style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
+                      className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
+                      style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
                       placeholder="Nom court (BNP)"
                       maxLength={3}
                       required
@@ -1049,8 +1029,18 @@ export default function Banks() {
                       type="date"
                       value={formData.createdAt}
                       onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:border-gray-400"
-                      style={{ '--tw-ring-color': '#6226fa', '--tw-border-opacity': '1' } as any}
+                      className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
+                      style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                      required
+                    />
+                    <input
+                      type="number"
+                      step="1"
+                      value={formData.balance}
+                      onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
+                      className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold"
+                      style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                      placeholder="Solde initial"
                       required
                     />
                   </div>
@@ -1103,26 +1093,11 @@ export default function Banks() {
                     </div>
                   )}
                 </div>
-                
-                {/* Solde - même position et style que les cartes */}
-                <div className="mt-4">
-                  <div className="text-sm text-gray-500 mb-1">
-                    Solde initial
-                  </div>
-                  <input
-                    type="number"
-                    step="1"
-                    value={formData.balance}
-                    onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                    className="text-2xl font-bold text-gray-900 border-none focus:ring-0 p-0 bg-transparent w-full"
-                    placeholder="0,00 €"
-                    required
-                  />
-                </div>
+
               </div>
               
               {/* Footer - même style que les cartes */}
-              <div className="bg-gray-50 px-6 py-3 rounded-b-lg">
+              <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
                 <div className="flex justify-between items-center">
                   <div className="text-sm text-gray-500">
                     Nouveau compte
@@ -1144,7 +1119,8 @@ export default function Banks() {
                         setImagePreview(null);
                         setImageFile(null);
                       }}
-                      className="px-3 py-1 text-xs border border-gray-300 rounded text-gray-700 hover:bg-gray-100"
+                      className="px-3 py-1 text-xs border rounded hover:opacity-80"
+                      style={{ backgroundColor: '#1f2226', color: '#a0aec0', borderColor: '#3a3d42' }}
                     >
                       Annuler
                     </button>
