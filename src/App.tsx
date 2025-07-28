@@ -7,7 +7,6 @@ import Transactions from './components/Transactions';
 import Investissement from './components/Investissement';
 import Categories from './components/Categories';
 import Budgets from './components/Budgets';
-import Recurrences from './components/Recurrences';
 import Banks from './components/Banks';
 import Users from './components/Users';
 import { Toaster } from 'react-hot-toast';
@@ -18,9 +17,7 @@ function App() {
     loadCategories, 
     loadTransactions, 
     loadBudgets, 
-    loadRecurrences, 
-    loadDashboardOverview,
-    processRecurrences
+    loadDashboardOverview
   } = useAppStore();
 
   useEffect(() => {
@@ -31,18 +28,14 @@ function App() {
         await loadCategories();
         await loadTransactions();
         await loadBudgets();
-        await loadRecurrences();
         await loadDashboardOverview();
-        
-        // Traiter automatiquement les récurrences dues aujourd'hui
-        await processRecurrences();
       } catch (error) {
         console.error('Failed to initialize app:', error);
       }
     };
 
     initializeApp();
-  }, [loadUsers, loadCategories, loadTransactions, loadBudgets, loadRecurrences, loadDashboardOverview, processRecurrences]);
+  }, [loadUsers, loadCategories, loadTransactions, loadBudgets, loadDashboardOverview]);
 
   return (
     <Router>
@@ -55,7 +48,6 @@ function App() {
             <Route path="/investissement" element={<Investissement />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/budgets" element={<Budgets />} />
-            <Route path="/recurrences" element={<Recurrences />} />
             <Route path="/banks" element={<Banks />} />
             <Route path="/users" element={<Users />} />
           </Routes>

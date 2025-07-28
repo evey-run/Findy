@@ -7,7 +7,6 @@ import {
   CreditCardIcon,
   TagIcon,
   ChartBarIcon,
-  ArrowPathIcon,
   BuildingLibraryIcon,
   UserIcon,
   ChevronDownIcon,
@@ -24,7 +23,6 @@ const navigation = [
   { name: 'Investissements', href: '/investissement', icon: CreditCardIcon },
   { name: 'Catégories', href: '/categories', icon: TagIcon },
   { name: 'Objectifs', href: '/budgets', icon: ChartBarIcon },
-  { name: 'Récurrences', href: '/recurrences', icon: ArrowPathIcon },
   { name: 'Banques', href: '/banks', icon: BuildingLibraryIcon },
   { name: 'Utilisateurs', href: '/users', icon: UserIcon },
 ];

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { User, Bank, Transaction, Category, Budget, Recurrence, DashboardOverview } from '../types';
+import type { User, Bank, Transaction, Category, Budget, DashboardOverview } from '../types';
 
 interface AppState {
   // Users
@@ -49,14 +49,7 @@ interface AppState {
   removeBudget: (id: string) => void;
   loadBudgets: (forceLoadAll?: boolean) => Promise<void>;
   
-  // Recurrences
-  recurrences: Recurrence[];
-  setRecurrences: (recurrences: Recurrence[]) => void;
-  addRecurrence: (recurrence: Recurrence) => void;
-  updateRecurrence: (id: string, recurrence: Partial<Recurrence>) => void;
-  removeRecurrence: (id: string) => void;
-  loadRecurrences: () => Promise<void>;
-  processRecurrences: () => Promise<void>;
+  // Recurrences section removed
   
   // Dashboard
   dashboardData: DashboardOverview | null;
@@ -299,9 +292,9 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           budgets: state.budgets.filter((b) => b.id !== id),
         })),
-      loadBudgets: async (forceLoadAll: boolean = false) => {
+      loadBudgets: async () => {
         try {
-          const state = get();
+          // Pas besoin de filtres pour les budgets
           const params = new URLSearchParams();
           
           // Ne jamais filtrer par banque pour les budgets
@@ -312,69 +305,6 @@ export const useAppStore = create<AppState>()(
           set({ budgets });
         } catch (error) {
           console.error('Failed to load budgets:', error);
-        }
-      },
-      
-      // Recurrences
-      recurrences: [],
-      setRecurrences: (recurrences: Recurrence[]) => set({ recurrences }),
-      addRecurrence: (recurrence: Recurrence) =>
-        set((state) => ({ 
-          recurrences: [recurrence, ...state.recurrences] 
-        })),
-      updateRecurrence: (id: string, updatedRecurrence: Partial<Recurrence>) =>
-        set((state) => ({
-          recurrences: state.recurrences.map((r) =>
-            r.id === id ? { ...r, ...updatedRecurrence } : r
-          ),
-        })),
-      removeRecurrence: (id: string) =>
-        set((state) => ({
-          recurrences: state.recurrences.filter((r) => r.id !== id),
-        })),
-      loadRecurrences: async () => {
-        try {
-          const state = get();
-          const params = new URLSearchParams();
-          if (state.selectedBank) {
-            params.append('bankId', state.selectedBank.id);
-          }
-          const response = await fetch(`/api/recurrences?${params}`);
-          const recurrences = await response.json();
-          set({ recurrences });
-        } catch (error) {
-          console.error('Failed to load recurrences:', error);
-        }
-      },
-      processRecurrences: async () => {
-        try {
-          const response = await fetch('/api/recurrences/process', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (!response.ok) {
-            throw new Error('Failed to process recurrences');
-          }
-          
-          const result = await response.json();
-          console.log('Recurrences processed:', result);
-          
-          // Recharger les récurrences et transactions si des changements ont été effectués
-          if (result.success > 0) {
-            await Promise.all([
-              get().loadRecurrences(),
-              get().loadTransactions(),
-              get().loadDashboardOverview()
-            ]);
-          }
-          
-          return result;
-        } catch (error) {
-          console.error('Failed to process recurrences:', error);
-          throw error;
         }
       },
       
