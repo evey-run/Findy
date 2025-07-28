@@ -461,6 +461,12 @@ export default function Transactions() {
   
   // Filtrer les transactions en fonction des critères
   const filteredTransactions = transactions.filter(transaction => {
+    // Exclure les transactions liées aux banques de type investissement
+    const transactionBank = banks.find(bank => bank.id === transaction.bankId);
+    if (transactionBank && transactionBank.accountType === 'INVESTMENT') {
+      return false;
+    }
+    
     // Filtre par banque sélectionnée
     if (selectedBank && String(transaction.bankId) !== String(selectedBank.id)) {
       return false;
