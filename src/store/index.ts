@@ -212,7 +212,8 @@ export const useAppStore = create<AppState>()(
         try {
           const state = get();
           const params = new URLSearchParams({
-            page: '1'
+            page: '1',
+            limit: options?.forceLoadAll ? '1000' : '50' // Limiter à 50 transactions par défaut
           });
           // Ajouter les filtres de dates
           if (state.dateRange.startDate && state.dateRange.startDate !== '') {
