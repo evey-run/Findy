@@ -4,6 +4,7 @@ import { useAppStore } from './store';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import Transactions from './components/Transactions';
+import Investissement from './components/Investissement';
 import Categories from './components/Categories';
 import Budgets from './components/Budgets';
 import Recurrences from './components/Recurrences';
@@ -51,6 +52,7 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/transactions" element={<Transactions />} />
+            <Route path="/investissement" element={<Investissement />} />
             <Route path="/categories" element={<Categories />} />
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/recurrences" element={<Recurrences />} />
