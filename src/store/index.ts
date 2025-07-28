@@ -227,6 +227,11 @@ export const useAppStore = create<AppState>()(
           if (options?.searchText) {
             params.append('search', options.searchText);
           }
+          
+          // Ajouter le filtre de banque si une banque est sélectionnée
+          if (state.selectedBank) {
+            params.append('bankId', state.selectedBank.id);
+          }
           const response = await fetch(`/api/transactions?${params}`);
           const data = await response.json();
           if (data.transactions) {
@@ -243,7 +248,6 @@ export const useAppStore = create<AppState>()(
         try {
           const state = get();
           const params = new URLSearchParams({
-            accountType: 'CURRENT',
             page: page.toString(),
             limit: itemsPerPage.toString()
           });
