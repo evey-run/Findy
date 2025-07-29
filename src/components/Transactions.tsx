@@ -785,18 +785,32 @@ export default function Transactions() {
               // Normaliser les noms de colonnes (enlever espaces, accents, casse)
               const normalizedRow: any = {};
               Object.keys(row).forEach(key => {
+                // Normalisation standard
                 const normalizedKey = key.toLowerCase()
                   .normalize('NFD')
                   .replace(/[\u0300-\u036f]/g, '')
                   .replace(/\s+/g, '');
                 normalizedRow[normalizedKey] = row[key];
+                
+                // Gestion des caractères mal encodés (ex: "libell�" du Crédit Mutuel)
+                if (key.includes('libell') || key.includes('Libell')) {
+                  normalizedRow['libelle'] = row[key];
+                }
+                
+                // Gestion des colonnes de montant mal encodées
+                if (key.includes('debit') || key.includes('débit') || key.includes('d�bit')) {
+                  normalizedRow['debit'] = row[key];
+                }
+                if (key.includes('credit') || key.includes('crédit') || key.includes('cr�dit')) {
+                  normalizedRow['credit'] = row[key];
+                }
               });
               
               // Détecter les colonnes de date, description et montant
               let dateValue, descriptionValue, amountValue;
               
               // Essayer différents noms de colonnes couramment utilisés par les banques françaises
-              const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop'];
+              const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop', 'datedevaleur'];
               const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label'];
               const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur'];
               
@@ -826,8 +840,19 @@ export default function Transactions() {
               
               // Si on n'a pas trouvé de montant, essayer de combiner débit et crédit
               if (amountValue === undefined) {
-                const debitValue = normalizedRow['debit'] || normalizedRow['debits'];
-                const creditValue = normalizedRow['credit'] || normalizedRow['credits'];
+                // Recherche plus poussée pour les colonnes débit/crédit
+                let debitValue = null;
+                let creditValue = null;
+                
+                // Chercher les colonnes débit/crédit avec différentes variantes
+                for (const key in normalizedRow) {
+                  if (key.includes('debit')) {
+                    debitValue = normalizedRow[key];
+                  }
+                  if (key.includes('credit')) {
+                    creditValue = normalizedRow[key];
+                  }
+                }
                 
                 if (debitValue !== undefined && debitValue !== '') {
                   amountValue = `-${Math.abs(parseFloat(String(debitValue).replace(/[^0-9.,-]/g, '').replace(',', '.')))}`; 
