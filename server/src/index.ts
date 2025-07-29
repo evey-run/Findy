@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
+import { cleanupUnusedImages } from './utils/cleanupImages';
 
 // Routes
 import userRoutes from './routes/users';
@@ -61,9 +62,12 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Finance Tracker API ready!`);
+  
+  // Nettoyer les images non utilisées au démarrage
+  await cleanupUnusedImages();
 });
 
 export { prisma };
