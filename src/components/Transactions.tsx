@@ -149,6 +149,7 @@ export default function Transactions() {
   // États pour l'import CSV
   const [showImportModal, setShowImportModal] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importBankId, setImportBankId] = useState<string>(''); // État séparé pour la banque dans le modal d'import CSV
   const [importProgress, setImportProgress] = useState<{
     isImporting: boolean;
     imported: number;
@@ -722,11 +723,28 @@ export default function Transactions() {
     }
   };
 
+  // Fonction pour ouvrir le modal d'import CSV
+  const handleOpenImportModal = () => {
+    setShowImportModal(true);
+    setCsvFile(null);
+    // Initialiser avec la banque actuellement sélectionnée ou vide
+    setImportBankId(selectedBank?.id || '');
+    setImportProgress({
+      isImporting: false,
+      imported: 0,
+      total: 0,
+      errors: []
+    });
+  };
+  
   const handleImportCSV = async () => {
-    if (!csvFile || !selectedBank) {
+    if (!csvFile || !importBankId) {
       alert('Veuillez sélectionner un fichier CSV et une banque');
       return;
     }
+    
+    // Récupérer la banque sélectionnée pour l'import
+    const selectedImportBank = banks.find(bank => bank.id === importBankId);
 
     setImportProgress({
       isImporting: true,
@@ -880,7 +898,7 @@ export default function Transactions() {
                 description: String(descriptionValue).trim(),
                 date: parsedDate.toISOString(),
                 createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
-                bankId: selectedBank.id,
+                bankId: importBankId,
                 categoryId: null,
                 checked: false
               };
@@ -1162,7 +1180,7 @@ export default function Transactions() {
             Modification en lot
           </button>
           <button
-            onClick={() => setShowImportModal(true)}
+            onClick={handleOpenImportModal}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
             style={{ backgroundColor: '#6227f5' }}
           >
@@ -1769,10 +1787,9 @@ export default function Transactions() {
                   Banque de destination *
                 </label>
                 <select
-                  value={selectedBank?.id || ''}
+                  value={importBankId}
                   onChange={(e) => {
-                    const bank = banks.find(b => b.id === e.target.value);
-                    setSelectedBank(bank || null);
+                    setImportBankId(e.target.value);
                   }}
                   className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                   style={{ backgroundColor: '#1f2226' }}
@@ -1787,7 +1804,7 @@ export default function Transactions() {
                     );
                   })}
                 </select>
-                {!selectedBank && (
+                {!importBankId && (
                   <p className="mt-1 text-sm text-red-600">
                     Veuillez sélectionner une banque avant d'importer
                   </p>
@@ -1841,7 +1858,7 @@ export default function Transactions() {
                 </button>
                 <button
                   onClick={handleImportCSV}
-                  disabled={!csvFile || !selectedBank || importProgress.isImporting}
+                  disabled={!csvFile || !importBankId || importProgress.isImporting}
                   className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: '#6226fa' }}
                 >

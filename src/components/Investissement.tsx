@@ -138,6 +138,7 @@ export default function Investissement() {
   // États pour l'import CSV
   const [showImportModal, setShowImportModal] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importBankId, setImportBankId] = useState<string>(''); // État séparé pour la banque dans le modal d'import CSV
   const [importProgress, setImportProgress] = useState<{
     isImporting: boolean;
     imported: number;
@@ -581,9 +582,23 @@ export default function Investissement() {
     navigate(`${location.pathname}?${searchParams.toString()}`);
   };
   
+  // Fonction pour ouvrir le modal d'import CSV
+  const handleOpenImportModal = () => {
+    setShowImportModal(true);
+    setCsvFile(null);
+    // Initialiser avec la banque actuellement sélectionnée ou vide
+    setImportBankId(localSelectedBank?.id || '');
+    setImportProgress({
+      isImporting: false,
+      imported: 0,
+      total: 0,
+      errors: []
+    });
+  };
+
   // Fonction pour gérer l'import CSV
   const handleImportCSV = async () => {
-    if (!csvFile || !localSelectedBank) {
+    if (!csvFile || !importBankId) {
       alert('Veuillez sélectionner un fichier CSV et un compte d\'investissement');
       return;
     }
@@ -642,7 +657,7 @@ export default function Investissement() {
               
               // Traitement spécifique pour le format Boursobank Investissement
               if (isBoursobankInvestmentFormat) {
-                transactionData = processBoursobankInvestmentRow(normalizedRow, localSelectedBank.id, importErrors, i);
+                transactionData = processBoursobankInvestmentRow(normalizedRow, importBankId, importErrors, i);
                 if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
               } else {
                 // Traitement standard pour les autres formats
@@ -800,7 +815,7 @@ export default function Investissement() {
                   description: String(descriptionValue).trim(),
                   date: parsedDate.toISOString(),
                   createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
-                  bankId: localSelectedBank.id,
+                  bankId: importBankId,
                   checked: false,
                   unitPrice,
                   quantity
@@ -1038,51 +1053,7 @@ export default function Investissement() {
     }
   };
   
-  // Fonction de test pour créer une transaction avec unitPrice et quantity
-  const testCreateTransactionWithUnitPriceAndQuantity = async () => {
-    try {
-      // Récupérer la première banque disponible
-      const bank = banks[0];
-      if (!bank) {
-        console.error('Aucune banque disponible pour le test');
-        return;
-      }
-      
-      // Créer une transaction de test avec unitPrice et quantity
-      const testTransaction = {
-        amount: 100,
-        description: 'TEST - Transaction avec unitPrice et quantity',
-        date: new Date().toISOString(),
-        bankId: bank.id,
-        checked: false,
-        unitPrice: 50,
-        quantity: 2
-      };
-      
-      console.log('🔍 TEST - Création d\'une transaction de test:', testTransaction);
-      
-      // Appel API
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(testTransaction),
-      });
-      
-      if (response.ok) {
-        const result = await response.json();
-        console.log('🔍 TEST - Transaction créée avec succès:', result);
-        console.log('🔍 TEST - unitPrice et quantity dans la réponse:', result.unitPrice, result.quantity);
-        await loadTransactions(); // Recharger les transactions
-      } else {
-        const error = await response.json();
-        console.error('🔍 TEST - Erreur lors de la création de la transaction:', error);
-      }
-    } catch (error) {
-      console.error('🔍 TEST - Exception:', error);
-    }
-  };
+
   
   // Fonction pour afficher les avatars des utilisateurs
   const renderUserAvatars = (users: any[], style?: React.CSSProperties) => {
@@ -1123,7 +1094,7 @@ export default function Investissement() {
           
           <div className="flex space-x-2">
             <button
-              onClick={() => setShowImportModal(true)}
+              onClick={handleOpenImportModal}
               className="px-3 py-2 text-sm font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
               style={{ backgroundColor: '#6226fa' }}
             >
@@ -1133,18 +1104,7 @@ export default function Investissement() {
               Importer CSV
             </button>
             
-            {/* Bouton de test pour unitPrice et quantity */}
-            <button
-              onClick={testCreateTransactionWithUnitPriceAndQuantity}
-              className="px-3 py-2 text-sm font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
-              style={{ backgroundColor: '#4f46e5' }}
-              title="Créer une transaction test avec unitPrice et quantity"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              Test unitPrice/quantity
-            </button>
+
           </div>
         </div>
         
@@ -1676,10 +1636,9 @@ export default function Investissement() {
                   Compte d'investissement de destination *
                 </label>
                 <select
-                  value={localSelectedBank?.id || ''}
+                  value={importBankId}
                   onChange={(e) => {
-                    const bank = banks.find(b => b.id === e.target.value);
-                    setLocalSelectedBank(bank || null);
+                    setImportBankId(e.target.value);
                   }}
                   className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                   style={{ backgroundColor: '#1f2226' }}
@@ -1694,7 +1653,7 @@ export default function Investissement() {
                     );
                   })}
                 </select>
-                {!localSelectedBank && (
+                {!importBankId && (
                   <p className="mt-1 text-sm text-red-600">
                     Veuillez sélectionner un compte avant d'importer
                   </p>
