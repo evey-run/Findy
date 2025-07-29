@@ -20,7 +20,7 @@ interface LayoutProps {
 const navigation = [
   { name: 'Tableau de bord', href: '/dashboard', icon: HomeIcon },
   { name: 'Transactions', href: '/transactions', icon: CreditCardIcon },
-  { name: 'Investissements', href: '/investissement', icon: CreditCardIcon },
+  { name: 'Investissements', href: '/investissement', icon: ChartBarIcon },
   { name: 'Catégories', href: '/categories', icon: TagIcon },
   { name: 'Objectifs', href: '/budgets', icon: ChartBarIcon },
   { name: 'Banques', href: '/banks', icon: BuildingLibraryIcon },
