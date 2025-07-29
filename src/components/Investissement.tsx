@@ -97,12 +97,14 @@ interface EditingTransaction {
   description: string;
   date: string;
   checked: boolean;
+  unitPrice?: number;
+  quantity?: number;
   bankId?: string;
 }
 
 interface InlineEditCell {
   transactionId: string;
-  field: 'amount' | 'description' | 'date' | 'bank' | 'checked';
+  field: 'amount' | 'description' | 'date' | 'bank' | 'checked' | 'unitPrice' | 'quantity';
 }
 
 // Fonction de formatage du montant
@@ -300,7 +302,7 @@ export default function Investissement() {
   };
 
   // Inline editing functions
-  const handleInlineEdit = (transactionId: string, field: 'amount' | 'description' | 'date' | 'bank' | 'checked') => {
+  const handleInlineEdit = (transactionId: string, field: 'amount' | 'description' | 'date' | 'bank' | 'checked' | 'unitPrice' | 'quantity') => {
     const transaction = transactions.find(t => t.id === transactionId);
     if (!transaction) return;
     
@@ -320,6 +322,12 @@ export default function Investissement() {
         break;
       case 'checked':
         value = transaction.checked.toString();
+        break;
+      case 'unitPrice':
+        value = transaction.unitPrice?.toString() || '';
+        break;
+      case 'quantity':
+        value = transaction.quantity?.toString() || '';
         break;
     }
     
@@ -352,6 +360,14 @@ export default function Investissement() {
         break;
       case 'checked':
         updateData.checked = inlineEditValue === 'true';
+        break;
+      case 'unitPrice':
+        updateData.unitPrice = parseFloat(inlineEditValue);
+        if (isNaN(updateData.unitPrice)) updateData.unitPrice = null; // Allow null for empty value
+        break;
+      case 'quantity':
+        updateData.quantity = parseFloat(inlineEditValue);
+        if (isNaN(updateData.quantity)) updateData.quantity = null; // Allow null for empty value
         break;
     }
     
@@ -637,6 +653,8 @@ export default function Investissement() {
                 const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop', 'lastmovementdate'];
                 const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label', 'name'];
                 const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur', 'amountvariation'];
+                const unitPriceKeys = ['unitprice', 'prixunitaire', 'prix_unitaire', 'prix', 'price', 'lastprice', 'coursunitaire', 'cours'];
+                const quantityKeys = ['quantity', 'quantite', 'nombre', 'nombre_parts', 'parts', 'qte', 'qty'];
                 
                 // Chercher la colonne de date
                 for (const key of dateKeys) {
@@ -658,6 +676,24 @@ export default function Investissement() {
                 for (const key of amountKeys) {
                   if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
                     amountValue = normalizedRow[key];
+                    break;
+                  }
+                }
+                
+                // Chercher la colonne de prix unitaire
+                let unitPriceValue;
+                for (const key of unitPriceKeys) {
+                  if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                    unitPriceValue = normalizedRow[key];
+                    break;
+                  }
+                }
+                
+                // Chercher la colonne de quantité
+                let quantityValue;
+                for (const key of quantityKeys) {
+                  if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                    quantityValue = normalizedRow[key];
                     break;
                   }
                 }
@@ -730,6 +766,34 @@ export default function Investissement() {
                   continue;
                 }
                 
+                // Parser le prix unitaire
+                let unitPrice: number | null = null;
+                if (unitPriceValue !== undefined) {
+                  const unitPriceStr = String(unitPriceValue).trim().replace(/\s/g, '');
+                  if (unitPriceStr.includes(',') && !unitPriceStr.includes('.')) {
+                    // Format français: 1 234,56
+                    unitPrice = parseFloat(unitPriceStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+                  } else {
+                    // Format anglais: 1,234.56 ou simple: 1234.56
+                    unitPrice = parseFloat(unitPriceStr.replace(/[^0-9.-]/g, ''));
+                  }
+                  if (isNaN(unitPrice)) unitPrice = null;
+                }
+                
+                // Parser la quantité
+                let quantity: number | null = null;
+                if (quantityValue !== undefined) {
+                  const quantityStr = String(quantityValue).trim().replace(/\s/g, '');
+                  if (quantityStr.includes(',') && !quantityStr.includes('.')) {
+                    // Format français: 1 234,56
+                    quantity = parseFloat(quantityStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+                  } else {
+                    // Format anglais: 1,234.56 ou simple: 1234.56
+                    quantity = parseFloat(quantityStr.replace(/[^0-9.-]/g, ''));
+                  }
+                  if (isNaN(quantity)) quantity = null;
+                }
+                
                 // Créer la transaction
                 transactionData = {
                   amount,
@@ -737,7 +801,9 @@ export default function Investissement() {
                   date: parsedDate.toISOString(),
                   createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
                   bankId: localSelectedBank.id,
-                  checked: false
+                  checked: false,
+                  unitPrice,
+                  quantity
                 };
               }
               
@@ -747,6 +813,12 @@ export default function Investissement() {
               }
               
               console.log(`📝 Creating transaction ${i + 1}:`, transactionData);
+              console.log(`🔍 DEBUG - unitPrice: ${transactionData.unitPrice}, type: ${typeof transactionData.unitPrice}`);
+              console.log(`🔍 DEBUG - quantity: ${transactionData.quantity}, type: ${typeof transactionData.quantity}`);
+              
+              // Sérialiser les données pour l'API
+              const jsonData = JSON.stringify(transactionData);
+              console.log(`🔍 DEBUG - JSON envoyé à l'API:`, jsonData);
               
               // Appel API pour créer la transaction
               const response = await fetch('/api/transactions', {
@@ -754,7 +826,7 @@ export default function Investissement() {
                 headers: {
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(transactionData),
+                body: jsonData,
               });
               
               if (!response.ok) {
@@ -822,24 +894,73 @@ export default function Investissement() {
         .replace(/\s+/g, '')
     );
     
-    // Vérifier si les colonnes typiques du format Boursobank sont présentes
+    console.log('Colonnes normalisées pour détection format:', normalizedKeys);
+    
+    // Vérifier si les colonnes exactes du format fourni sont présentes
+    // Format attendu: name;isin;quantity;buyingPrice;lastPrice;intradayVariation;amount;amountVariation;variation;lastMovementDate;compensation
     const requiredColumns = ['name', 'isin', 'quantity', 'buyingprice', 'lastprice', 'amount'];
     const hasRequiredColumns = requiredColumns.every(col => 
-      normalizedKeys.some(key => key.includes(col))
+      normalizedKeys.some(key => key === col || key.includes(col))
     );
     
-    return hasRequiredColumns;
+    // Format spécifique fourni par l'utilisateur
+    const userFormatColumns = ['name', 'isin', 'quantity', 'buyingprice', 'lastprice', 'intradayvariation', 'amount', 'amountvariation', 'variation', 'lastmovementdate', 'compensation'];
+    const isUserFormat = userFormatColumns.every(col => 
+      normalizedKeys.some(key => key === col || key.includes(col))
+    );
+    
+    console.log('Détection format Boursobank:', hasRequiredColumns);
+    console.log('Détection format utilisateur:', isUserFormat);
+    
+    return hasRequiredColumns || isUserFormat;
   };
   
   // Fonction pour traiter une ligne au format Boursobank Investissement
   const processBoursobankInvestmentRow = (row: any, bankId: string, importErrors: string[], rowIndex: number): any => {
     try {
+      console.log('Traitement ligne CSV format utilisateur:', row);
+      
       // Extraire les données pertinentes
       const name = row['name'] || '';
       const isin = row['isin'] || '';
-      const quantity = parseFloat(String(row['quantity'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.'));
-      const lastPrice = parseFloat(String(row['lastprice'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.'));
-      const amount = parseFloat(String(row['amount'] || row['amountvariation'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+      
+      // Traiter la quantité (convertir les formats numériques)
+      let quantity = 0;
+      if (row['quantity'] !== undefined && row['quantity'] !== '') {
+        const quantityStr = String(row['quantity']).trim().replace(/\s/g, '');
+        if (quantityStr.includes(',') && !quantityStr.includes('.')) {
+          // Format français: 1 234,56
+          quantity = parseFloat(quantityStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+        } else {
+          // Format anglais: 1,234.56 ou simple: 1234.56
+          quantity = parseFloat(quantityStr.replace(/[^0-9.-]/g, ''));
+        }
+      }
+      
+      // Traiter le prix unitaire (lastPrice)
+      let lastPrice = 0;
+      if (row['lastprice'] !== undefined && row['lastprice'] !== '') {
+        const priceStr = String(row['lastprice']).trim().replace(/\s/g, '');
+        if (priceStr.includes(',') && !priceStr.includes('.')) {
+          lastPrice = parseFloat(priceStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+        } else {
+          lastPrice = parseFloat(priceStr.replace(/[^0-9.-]/g, ''));
+        }
+      }
+      
+      // Traiter le montant (amount ou amountvariation)
+      let amount = 0;
+      const amountValue = row['amount'] || row['amountvariation'];
+      if (amountValue !== undefined && amountValue !== '') {
+        const amountStr = String(amountValue).trim().replace(/\s/g, '');
+        if (amountStr.includes(',') && !amountStr.includes('.')) {
+          amount = parseFloat(amountStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+        } else {
+          amount = parseFloat(amountStr.replace(/[^0-9.-]/g, ''));
+        }
+      }
+      
+      // Traiter la date du dernier mouvement
       const lastMovementDate = row['lastmovementdate'] || new Date().toISOString().split('T')[0];
       
       // Vérifier les données obligatoires
@@ -876,8 +997,21 @@ export default function Investissement() {
         parsedDate = new Date();
       }
       
+      // Traiter le prix d'achat (buyingPrice)
+      let buyingPrice = 0;
+      if (row['buyingprice'] !== undefined && row['buyingprice'] !== '') {
+        const buyingPriceStr = String(row['buyingprice']).trim().replace(/\s/g, '');
+        if (buyingPriceStr.includes(',') && !buyingPriceStr.includes('.')) {
+          buyingPrice = parseFloat(buyingPriceStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+        } else {
+          buyingPrice = parseFloat(buyingPriceStr.replace(/[^0-9.-]/g, ''));
+        }
+      }
+      
       // Créer la description avec les informations pertinentes
       const description = `${name} (${isin}) - Qté: ${quantity} - Prix: ${lastPrice}€`;
+      
+      console.log(`CSV import: Création transaction pour ${name}, unitPrice=${lastPrice}, quantity=${quantity}`);
       
       // Créer la transaction
       return {
@@ -887,10 +1021,12 @@ export default function Investissement() {
         createdAt: parsedDate.toISOString(),
         bankId,
         checked: false,
+        // Ajouter unitPrice et quantity directement dans la transaction
+        unitPrice: lastPrice,
+        quantity: quantity,
         metadata: {
           isin,
-          quantity,
-          buyingPrice: parseFloat(String(row['buyingprice'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.')),
+          buyingPrice,
           lastPrice,
           type: 'investment'
         }
@@ -899,6 +1035,52 @@ export default function Investissement() {
       console.error(`Error processing Boursobank row ${rowIndex + 1}:`, error);
       importErrors.push(`Ligne ${rowIndex + 2}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
       return null;
+    }
+  };
+  
+  // Fonction de test pour créer une transaction avec unitPrice et quantity
+  const testCreateTransactionWithUnitPriceAndQuantity = async () => {
+    try {
+      // Récupérer la première banque disponible
+      const bank = banks[0];
+      if (!bank) {
+        console.error('Aucune banque disponible pour le test');
+        return;
+      }
+      
+      // Créer une transaction de test avec unitPrice et quantity
+      const testTransaction = {
+        amount: 100,
+        description: 'TEST - Transaction avec unitPrice et quantity',
+        date: new Date().toISOString(),
+        bankId: bank.id,
+        checked: false,
+        unitPrice: 50,
+        quantity: 2
+      };
+      
+      console.log('🔍 TEST - Création d\'une transaction de test:', testTransaction);
+      
+      // Appel API
+      const response = await fetch('/api/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(testTransaction),
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('🔍 TEST - Transaction créée avec succès:', result);
+        console.log('🔍 TEST - unitPrice et quantity dans la réponse:', result.unitPrice, result.quantity);
+        await loadTransactions(); // Recharger les transactions
+      } else {
+        const error = await response.json();
+        console.error('🔍 TEST - Erreur lors de la création de la transaction:', error);
+      }
+    } catch (error) {
+      console.error('🔍 TEST - Exception:', error);
     }
   };
   
@@ -949,6 +1131,19 @@ export default function Investissement() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
               Importer CSV
+            </button>
+            
+            {/* Bouton de test pour unitPrice et quantity */}
+            <button
+              onClick={testCreateTransactionWithUnitPriceAndQuantity}
+              className="px-3 py-2 text-sm font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
+              style={{ backgroundColor: '#4f46e5' }}
+              title="Créer une transaction test avec unitPrice et quantity"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              Test unitPrice/quantity
             </button>
           </div>
         </div>
@@ -1055,6 +1250,12 @@ export default function Investissement() {
                     Propriétaires
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                    Prix unitaire
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                    Quantité
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
                     Montant
                   </th>
                   <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
@@ -1115,6 +1316,28 @@ export default function Investissement() {
                         : '-'
                       }
                     </span>
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingTransaction?.unitPrice || ''}
+                      onChange={(e) => setEditingTransaction(prev => prev ? {...prev, unitPrice: parseFloat(e.target.value) || 0} : null)}
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                      style={{ backgroundColor: '#272a2f' }}
+                      placeholder="0.00"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingTransaction?.quantity || ''}
+                      onChange={(e) => setEditingTransaction(prev => prev ? {...prev, quantity: parseFloat(e.target.value) || 0} : null)}
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                      style={{ backgroundColor: '#272a2f' }}
+                      placeholder="0"
+                    />
                   </td>
                   <td className="px-4 py-2">
                     <input
@@ -1268,16 +1491,80 @@ export default function Investissement() {
                       {editingId === transaction.id ? (
                         <input
                           type="number"
-                          step="1"
+                          step="0.01"
+                          value={editingTransaction?.unitPrice || ''}
+                          onChange={(e) => setEditingTransaction(prev => prev ? {...prev, unitPrice: parseFloat(e.target.value) || 0} : null)}
+                          className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                          style={{ backgroundColor: '#1f2226' }}
+                        />
+                      ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'unitPrice' ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={inlineEditValue}
+                          onChange={(e) => setInlineEditValue(e.target.value)}
+                          onBlur={handleInlineSave}
+                          onKeyDown={handleInlineKeyDown}
+                          className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                          style={{ backgroundColor: '#1f2226' }}
+                          autoFocus
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => handleInlineEdit(transaction.id, 'unitPrice')}
+                          className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
+                          title="Double-cliquez pour éditer"
+                        >
+                          {transaction.unitPrice ? formatAmount(transaction.unitPrice) : '-'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                      {editingId === transaction.id ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editingTransaction?.quantity || ''}
+                          onChange={(e) => setEditingTransaction(prev => prev ? {...prev, quantity: parseFloat(e.target.value) || 0} : null)}
+                          className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                          style={{ backgroundColor: '#1f2226' }}
+                        />
+                      ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'quantity' ? (
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={inlineEditValue}
+                          onChange={(e) => setInlineEditValue(e.target.value)}
+                          onBlur={handleInlineSave}
+                          onKeyDown={handleInlineKeyDown}
+                          className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                          style={{ backgroundColor: '#1f2226' }}
+                          autoFocus
+                        />
+                      ) : (
+                        <span 
+                          onClick={() => handleInlineEdit(transaction.id, 'quantity')}
+                          className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
+                          title="Double-cliquez pour éditer"
+                        >
+                          {transaction.quantity ? transaction.quantity : '-'}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                      {editingId === transaction.id ? (
+                        <input
+                          type="number"
+                          step="0.01"
                           value={editingTransaction?.amount || ''}
-                          onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)}
+                          onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
                           style={{ backgroundColor: '#1f2226' }}
                         />
                       ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
                         <input
                           type="number"
-                          step="1"
+                          step="0.01"
                           value={inlineEditValue}
                           onChange={(e) => setInlineEditValue(e.target.value)}
                           onBlur={handleInlineSave}

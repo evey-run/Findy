@@ -849,7 +849,9 @@ app.get('/api/transactions', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 app.post('/api/transactions', async (req, res) => {
   try {
-    const { amount, description, date, checked, bankId, categoryId, createdAt } = req.body;
+    const { amount, description, date, checked, bankId, categoryId, createdAt, unitPrice, quantity } = req.body;
+    
+    console.log('🔍 DEBUG API - Reçu dans la requête POST:', { amount, description, unitPrice, quantity });
     
     if (!amount || !description || !bankId) {
       return res.status(400).json({ 
@@ -877,8 +879,12 @@ app.post('/api/transactions', async (req, res) => {
       date: date ? new Date(date) : new Date(),
       checked: checked || false,
       bankId,
-      categoryId: categoryId || null
+      categoryId: categoryId || null,
+      unitPrice: unitPrice !== undefined ? parseFloat(unitPrice) : null,
+      quantity: quantity !== undefined ? parseFloat(quantity) : null
     };
+    
+    console.log('🔍 DEBUG API - transactionData envoyé à Prisma:', transactionData);
 
     // Si createdAt est fourni, l'utiliser (pour l'import CSV)
     if (createdAt) {

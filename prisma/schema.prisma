@@ -71,6 +71,8 @@ model Transaction {
   description String
   date        DateTime  @default(now())
   checked     Boolean   @default(false)
+  unitPrice   Float?    // Prix unitaire pour les investissements
+  quantity    Float?    // Quantité pour les investissements
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   bankId      String

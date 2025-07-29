@@ -49,6 +49,8 @@ export interface Transaction {
   description: string;
   date: string;
   checked: boolean;
+  unitPrice?: number;
+  quantity?: number;
   createdAt: string;
   updatedAt: string;
   bankId: string;

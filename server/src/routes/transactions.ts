@@ -179,7 +179,16 @@ router.get('/:id', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 router.post('/', async (req, res) => {
   try {
-    const { amount, description, date, shared, bankId, categoryId } = req.body;
+    const { amount, description, date, shared, bankId, categoryId, unitPrice, quantity } = req.body;
+    
+    // Logs de debug pour voir les valeurs reçues
+    console.log('🔍 DEBUG - POST /api/transactions - Données reçues:');
+    console.log('amount:', amount, typeof amount);
+    console.log('description:', description);
+    console.log('date:', date);
+    console.log('bankId:', bankId);
+    console.log('unitPrice:', unitPrice, typeof unitPrice);
+    console.log('quantity:', quantity, typeof quantity);
     
     if (!amount || !description || !bankId) {
       return res.status(400).json({ 
@@ -201,15 +210,23 @@ router.post('/', async (req, res) => {
       }
     }
     
+    // Préparer les données à envoyer à Prisma
+    const transactionData = {
+      amount: parseFloat(amount),
+      description,
+      date: date ? new Date(date) : new Date(),
+      shared: shared || false,
+      bankId,
+      categoryId: categoryId || null,
+      unitPrice: unitPrice ? parseFloat(unitPrice) : null,
+      quantity: quantity ? parseFloat(quantity) : null
+    };
+    
+    // Log des données qui seront envoyées à Prisma
+    console.log('🔍 DEBUG - Données envoyées à Prisma:', JSON.stringify(transactionData, null, 2));
+    
     const transaction = await prisma.transaction.create({
-      data: {
-        amount: parseFloat(amount),
-        description,
-        date: date ? new Date(date) : new Date(),
-        shared: shared || false,
-        bankId,
-        categoryId: categoryId || null
-      },
+      data: transactionData,
       include: {
         bank: {
           select: {
@@ -232,6 +249,9 @@ router.post('/', async (req, res) => {
       }
     });
     
+    // Log de la transaction créée
+    console.log('🔍 DEBUG - Transaction créée:', JSON.stringify(transaction, null, 2));
+    
     res.status(201).json(transaction);
   } catch (error) {
     console.error('Error creating transaction:', error);
@@ -243,7 +263,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, description, date, shared, categoryId } = req.body;
+    const { amount, description, date, shared, categoryId, unitPrice, quantity } = req.body;
     
     // Vérifier que la catégorie existe si elle est fournie
     if (categoryId) {
@@ -260,7 +280,9 @@ router.put('/:id', async (req, res) => {
         ...(description && { description }),
         ...(date && { date: new Date(date) }),
         ...(shared !== undefined && { shared }),
-        ...(categoryId !== undefined && { categoryId })
+        ...(categoryId !== undefined && { categoryId }),
+        ...(unitPrice !== undefined && { unitPrice: unitPrice ? parseFloat(unitPrice) : null }),
+        ...(quantity !== undefined && { quantity: quantity ? parseFloat(quantity) : null })
       },
       include: {
         bank: {
