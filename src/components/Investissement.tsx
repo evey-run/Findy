@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import { useLocation } from 'react-router-dom';
+import Papa from 'papaparse';
 
 // Styles pour les cellules éditables sont intégrés directement dans les classes CSS
 
@@ -513,7 +514,7 @@ export default function Investissement() {
   
   // Fonction pour gérer la recherche
   const handleSearch = () => {
-    setFilters({ ...filters, searchText: searchInput });
+    setFilters({...filters, searchText: searchInput});
   };
   
   // Fonction pour gérer la sélection/désélection de toutes les transactions
@@ -524,6 +525,233 @@ export default function Investissement() {
       setSelectedTransactions(filteredTransactions.map(t => t.id));
     }
     setSelectAll(!selectAll);
+  };
+  
+  // Fonction pour gérer l'import CSV
+  const handleImportCSV = async () => {
+    if (!csvFile || !localSelectedBank) {
+      alert('Veuillez sélectionner un fichier CSV et un compte d\'investissement');
+      return;
+    }
+
+    setImportProgress({
+      isImporting: true,
+      imported: 0,
+      total: 0,
+      errors: []
+    });
+
+    try {
+      // Parser le CSV
+      Papa.parse(csvFile, {
+        header: true,
+        skipEmptyLines: true,
+        complete: async (results) => {
+          console.log('📄 CSV parsed:', results);
+          
+          const { data, errors } = results;
+          let importErrors: string[] = [];
+          
+          if (errors.length > 0) {
+            importErrors = errors.map(err => `Ligne ${err.row}: ${err.message}`);
+          }
+          
+          // Afficher les colonnes détectées pour debugging
+          if (data.length > 0) {
+            const firstRow = data[0] as any;
+            console.log('🔍 Colonnes détectées:', Object.keys(firstRow));
+            console.log('🔍 Premier échantillon de données:', firstRow);
+          }
+          
+          setImportProgress(prev => ({ ...prev, total: data.length }));
+          
+          // Traiter chaque ligne
+          for (let i = 0; i < data.length; i++) {
+            const row = data[i] as any;
+            
+            try {
+              // Normaliser les noms de colonnes (enlever espaces, accents, casse)
+              const normalizedRow: any = {};
+              Object.keys(row).forEach(key => {
+                const normalizedKey = key.toLowerCase()
+                  .normalize('NFD')
+                  .replace(/[\u0300-\u036f]/g, '')
+                  .replace(/\s+/g, '');
+                normalizedRow[normalizedKey] = row[key];
+              });
+              
+              // Détecter les colonnes de date, description et montant
+              let dateValue, descriptionValue, amountValue;
+              
+              // Essayer différents noms de colonnes couramment utilisés
+              const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop'];
+              const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label'];
+              const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur'];
+              
+              // Chercher la colonne de date
+              for (const key of dateKeys) {
+                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                  dateValue = normalizedRow[key];
+                  break;
+                }
+              }
+              
+              // Chercher la colonne de description
+              for (const key of descriptionKeys) {
+                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                  descriptionValue = normalizedRow[key];
+                  break;
+                }
+              }
+              
+              // Chercher la colonne de montant
+              for (const key of amountKeys) {
+                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                  amountValue = normalizedRow[key];
+                  break;
+                }
+              }
+              
+              // Si on n'a pas trouvé de montant, essayer de combiner débit et crédit
+              if (amountValue === undefined) {
+                const debitValue = normalizedRow['debit'] || normalizedRow['debits'];
+                const creditValue = normalizedRow['credit'] || normalizedRow['credits'];
+                
+                if (debitValue !== undefined && debitValue !== '') {
+                  amountValue = `-${Math.abs(parseFloat(String(debitValue).replace(/[^0-9.,-]/g, '').replace(',', '.')))}`;  
+                } else if (creditValue !== undefined && creditValue !== '') {
+                  amountValue = Math.abs(parseFloat(String(creditValue).replace(/[^0-9.,-]/g, '').replace(',', '.')));
+                }
+              }
+              
+              console.log(`🔍 Ligne ${i + 1} - Date: "${dateValue}", Description: "${descriptionValue}", Montant: "${amountValue}"`);
+              
+              if (!dateValue || !descriptionValue || amountValue === undefined) {
+                const missingFields = [];
+                if (!dateValue) missingFields.push('date');
+                if (!descriptionValue) missingFields.push('description');
+                if (amountValue === undefined) missingFields.push('montant');
+                
+                importErrors.push(`Ligne ${i + 2}: Données manquantes (${missingFields.join(', ')}) - Colonnes disponibles: ${Object.keys(normalizedRow).join(', ')}`);
+                continue;
+              }
+              
+              // Parser la date
+              let parsedDate: Date;
+              const dateStr = String(dateValue).trim();
+              
+              // Essayer différents formats de date
+              if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                // Format YYYY-MM-DD
+                parsedDate = new Date(dateStr);
+              } else if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                // Format DD/MM/YYYY
+                const [day, month, year] = dateStr.split('/');
+                parsedDate = new Date(`${year}-${month}-${day}`);
+              } else if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                // Format DD-MM-YYYY
+                const [day, month, year] = dateStr.split('-');
+                parsedDate = new Date(`${year}-${month}-${day}`);
+              } else {
+                importErrors.push(`Ligne ${i + 2}: Format de date non reconnu (${dateStr})`);
+                continue;
+              }
+              
+              if (isNaN(parsedDate.getTime())) {
+                importErrors.push(`Ligne ${i + 2}: Date invalide (${dateStr})`);
+                continue;
+              }
+              
+              // Parser le montant
+              let amount: number;
+              const amountStr = String(amountValue).trim().replace(/\s/g, '');
+              
+              // Gérer les différents formats de montant
+              if (amountStr.includes(',') && !amountStr.includes('.')) {
+                // Format français: 1 234,56
+                amount = parseFloat(amountStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+              } else {
+                // Format anglais: 1,234.56 ou simple: 1234.56
+                amount = parseFloat(amountStr.replace(/[^0-9.-]/g, ''));
+              }
+              
+              if (isNaN(amount)) {
+                importErrors.push(`Ligne ${i + 2}: Montant invalide (${amountStr})`);
+                continue;
+              }
+              
+              // Créer la transaction
+              const transactionData = {
+                amount,
+                description: String(descriptionValue).trim(),
+                date: parsedDate.toISOString(),
+                createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
+                bankId: localSelectedBank.id,
+                checked: false
+              };
+              
+              console.log(`📝 Creating transaction ${i + 1}:`, transactionData);
+              
+              // Appel API pour créer la transaction
+              const response = await fetch('/api/transactions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(transactionData),
+              });
+              
+              if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                importErrors.push(`Ligne ${i + 2}: ${errorData.error || 'Erreur lors de la création'}`);
+              }
+              
+            } catch (error) {
+              console.error(`Error processing row ${i + 1}:`, error);
+              importErrors.push(`Ligne ${i + 2}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+            }
+            
+            // Mettre à jour le progrès
+            setImportProgress(prev => ({ ...prev, imported: i + 1, errors: importErrors }));
+          }
+          
+          // Recharger les transactions
+          await loadTransactions();
+          
+          // Finaliser l'import
+          setImportProgress(prev => ({ 
+            ...prev, 
+            isImporting: false,
+            errors: importErrors 
+          }));
+          
+          if (importErrors.length === 0) {
+            alert(`✅ Import terminé avec succès!\n${data.length} transaction(s) importée(s).`);
+            setShowImportModal(false);
+            setCsvFile(null);
+          } else {
+            alert(`⚠️ Import terminé avec ${importErrors.length} erreur(s).\nConsultez les détails dans la modal.`);
+          }
+        },
+        error: (error) => {
+          console.error('CSV parsing error:', error);
+          setImportProgress(prev => ({ 
+            ...prev, 
+            isImporting: false, 
+            errors: [`Erreur de parsing CSV: ${error.message}`] 
+          }));
+        }
+      });
+      
+    } catch (error) {
+      console.error('Import error:', error);
+      setImportProgress({
+        isImporting: false,
+        imported: 0,
+        total: 0,
+        errors: [`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`]
+      });
+    }
   };
   
   // Fonction pour gérer la sélection/désélection d'une transaction
@@ -576,14 +804,14 @@ export default function Investissement() {
           
           <div className="flex space-x-2">
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => setShowImportModal(true)}
               className="px-3 py-2 text-sm font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
               style={{ backgroundColor: '#6226fa' }}
             >
               <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              Actualiser
+              Importer CSV
             </button>
           </div>
         </div>
@@ -1017,6 +1245,143 @@ export default function Investissement() {
           )}
         </div>
       </div>
+
+      {/* Modal d'import CSV */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+          <div className="p-0 w-80 md:w-[24rem] lg:w-[28rem] xl:w-[32rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
+            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
+              <h3 className="text-lg font-bold text-white">
+                Importer des transactions depuis un fichier CSV
+              </h3>
+              <button
+                onClick={() => setShowImportModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="px-6 py-6">
+
+              {/* Sélection de la banque */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Compte d'investissement de destination *
+                </label>
+                <select
+                  value={localSelectedBank?.id || ''}
+                  onChange={(e) => {
+                    const bank = banks.find(b => b.id === e.target.value);
+                    setLocalSelectedBank(bank || null);
+                  }}
+                  className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
+                  style={{ backgroundColor: '#1f2226' }}
+                  required
+                >
+                  <option value="">Sélectionnez un compte...</option>
+                  {banks.filter(bank => bank.accountType === 'INVESTMENT').map(bank => {
+                    const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
+                    const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+                    return (
+                      <option key={bank.id} value={bank.id}>{bank.name}{bankUsersText}</option>
+                    );
+                  })}
+                </select>
+                {!localSelectedBank && (
+                  <p className="mt-1 text-sm text-red-600">
+                    Veuillez sélectionner un compte avant d'importer
+                  </p>
+                )}
+              </div>
+
+              {/* Zone de drop de fichier */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Fichier CSV *
+                </label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-700 border-dashed rounded-md hover:border-gray-400 transition-colors" style={{ backgroundColor: '#23262b' }}>
+                  <div className="space-y-1 text-center">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <div className="flex text-sm text-gray-400">
+                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-[#1f2226] rounded-md font-medium hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 px-2 py-1" style={{ color: '#6226fa' }}>
+                        <span>Choisir un fichier</span>
+                        <input
+                          id="csv-upload"
+                          name="csv-upload"
+                          type="file"
+                          accept=".csv"
+                          className="sr-only"
+                          onChange={(e) => setCsvFile(e.target.files?.[0] || null)}
+                        />
+                      </label>
+                      <p className="pl-1">ou glisser-déposer</p>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      CSV uniquement (max 10MB)
+                    </p>
+                  </div>
+                </div>
+                {csvFile && (
+                  <div className="mt-2 text-sm text-green-400">
+                    ✓ Fichier sélectionné: {csvFile.name}
+                  </div>
+                )}
+              </div>
+
+
+              {/* Boutons d'action */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-300 bg-[#23262b] border border-gray-700 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleImportCSV}
+                  disabled={!csvFile || !localSelectedBank || importProgress.isImporting}
+                  className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: '#6226fa' }}
+                >
+                  {importProgress.isImporting ? 'Import en cours...' : 'Importer'}
+                </button>
+              </div>
+
+              {/* Barre de progression */}
+              {importProgress.isImporting && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Import en cours...</span>
+                    <span>{importProgress.imported}/{importProgress.total}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${importProgress.total > 0 ? (importProgress.imported / importProgress.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {/* Erreurs */}
+              {importProgress.errors.length > 0 && (
+                <div className="mt-4 p-4 bg-red-50 rounded-md">
+                  <h4 className="text-sm font-medium text-red-900 mb-2">Erreurs rencontrées:</h4>
+                  <ul className="text-sm text-red-700 space-y-1">
+                    {importProgress.errors.map((error, index) => (
+                      <li key={index}>• {error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
