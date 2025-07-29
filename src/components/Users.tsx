@@ -174,10 +174,10 @@ export default function Users() {
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-gray-900 sm:text-3xl sm:truncate">
+          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             Gestion des utilisateurs
           </h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-gray-400 mt-1">
             Gérez les utilisateurs et leurs banques associées
           </p>
         </div>
@@ -237,8 +237,8 @@ export default function Users() {
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="mt-1 block rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem] text-white text-base text-center"
-                        style={{ backgroundColor: '#1f2226', color: 'white', minWidth: '180px', maxWidth: '220px', border: 'none', padding: '0.5rem 0.75rem' }}
+                        className="mt-1 block rounded-md border-none focus:ring-0 text-white bg-gray-800 border-gray-600 focus:ring-violet-500 py-2 px-3 h-10 min-h-[2.5rem] text-base text-center"
+                        style={{ minWidth: '180px', maxWidth: '220px' }}
                         placeholder="Nom de l'utilisateur"
                         required
                         maxLength={20}
@@ -250,7 +250,7 @@ export default function Users() {
                 <div className="px-6 py-3 rounded-b-lg flex justify-end items-center gap-2 w-full" style={{ backgroundColor: '#1f2226' }}>
                   <button
                     type="button"
-                    className="px-4 py-2 border border-gray-500 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-700"
+                    className="px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-800 transition-colors"
                     onClick={() => { 
                       setEditingId(null); 
                       setEditingUser(null); 
@@ -263,8 +263,7 @@ export default function Users() {
                   <button
                     type="submit"
                     disabled={isSaving}
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: '#6226fa' }}
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-violet-700 hover:bg-violet-600 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {isSaving ? 'Sauvegarde...' : 'Sauvegarder'}
                   </button>

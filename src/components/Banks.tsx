@@ -79,6 +79,15 @@ if (typeof document !== 'undefined') {
   }
 }
 
+// Helper function pour formater l'IBAN avec un espace tous les 4 caractères
+const formatIBAN = (iban: string): string => {
+  // Supprimer tous les espaces existants
+  const cleanIban = iban.replace(/\s+/g, '');
+  
+  // Ajouter un espace tous les 4 caractères
+  return cleanIban.replace(/(.{4})(?=.)/g, '$1 ');
+};
+
 // Helper function pour obtenir les informations du type de compte
 const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
   switch (accountType) {
@@ -90,12 +99,12 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
     case 'SAVINGS':
       return {
         label: 'Livret d\'épargne',
-        color: 'bg-violet-100 text-violet-800'
+        color: 'bg-violet-900 text-violet-200'
       };
     case 'INVESTMENT':
       return {
         label: 'Compte d\'investissement',
-        color: 'bg-purple-100 text-purple-800'
+        color: 'bg-purple-900 text-purple-200'
       };
     default:
       return {
@@ -446,7 +455,7 @@ export default function Banks() {
               </div>
             </div>
             
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
+            <h3 className="text-lg font-medium text-white mb-4">
               Banques archivées ({archivedBanks.length})
             </h3>
             
@@ -458,28 +467,47 @@ export default function Banks() {
                 <p className="mt-2 text-sm text-gray-500">Aucune banque archivée</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-fr">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
                 {archivedBanks.slice().reverse().map((bank) => (
-                  <div key={bank.id} className="bg-gray-50 shadow rounded-lg overflow-hidden opacity-75 flex flex-col h-80">
-                    <div className="p-4">
+                  <div key={bank.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f', opacity: '0.85' }}>
+                    <div className="p-6 flex-1 flex flex-col">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center">
                           {bank.image ? (
                             <img
                               src={`http://localhost:3001${bank.image}`}
                               alt={bank.name}
-                              className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 opacity-50"
+                              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                              style={{ opacity: '0.7' }}
                             />
                           ) : (
-                            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold bg-gray-400">
+                            <div 
+                              className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
+                              style={{ backgroundColor: '#6226fa', opacity: '0.7' }}
+                            >
                               {bank.shortName}
                             </div>
                           )}
-                          <div className="ml-3">
-                            <h4 className="text-sm font-medium text-gray-900">{bank.name}</h4>
-                            <p className="text-xs text-gray-500">
-                              Archivé le {bank.archivedAt ? new Date(bank.archivedAt).toLocaleDateString('fr-FR') : 'N/A'}
+                          <div className="ml-4">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-medium text-white">{bank.name}</h3>
+                              <span className="text-xs text-gray-400">
+                                Archivé le {bank.archivedAt ? new Date(bank.archivedAt).toLocaleDateString('fr-FR') : 'N/A'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-300">
+                              {getAccountTypeInfo(bank.accountType).label}
+                              {!selectedUser && bank.users && bank.users.length > 0 && (
+                                <span className="ml-2 text-violet-300">
+                                  • {bank.users.map(u => u.name).join(', ')}
+                                </span>
+                              )}
                             </p>
+                            {bank.iban && (
+                              <p className="text-xs text-gray-400 mt-1 font-mono">
+                                {formatIBAN(bank.iban)}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="flex flex-col space-y-2">
@@ -496,7 +524,7 @@ export default function Banks() {
                           </button>
                           <button
                             onClick={() => handlePermanentDelete(bank.id, bank.name)}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                             title="Supprimer définitivement cette banque et toutes ses données"
                           >
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -506,11 +534,11 @@ export default function Banks() {
                           </button>
                         </div>
                       </div>
-                      <div className="mt-3">
-                        <div className="text-sm font-medium text-gray-900">
+                      <div className="mt-auto">
+                        <div className="text-xl font-bold text-white">
                           {formatAmount(bank.balance)}
                         </div>
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-gray-400">
                           Solde lors de l'archivage
                         </div>
                       </div>
@@ -583,8 +611,8 @@ export default function Banks() {
                                 console.log('🔧 Selected account type:', e.target.value);
                                 setFormData({...formData, accountType: e.target.value as any});
                               }}
-                              className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
-                              style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                              className="text-xs border-none focus:ring-0 rounded-md text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
+                              style={{ padding: '0.25rem 0.5rem', height: '1.75rem' }}
                             >
                               <option value="CURRENT">Compte courant</option>
                               <option value="SAVINGS">Livret d'épargne</option>
@@ -597,7 +625,7 @@ export default function Banks() {
                           <input
                             type="text"
                             value={formData.iban}
-                            onChange={(e) => setFormData({...formData, iban: e.target.value})}
+                            onChange={(e) => setFormData({...formData, iban: e.target.value.replace(/\s+/g, '')})}
                             className="text-xs text-gray-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
                             placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
                           />
@@ -609,7 +637,7 @@ export default function Banks() {
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-gray-400 hover:text-red-400 transition-colors"
                           title="Annuler"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -627,8 +655,8 @@ export default function Banks() {
                           type="text"
                           value={formData.shortName}
                           onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
+                          style={{ '--tw-ring-color': '#6226fa' } as any}
                           placeholder="Nom court (BNP)"
                           maxLength={3}
                           required
@@ -637,8 +665,8 @@ export default function Banks() {
                           type="date"
                           value={formData.createdAt}
                           onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
+                          style={{ '--tw-ring-color': '#6226fa' } as any}
                           required
                         />
                         <input
@@ -646,8 +674,8 @@ export default function Banks() {
                           step="1"
                           value={formData.balance}
                           onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold"
-                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
+                          style={{ '--tw-ring-color': '#6226fa' } as any}
                           placeholder="Solde initial"
                           required
                         />
@@ -707,15 +735,15 @@ export default function Banks() {
                   {/* Footer - même style que les cartes */}
                   <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
                     <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-gray-400">
                         Modification
                       </div>
                       <div className="flex space-x-2">
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="px-3 py-1 text-xs border rounded hover:opacity-80"
-                          style={{ backgroundColor: '#1f2226', color: '#a0aec0', borderColor: '#3a3d42' }}
+                          className="px-3 py-1 text-xs border rounded hover:opacity-80 text-gray-300"
+                          style={{ backgroundColor: '#1f2226', borderColor: '#3a3d42' }}
                         >
                           Annuler
                         </button>
@@ -763,14 +791,14 @@ export default function Banks() {
                         <p className="text-sm text-gray-300">
                           {getAccountTypeInfo(bank.accountType).label}
                           {!selectedUser && bank.users && bank.users.length > 0 && (
-                            <span className="ml-2 text-violet-400">
+                            <span className="ml-2 text-violet-300">
                               • {bank.users.map(u => u.name).join(', ')}
                             </span>
                           )}
                         </p>
                         {bank.iban && (
                           <p className="text-xs text-gray-400 mt-1 font-mono">
-                            {bank.iban}
+                            {formatIBAN(bank.iban)}
                           </p>
                         )}
                       </div>
@@ -781,10 +809,9 @@ export default function Banks() {
                             e.stopPropagation();
                             handleEdit(bank);
                           }}
-                          className="transition-colors"
-                          style={{ color: '#616875' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
+                          className="transition-colors text-gray-400"
+                          onMouseEnter={(e) => e.currentTarget.className = 'transition-colors text-violet-300'}
+                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-gray-400'}
                           title="Modifier"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -796,10 +823,9 @@ export default function Banks() {
                             e.stopPropagation();
                             handleDelete(bank.id);
                           }}
-                          className="transition-colors"
-                          style={{ color: '#616875' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
+                          className="transition-colors text-gray-400"
+                          onMouseEnter={(e) => e.currentTarget.className = 'transition-colors text-red-400'}
+                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-gray-400'}
                           title="Supprimer"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -976,7 +1002,7 @@ export default function Banks() {
                       <input
                         type="text"
                         value={formData.iban}
-                        onChange={(e) => setFormData({...formData, iban: e.target.value})}
+                        onChange={(e) => setFormData({...formData, iban: e.target.value.replace(/\s+/g, '')})}
                         className="text-xs text-gray-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
                         placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
                       />

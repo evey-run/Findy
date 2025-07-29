@@ -39,7 +39,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-900">
         <Layout>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
