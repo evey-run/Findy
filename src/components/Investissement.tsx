@@ -565,6 +565,10 @@ export default function Investissement() {
           
           setImportProgress(prev => ({ ...prev, total: data.length }));
           
+          // Détecter si c'est un format Boursobank pour les investissements
+          const isBoursobankInvestmentFormat = detectBoursobankInvestmentFormat(data[0]);
+          console.log('Format Boursobank pour investissements détecté:', isBoursobankInvestmentFormat);
+          
           // Traiter chaque ligne
           for (let i = 0; i < data.length; i++) {
             const row = data[i] as any;
@@ -580,115 +584,129 @@ export default function Investissement() {
                 normalizedRow[normalizedKey] = row[key];
               });
               
-              // Détecter les colonnes de date, description et montant
-              let dateValue, descriptionValue, amountValue;
+              let transactionData;
               
-              // Essayer différents noms de colonnes couramment utilisés
-              const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop'];
-              const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label'];
-              const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur'];
-              
-              // Chercher la colonne de date
-              for (const key of dateKeys) {
-                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
-                  dateValue = normalizedRow[key];
-                  break;
-                }
-              }
-              
-              // Chercher la colonne de description
-              for (const key of descriptionKeys) {
-                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
-                  descriptionValue = normalizedRow[key];
-                  break;
-                }
-              }
-              
-              // Chercher la colonne de montant
-              for (const key of amountKeys) {
-                if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
-                  amountValue = normalizedRow[key];
-                  break;
-                }
-              }
-              
-              // Si on n'a pas trouvé de montant, essayer de combiner débit et crédit
-              if (amountValue === undefined) {
-                const debitValue = normalizedRow['debit'] || normalizedRow['debits'];
-                const creditValue = normalizedRow['credit'] || normalizedRow['credits'];
-                
-                if (debitValue !== undefined && debitValue !== '') {
-                  amountValue = `-${Math.abs(parseFloat(String(debitValue).replace(/[^0-9.,-]/g, '').replace(',', '.')))}`;  
-                } else if (creditValue !== undefined && creditValue !== '') {
-                  amountValue = Math.abs(parseFloat(String(creditValue).replace(/[^0-9.,-]/g, '').replace(',', '.')));
-                }
-              }
-              
-              console.log(`🔍 Ligne ${i + 1} - Date: "${dateValue}", Description: "${descriptionValue}", Montant: "${amountValue}"`);
-              
-              if (!dateValue || !descriptionValue || amountValue === undefined) {
-                const missingFields = [];
-                if (!dateValue) missingFields.push('date');
-                if (!descriptionValue) missingFields.push('description');
-                if (amountValue === undefined) missingFields.push('montant');
-                
-                importErrors.push(`Ligne ${i + 2}: Données manquantes (${missingFields.join(', ')}) - Colonnes disponibles: ${Object.keys(normalizedRow).join(', ')}`);
-                continue;
-              }
-              
-              // Parser la date
-              let parsedDate: Date;
-              const dateStr = String(dateValue).trim();
-              
-              // Essayer différents formats de date
-              if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
-                // Format YYYY-MM-DD
-                parsedDate = new Date(dateStr);
-              } else if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
-                // Format DD/MM/YYYY
-                const [day, month, year] = dateStr.split('/');
-                parsedDate = new Date(`${year}-${month}-${day}`);
-              } else if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
-                // Format DD-MM-YYYY
-                const [day, month, year] = dateStr.split('-');
-                parsedDate = new Date(`${year}-${month}-${day}`);
+              // Traitement spécifique pour le format Boursobank Investissement
+              if (isBoursobankInvestmentFormat) {
+                transactionData = processBoursobankInvestmentRow(normalizedRow, localSelectedBank.id, importErrors, i);
+                if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
               } else {
-                importErrors.push(`Ligne ${i + 2}: Format de date non reconnu (${dateStr})`);
+                // Traitement standard pour les autres formats
+                // Détecter les colonnes de date, description et montant
+                let dateValue, descriptionValue, amountValue;
+                
+                // Essayer différents noms de colonnes couramment utilisés
+                const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop', 'lastmovementdate'];
+                const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label', 'name'];
+                const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur', 'amountvariation'];
+                
+                // Chercher la colonne de date
+                for (const key of dateKeys) {
+                  if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                    dateValue = normalizedRow[key];
+                    break;
+                  }
+                }
+                
+                // Chercher la colonne de description
+                for (const key of descriptionKeys) {
+                  if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                    descriptionValue = normalizedRow[key];
+                    break;
+                  }
+                }
+                
+                // Chercher la colonne de montant
+                for (const key of amountKeys) {
+                  if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
+                    amountValue = normalizedRow[key];
+                    break;
+                  }
+                }
+                
+                // Si on n'a pas trouvé de montant, essayer de combiner débit et crédit
+                if (amountValue === undefined) {
+                  const debitValue = normalizedRow['debit'] || normalizedRow['debits'];
+                  const creditValue = normalizedRow['credit'] || normalizedRow['credits'];
+                  
+                  if (debitValue !== undefined && debitValue !== '') {
+                    amountValue = `-${Math.abs(parseFloat(String(debitValue).replace(/[^0-9.,-]/g, '').replace(',', '.')))}`;  
+                  } else if (creditValue !== undefined && creditValue !== '') {
+                    amountValue = Math.abs(parseFloat(String(creditValue).replace(/[^0-9.,-]/g, '').replace(',', '.')));
+                  }
+                }
+                
+                console.log(`🔍 Ligne ${i + 1} - Date: "${dateValue}", Description: "${descriptionValue}", Montant: "${amountValue}"`);
+                
+                if (!dateValue || !descriptionValue || amountValue === undefined) {
+                  const missingFields = [];
+                  if (!dateValue) missingFields.push('date');
+                  if (!descriptionValue) missingFields.push('description');
+                  if (amountValue === undefined) missingFields.push('montant');
+                  
+                  importErrors.push(`Ligne ${i + 2}: Données manquantes (${missingFields.join(', ')}) - Colonnes disponibles: ${Object.keys(normalizedRow).join(', ')}`);
+                  continue;
+                }
+                
+                // Parser la date
+                let parsedDate: Date;
+                const dateStr = String(dateValue).trim();
+                
+                // Essayer différents formats de date
+                if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                  // Format YYYY-MM-DD
+                  parsedDate = new Date(dateStr);
+                } else if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                  // Format DD/MM/YYYY
+                  const [day, month, year] = dateStr.split('/');
+                  parsedDate = new Date(`${year}-${month}-${day}`);
+                } else if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                  // Format DD-MM-YYYY
+                  const [day, month, year] = dateStr.split('-');
+                  parsedDate = new Date(`${year}-${month}-${day}`);
+                } else {
+                  importErrors.push(`Ligne ${i + 2}: Format de date non reconnu (${dateStr})`);
+                  continue;
+                }
+                
+                if (isNaN(parsedDate.getTime())) {
+                  importErrors.push(`Ligne ${i + 2}: Date invalide (${dateStr})`);
+                  continue;
+                }
+                
+                // Parser le montant
+                let amount: number;
+                const amountStr = String(amountValue).trim().replace(/\s/g, '');
+                
+                // Gérer les différents formats de montant
+                if (amountStr.includes(',') && !amountStr.includes('.')) {
+                  // Format français: 1 234,56
+                  amount = parseFloat(amountStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+                } else {
+                  // Format anglais: 1,234.56 ou simple: 1234.56
+                  amount = parseFloat(amountStr.replace(/[^0-9.-]/g, ''));
+                }
+                
+                if (isNaN(amount)) {
+                  importErrors.push(`Ligne ${i + 2}: Montant invalide (${amountStr})`);
+                  continue;
+                }
+                
+                // Créer la transaction
+                transactionData = {
+                  amount,
+                  description: String(descriptionValue).trim(),
+                  date: parsedDate.toISOString(),
+                  createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
+                  bankId: localSelectedBank.id,
+                  checked: false
+                };
+              }
+              
+              if (!transactionData) {
+                importErrors.push(`Ligne ${i + 2}: Impossible de créer la transaction`);
                 continue;
               }
-              
-              if (isNaN(parsedDate.getTime())) {
-                importErrors.push(`Ligne ${i + 2}: Date invalide (${dateStr})`);
-                continue;
-              }
-              
-              // Parser le montant
-              let amount: number;
-              const amountStr = String(amountValue).trim().replace(/\s/g, '');
-              
-              // Gérer les différents formats de montant
-              if (amountStr.includes(',') && !amountStr.includes('.')) {
-                // Format français: 1 234,56
-                amount = parseFloat(amountStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
-              } else {
-                // Format anglais: 1,234.56 ou simple: 1234.56
-                amount = parseFloat(amountStr.replace(/[^0-9.-]/g, ''));
-              }
-              
-              if (isNaN(amount)) {
-                importErrors.push(`Ligne ${i + 2}: Montant invalide (${amountStr})`);
-                continue;
-              }
-              
-              // Créer la transaction
-              const transactionData = {
-                amount,
-                description: String(descriptionValue).trim(),
-                date: parsedDate.toISOString(),
-                createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
-                bankId: localSelectedBank.id,
-                checked: false
-              };
               
               console.log(`📝 Creating transaction ${i + 1}:`, transactionData);
               
@@ -751,6 +769,98 @@ export default function Investissement() {
         total: 0,
         errors: [`Erreur: ${error instanceof Error ? error.message : 'Erreur inconnue'}`]
       });
+    }
+  };
+  
+  // Fonction pour détecter si c'est le format Boursobank pour les investissements
+  const detectBoursobankInvestmentFormat = (row: any): boolean => {
+    if (!row) return false;
+    
+    // Normaliser les noms de colonnes
+    const normalizedKeys = Object.keys(row).map(key => 
+      key.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '')
+    );
+    
+    // Vérifier si les colonnes typiques du format Boursobank sont présentes
+    const requiredColumns = ['name', 'isin', 'quantity', 'buyingprice', 'lastprice', 'amount'];
+    const hasRequiredColumns = requiredColumns.every(col => 
+      normalizedKeys.some(key => key.includes(col))
+    );
+    
+    return hasRequiredColumns;
+  };
+  
+  // Fonction pour traiter une ligne au format Boursobank Investissement
+  const processBoursobankInvestmentRow = (row: any, bankId: string, importErrors: string[], rowIndex: number): any => {
+    try {
+      // Extraire les données pertinentes
+      const name = row['name'] || '';
+      const isin = row['isin'] || '';
+      const quantity = parseFloat(String(row['quantity'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+      const lastPrice = parseFloat(String(row['lastprice'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+      const amount = parseFloat(String(row['amount'] || row['amountvariation'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.'));
+      const lastMovementDate = row['lastmovementdate'] || new Date().toISOString().split('T')[0];
+      
+      // Vérifier les données obligatoires
+      if (!name || !isin || isNaN(quantity) || isNaN(lastPrice) || isNaN(amount)) {
+        const missingFields = [];
+        if (!name) missingFields.push('name');
+        if (!isin) missingFields.push('isin');
+        if (isNaN(quantity)) missingFields.push('quantity');
+        if (isNaN(lastPrice)) missingFields.push('lastPrice');
+        if (isNaN(amount)) missingFields.push('amount');
+        
+        importErrors.push(`Ligne ${rowIndex + 2}: Données manquantes ou invalides (${missingFields.join(', ')})`);
+        return null;
+      }
+      
+      // Parser la date
+      let parsedDate: Date;
+      const dateStr = String(lastMovementDate).trim();
+      
+      // Essayer différents formats de date
+      if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // Format YYYY-MM-DD
+        parsedDate = new Date(dateStr);
+      } else if (dateStr.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+        // Format DD/MM/YYYY
+        const [day, month, year] = dateStr.split('/');
+        parsedDate = new Date(`${year}-${month}-${day}`);
+      } else if (dateStr.match(/^\d{2}-\d{2}-\d{4}$/)) {
+        // Format DD-MM-YYYY
+        const [day, month, year] = dateStr.split('-');
+        parsedDate = new Date(`${year}-${month}-${day}`);
+      } else {
+        // Si pas de date valide, utiliser la date du jour
+        parsedDate = new Date();
+      }
+      
+      // Créer la description avec les informations pertinentes
+      const description = `${name} (${isin}) - Qté: ${quantity} - Prix: ${lastPrice}€`;
+      
+      // Créer la transaction
+      return {
+        amount,
+        description,
+        date: parsedDate.toISOString(),
+        createdAt: parsedDate.toISOString(),
+        bankId,
+        checked: false,
+        metadata: {
+          isin,
+          quantity,
+          buyingPrice: parseFloat(String(row['buyingprice'] || '0').replace(/[^0-9.,-]/g, '').replace(',', '.')),
+          lastPrice,
+          type: 'investment'
+        }
+      };
+    } catch (error) {
+      console.error(`Error processing Boursobank row ${rowIndex + 1}:`, error);
+      importErrors.push(`Ligne ${rowIndex + 2}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      return null;
     }
   };
   
