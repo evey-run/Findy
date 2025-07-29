@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 
 // Styles pour les cellules éditables sont intégrés directement dans les classes CSS
@@ -215,6 +215,12 @@ export default function Investissement() {
           .filter(bank => bank.accountType === 'INVESTMENT')
           .map(bank => bank.id);
         
+        // Nous utilisons uniquement localSelectedBank pour la page Investissements
+        
+        // Initialiser la banque locale avec la première banque d'investissement
+        const firstInvestmentBank = banks.find(bank => bank.accountType === 'INVESTMENT');
+        setLocalSelectedBank(firstInvestmentBank || null);
+        
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
           setSearchInput(searchFromURL);
@@ -224,15 +230,21 @@ export default function Investissement() {
           if (investmentBankIds.length > 0) {
             await loadTransactions({ 
               searchText: searchFromURL,
-              accountType: 'INVESTMENT'
-            });
+              accountType: 'INVESTMENT',
+              forceIgnoreSelectedBank: true
+            } as any);
           }
         } else {
           // Chargement normal avec filtre par type de compte
           if (investmentBankIds.length > 0) {
+            // Forcer le rechargement complet des transactions d'investissement
+            // en ignorant le filtre global de banque sélectionnée
             await loadTransactions({ 
-              accountType: 'INVESTMENT'
-            });
+              accountType: 'INVESTMENT',
+              forceIgnoreSelectedBank: true,
+              // Si une banque locale est déjà sélectionnée, l'utiliser comme filtre
+              ...(firstInvestmentBank ? { bankId: firstInvestmentBank.id } : {})
+            } as any);
           }
         }
         
@@ -243,7 +255,7 @@ export default function Investissement() {
           description: '',
           date: new Date().toISOString().split('T')[0],
           checked: false,
-          bankId: banks.filter(bank => bank.accountType === 'INVESTMENT')[0]?.id || ''
+          bankId: firstInvestmentBank?.id || ''
         });
       } catch (error) {
         console.error('Error initializing data:', error);
@@ -253,6 +265,8 @@ export default function Investissement() {
     };
     
     initializeData();
+    
+    // Pas besoin de nettoyer l'état global car nous utilisons uniquement localSelectedBank
   }, []);
   
   // Log transactions changes
@@ -439,54 +453,45 @@ export default function Investissement() {
       console.error('Error creating transaction:', error);
     }
   };
-  
-  // Filtrer les transactions en fonction des critères
-  const filteredTransactions = investmentTransactions.filter(transaction => {
-    // Filtre par banque sélectionnée
-    if (localSelectedBank && String(transaction.bankId) !== String(localSelectedBank.id)) {
-      return false;
-    }
-    
-    // Filtre par statut pointé
-    if (filters.checked !== '') {
-      // Conversion explicite en booléen pour la comparaison
-      const isChecked = filters.checked === 'true';
-      if (transaction.checked !== isChecked) {
+
+  // Fonction pour filtrer les transactions en fonction des filtres appliqués
+  const filteredTransactions = useMemo(() => {
+    return investmentTransactions.filter(transaction => {
+      // Filtre par banque (utiliser uniquement localSelectedBank, pas selectedBank du store)
+      if (localSelectedBank && transaction.bankId !== localSelectedBank.id) {
         return false;
       }
-    }
-    
-    // Filtre par date de début
-    if (filters.startDate && transaction.date < filters.startDate) {
-      return false;
-    }
-    
-    // Filtre par date de fin
-    if (filters.endDate && transaction.date > filters.endDate) {
-      return false;
-    }
-    
-    // Filtre par recherche de texte ou montant
-    if (filters.searchText) {
-      const searchLower = filters.searchText.toLowerCase();
-      const descriptionMatch = transaction.description.toLowerCase().includes(searchLower);
       
-      // Recherche dans le montant (convertir le montant en string pour la recherche)
-      const amountStr = transaction.amount.toString();
-      const amountMatch = amountStr.includes(searchLower);
+      // Filtre par statut pointé
+      if (filters.checked) {
+        const isChecked = transaction.checked === true;
+        if (filters.checked === 'true' && !isChecked) return false;
+        if (filters.checked === 'false' && isChecked) return false;
+      }
       
-      // Recherche dans le montant formaté (ex: "123,45 €")
-      const formattedAmount = formatAmount(transaction.amount).toLowerCase();
-      const formattedAmountMatch = formattedAmount.includes(searchLower);
-      
-      if (!descriptionMatch && !amountMatch && !formattedAmountMatch) {
+      // Filtre par date de début
+      if (filters.startDate && new Date(transaction.date) < new Date(filters.startDate)) {
         return false;
       }
-    }
-    
-    return true;
-  });
-  
+      
+      // Filtre par date de fin
+      if (filters.endDate && new Date(transaction.date) > new Date(filters.endDate)) {
+        return false;
+      }
+      
+      // Filtre par texte de recherche
+      if (filters.searchText) {
+        const searchLower = filters.searchText.toLowerCase();
+        const descriptionLower = transaction.description.toLowerCase();
+        if (!descriptionLower.includes(searchLower)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+  }, [investmentTransactions, localSelectedBank, filters]);
+
   // Fonction pour gérer le scroll infini
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, clientHeight, scrollHeight } = e.currentTarget;
@@ -502,8 +507,22 @@ export default function Investissement() {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
+      
+      // Nous utilisons uniquement localSelectedBank pour la page Investissements
+      
       // Ajouter le paramètre accountType pour charger uniquement les transactions d'investissement
-      const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE, { accountType: 'INVESTMENT' });
+      // Forcer l'ignorance de la banque globale sélectionnée
+      const options: any = { 
+        accountType: 'INVESTMENT',
+        forceIgnoreSelectedBank: true
+      };
+      
+      // Si une banque locale est sélectionnée, ajouter son ID aux options
+      if (localSelectedBank) {
+        options.bankId = localSelectedBank.id;
+      }
+      
+      const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE, options as any);
       
       if (result.newTransactions.length > 0) {
         setPage(nextPage);
@@ -517,9 +536,36 @@ export default function Investissement() {
     }
   };
   
+  // Fonction pour gérer la sélection d'une banque
+  const handleBankSelect = async (bank: any) => {
+    setLocalSelectedBank(bank);
+    setPage(1);
+    setHasMore(true);
+    
+    // Recharger les transactions avec la banque sélectionnée
+    await loadTransactions({
+      accountType: 'INVESTMENT',
+      forceIgnoreSelectedBank: true,
+      ...(bank ? { bankId: bank.id } : {})
+    } as any);
+  };
+
   // Fonction pour gérer la recherche
+  const navigate = useNavigate();
+  
   const handleSearch = () => {
-    setFilters({...filters, searchText: searchInput});
+    setFilters(prev => ({ ...prev, searchText: searchInput }));
+    
+    // Nous utilisons uniquement localSelectedBank pour la page Investissements
+    
+    // Mettre à jour l'URL avec le paramètre de recherche
+    const searchParams = new URLSearchParams(location.search);
+    if (searchInput) {
+      searchParams.set('search', searchInput);
+    } else {
+      searchParams.delete('search');
+    }
+    navigate(`${location.pathname}?${searchParams.toString()}`);
   };
   
   // Fonction pour gérer la sélection/désélection de toutes les transactions
@@ -869,17 +915,6 @@ export default function Investissement() {
     }
   };
   
-  // Fonction pour gérer la sélection/désélection d'une transaction
-  const handleToggleSelect = (id: string) => {
-    setSelectedTransactions(prev => {
-      if (prev.includes(id)) {
-        return prev.filter(transactionId => transactionId !== id);
-      } else {
-        return [...prev, id];
-      }
-    });
-  };
-  
   // Fonction pour afficher les avatars des utilisateurs
   const renderUserAvatars = (users: any[], style?: React.CSSProperties) => {
     if (!users || users.length === 0) return <span className="text-gray-400">-</span>;
@@ -940,7 +975,7 @@ export default function Investissement() {
                 value={localSelectedBank?.id || ''}
                 onChange={(e) => {
                   const bank = banks.find(b => b.id === e.target.value);
-                  setLocalSelectedBank(bank || null);
+                  handleBankSelect(bank || null);
                 }}
                 className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
                 style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}

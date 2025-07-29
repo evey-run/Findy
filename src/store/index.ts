@@ -202,7 +202,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -223,7 +223,8 @@ export const useAppStore = create<AppState>()(
           }
           
           // Ajouter le filtre de banque si une banque est sélectionnée
-          if (state.selectedBank) {
+          // et si on ne force pas l'ignorance de ce filtre
+          if (state.selectedBank && !options?.forceIgnoreSelectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
           
@@ -243,7 +244,7 @@ export const useAppStore = create<AppState>()(
         }
       },
       
-      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string }) => {
+      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -258,8 +259,9 @@ export const useAppStore = create<AppState>()(
           if (state.dateRange.endDate && state.dateRange.endDate !== '') {
             params.append('endDate', state.dateRange.endDate);
           }
-          
-          if (state.selectedBank) {
+          // Ajouter le filtre de banque si une banque est sélectionnée
+          // et si on ne force pas l'ignorance de ce filtre
+          if (state.selectedBank && !options?.forceIgnoreSelectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
           
