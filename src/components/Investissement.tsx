@@ -1008,8 +1008,8 @@ export default function Investissement() {
         }
       }
       
-      // Créer la description avec les informations pertinentes
-      const description = `${name} (${isin}) - Qté: ${quantity} - Prix: ${lastPrice}€`;
+      // Créer la description avec uniquement le nom et l'ISIN (sans quantité ni prix)
+      const description = `${name} (${isin})`;
       
       console.log(`CSV import: Création transaction pour ${name}, unitPrice=${lastPrice}, quantity=${quantity}`);
       
