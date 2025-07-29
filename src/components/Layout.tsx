@@ -11,6 +11,7 @@ import {
   UserIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  FlagIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -22,7 +23,7 @@ const navigation = [
   { name: 'Transactions', href: '/transactions', icon: CreditCardIcon },
   { name: 'Investissements', href: '/investissement', icon: ChartBarIcon },
   { name: 'Catégories', href: '/categories', icon: TagIcon },
-  { name: 'Objectifs', href: '/budgets', icon: ChartBarIcon },
+  { name: 'Objectifs', href: '/budgets', icon: FlagIcon },
   { name: 'Banques', href: '/banks', icon: BuildingLibraryIcon },
   { name: 'Utilisateurs', href: '/users', icon: UserIcon },
 ];

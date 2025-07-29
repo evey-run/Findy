@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import type { Bank } from '../types/index.js';
+import type { Bank } from '../types';
+import { getAllBankBalances } from '../api/bankBalance';
 
 // Styles pour la barre de scroll personnalisée
 const scrollbarStyles = `
@@ -134,7 +135,7 @@ export default function Banks() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   useEffect(() => {
-    // Charger toutes les transactions sans filtre
+    // Charger les banques et les transactions
     const initBanks = async () => {
       setLoading(true);
       try {
@@ -151,6 +152,8 @@ export default function Banks() {
     };
     initBanks();
   }, [loadBanks, loadTransactions, showArchived, selectedUser]);
+
+
 
   const loadArchivedBanks = async () => {
     try {
@@ -389,11 +392,40 @@ export default function Banks() {
     }
   };
 
-  const getCurrentBalance = (bankId: string, initialBalance: number) => {
-    const bankTransactions = transactions.filter(t => t.bankId === bankId);
-    const transactionsSum = bankTransactions.reduce((sum, t) => sum + t.amount, 0);
-    return initialBalance + transactionsSum;
+  // Stocker les soldes calculés pour éviter des recalculs inutiles
+  const [bankBalances, setBankBalances] = useState<{[key: string]: number}>({});
+  
+  // Charger les soldes pour toutes les banques en utilisant l'API dédiée
+  const loadAllBankBalances = async () => {
+    try {
+      if (banks.length > 0) {
+        const balances = await getAllBankBalances(banks);
+        setBankBalances(balances);
+      }
+    } catch (error) {
+      console.error('Failed to load bank balances:', error);
+    }
   };
+  
+  // Charger les soldes au chargement du composant et quand les banques changent
+  useEffect(() => {
+    loadAllBankBalances();
+  }, [banks]);
+  
+  const getCurrentBalance = (bankId: string, initialBalance: number) => {
+    // Utiliser le solde précalculé s'il existe, sinon utiliser le solde initial
+    return bankBalances[bankId] !== undefined ? bankBalances[bankId] : initialBalance;
+  };
+  
+  // Fonction pour forcer le rechargement des soldes (utile après ajout/modification de transaction)
+  const refreshBalances = () => {
+    loadAllBankBalances();
+  };
+  
+  // Recharger les soldes quand les transactions changent
+  useEffect(() => {
+    refreshBalances();
+  }, [transactions.length]);
 
   if (loading) {
     return (

@@ -21,7 +21,7 @@ interface AppState {
   // Banks (filtered by selected user)
   banks: Bank[];
   setBanks: (banks: Bank[]) => void;
-  loadBanks: () => Promise<void>;
+  loadBanks: (userId?: string) => Promise<void>;
   
   // Categories
   categories: Category[];
@@ -33,6 +33,7 @@ interface AppState {
   
   // Transactions
   transactions: Transaction[];
+  allTransactions: Transaction[];
   setTransactions: (transactions: Transaction[]) => void;
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
