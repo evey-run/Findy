@@ -154,9 +154,6 @@ export default function Investissement() {
   const [loadingMore, setLoadingMore] = useState(false);
   const ITEMS_PER_PAGE = 50;
   
-  // États pour la sélection multiple
-  const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
-  const [selectAll, setSelectAll] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -566,16 +563,6 @@ export default function Investissement() {
       searchParams.delete('search');
     }
     navigate(`${location.pathname}?${searchParams.toString()}`);
-  };
-  
-  // Fonction pour gérer la sélection/désélection de toutes les transactions
-  const handleToggleSelectAll = () => {
-    if (selectAll) {
-      setSelectedTransactions([]);
-    } else {
-      setSelectedTransactions(filteredTransactions.map(t => t.id));
-    }
-    setSelectAll(!selectAll);
   };
   
   // Fonction pour gérer l'import CSV
@@ -1055,14 +1042,6 @@ export default function Investissement() {
             <table className="w-full divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
               <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-8">
-                    <input
-                      type="checkbox"
-                      checked={selectAll}
-                      onChange={handleToggleSelectAll}
-                      className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                    />
-                  </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
                     Date
                   </th>
@@ -1086,8 +1065,6 @@ export default function Investissement() {
               <tbody className="divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
                 {/* Add form row - always visible as first row */}
                 <tr className="border-l-4" style={{ backgroundColor: '#1f2226', borderLeftColor: '#6226fa' }}>
-                  {/* Cellule vide pour aligner avec la colonne de checkbox */}
-                  <td className="px-4 py-2"></td>
                   <td className="px-4 py-2">
                     <input
                       type="date"
@@ -1176,15 +1153,6 @@ export default function Investissement() {
                     onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #6226fa'}
                     onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
                   >
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
-                      <input
-                        type="checkbox"
-                        checked={selectedTransactions.includes(transaction.id)}
-                        onChange={() => handleToggleSelect(transaction.id)}
-                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                       {editingId === transaction.id ? (
                         <input
