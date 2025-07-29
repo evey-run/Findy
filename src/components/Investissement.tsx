@@ -173,8 +173,7 @@ export default function Investissement() {
     searchText: ''
   });
 
-  // États pour la modification en lot
-  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  // États pour la modification en masse
   const [bulkEditFilters, setBulkEditFilters] = useState({
     searchText: '',
     bankId: '',
@@ -188,12 +187,7 @@ export default function Investissement() {
     changeBank: { enabled: false, bankId: '' }
   });
   const [bulkEditTransactions, setBulkEditTransactions] = useState([]);
-  const [bulkEditProgress, setBulkEditProgress] = useState({
-    isProcessing: false,
-    processed: 0,
-    total: 0,
-    errors: [] as string[]
-  });
+
 
   // État local pour la saisie du texte de recherche
   const [searchInput, setSearchInput] = useState('');
@@ -201,11 +195,9 @@ export default function Investissement() {
   // Récupérer les paramètres d'URL
   const location = useLocation();
 
-  // Filtrer uniquement les transactions liées aux investissements
-  const investmentTransactions = transactions.filter(transaction => {
-    const bank = banks.find(b => b.id === transaction.bankId);
-    return bank?.accountType === 'INVESTMENT';
-  });
+  // Nous n'avons plus besoin de filtrer les transactions côté client
+  // car nous les chargeons déjà filtrées par type de compte
+  const investmentTransactions = transactions;
 
   useEffect(() => {
     const initializeData = async () => {
@@ -215,23 +207,35 @@ export default function Investissement() {
         const searchParams = new URLSearchParams(location.search);
         const searchFromURL = searchParams.get('search');
         
+        // Charger d'abord les banques pour pouvoir filtrer les transactions
+        await loadBanks();
+        
+        // Récupérer les IDs des banques de type INVESTMENT
+        const investmentBankIds = banks
+          .filter(bank => bank.accountType === 'INVESTMENT')
+          .map(bank => bank.id);
+        
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
           setSearchInput(searchFromURL);
           // Mettre à jour les filtres affichés
           setFilters(prev => ({ ...prev, searchText: searchFromURL }));
-          // Charger les transactions avec le filtre de recherche
-          await Promise.all([
-            loadTransactions({ searchText: searchFromURL }),
-            loadBanks()
-          ]);
+          // Charger les transactions avec le filtre de recherche et les banques d'investissement
+          if (investmentBankIds.length > 0) {
+            await loadTransactions({ 
+              searchText: searchFromURL,
+              accountType: 'INVESTMENT'
+            });
+          }
         } else {
-          // Chargement normal sans filtre
-          await Promise.all([
-            loadTransactions(),
-            loadBanks()
-          ]);
+          // Chargement normal avec filtre par type de compte
+          if (investmentBankIds.length > 0) {
+            await loadTransactions({ 
+              accountType: 'INVESTMENT'
+            });
+          }
         }
+        
         // Initialiser le formulaire d'ajout
         setEditingTransaction({
           id: '',
@@ -498,7 +502,8 @@ export default function Investissement() {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE);
+      // Ajouter le paramètre accountType pour charger uniquement les transactions d'investissement
+      const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE, { accountType: 'INVESTMENT' });
       
       if (result.newTransactions.length > 0) {
         setPage(nextPage);
@@ -506,7 +511,7 @@ export default function Investissement() {
       
       setHasMore(result.hasMore);
     } catch (error) {
-      console.error('Error loading more transactions:', error);
+      console.error('Error loading more data:', error);
     } finally {
       setLoadingMore(false);
     }

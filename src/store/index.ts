@@ -38,8 +38,8 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean }) => Promise<void>;
-  loadMoreTransactions: (page: number, itemsPerPage: number) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string }) => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
   // Budgets
@@ -202,7 +202,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -226,6 +226,11 @@ export const useAppStore = create<AppState>()(
           if (state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
+          
+          // Ajouter le filtre par type de compte si spécifié
+          if (options?.accountType) {
+            params.append('accountType', options.accountType);
+          }
           const response = await fetch(`/api/transactions?${params}`);
           const data = await response.json();
           if (data.transactions) {
@@ -238,7 +243,7 @@ export const useAppStore = create<AppState>()(
         }
       },
       
-      loadMoreTransactions: async (page: number, itemsPerPage: number) => {
+      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -256,6 +261,11 @@ export const useAppStore = create<AppState>()(
           
           if (state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
+          }
+          
+          // Ajouter le filtre par type de compte si spécifié
+          if (options?.accountType) {
+            params.append('accountType', options.accountType);
           }
           
           const response = await fetch(`/api/transactions?${params}`);
