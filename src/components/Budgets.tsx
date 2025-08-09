@@ -390,10 +390,10 @@ export default function Budgets() {
             const percentage = progress ? progress.percentage : 0;
             const isCompleted = progress ? progress.isCompleted : objective.isCompleted;
             const deadline = objective.deadline;
-            const overdueClass = deadline && isOverdue(deadline) && !isCompleted ? 'ring-2 ring-red-500' : '';
+            // Suppression du carré rouge autour des objectifs en retard
             
             return (
-              <div key={objective.id} className={`shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80 ${overdueClass}`} style={{ backgroundColor: '#272a2f' }}>
+              <div key={objective.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f' }}>
               {editingId === objective.id ? (
                 <form onSubmit={handleSave} className="flex flex-col h-full">
                   <div className="p-6 flex-1">
@@ -547,7 +547,7 @@ export default function Budgets() {
                       </div>
                       
                       <div className="flex justify-between text-sm text-gray-400 mt-2">
-                        <span>{deadline ? `Échéance: ${new Date(deadline).toLocaleDateString('fr-FR')}` : 'Pas d\'échéance'}</span>
+                        <span className={deadline && isOverdue(deadline) && !isCompleted ? 'text-red-500 font-medium' : ''}>{deadline ? `Échéance: ${new Date(deadline).toLocaleDateString('fr-FR')}` : 'Pas d\'échéance'}</span>
                         <span className={isCompleted ? 'text-green-400' : 'text-gray-400'}>
                           {progress ? 
                             (progress.remaining > 0 ? 

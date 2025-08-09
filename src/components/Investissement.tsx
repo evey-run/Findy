@@ -634,9 +634,11 @@ export default function Investissement() {
           
           setImportProgress(prev => ({ ...prev, total: data.length }));
           
-          // Détecter si c'est un format Boursobank pour les investissements
+          // Détecter le format du fichier CSV
           const isBoursobankInvestmentFormat = detectBoursobankInvestmentFormat(data[0]);
+          const isBinanceFormat = detectBinanceFormat(data[0]);
           console.log('Format Boursobank pour investissements détecté:', isBoursobankInvestmentFormat);
+          console.log('Format Binance détecté:', isBinanceFormat);
           
           // Traiter chaque ligne
           for (let i = 0; i < data.length; i++) {
@@ -655,9 +657,12 @@ export default function Investissement() {
               
               let transactionData;
               
-              // Traitement spécifique pour le format Boursobank Investissement
+              // Traitement spécifique selon le format détecté
               if (isBoursobankInvestmentFormat) {
                 transactionData = processBoursobankInvestmentRow(normalizedRow, importBankId, importErrors, i);
+                if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
+              } else if (isBinanceFormat) {
+                transactionData = processBinanceRow(normalizedRow, importBankId, importErrors, i);
                 if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
               } else {
                 // Traitement standard pour les autres formats
@@ -827,6 +832,22 @@ export default function Investissement() {
                 continue;
               }
               
+              // Vérification finale des champs requis avant envoi à l'API
+              if (!transactionData.amount && transactionData.amount !== 0) {
+                importErrors.push(`Ligne ${i + 2}: Montant manquant dans la transaction`);
+                continue;
+              }
+              
+              if (!transactionData.description || transactionData.description.trim() === '') {
+                importErrors.push(`Ligne ${i + 2}: Description manquante dans la transaction`);
+                continue;
+              }
+              
+              if (!transactionData.bankId) {
+                importErrors.push(`Ligne ${i + 2}: ID de compte manquant dans la transaction`);
+                continue;
+              }
+              
               console.log(`📝 Creating transaction ${i + 1}:`, transactionData);
               console.log(`🔍 DEBUG - unitPrice: ${transactionData.unitPrice}, type: ${typeof transactionData.unitPrice}`);
               console.log(`🔍 DEBUG - quantity: ${transactionData.quantity}, type: ${typeof transactionData.quantity}`);
@@ -897,7 +918,8 @@ export default function Investissement() {
     }
   };
   
-  // Fonction pour détecter si c'est le format Boursobank pour les investissements
+
+    // Fonction pour détecter si c'est un format Boursobank pour les investissements
   const detectBoursobankInvestmentFormat = (row: any): boolean => {
     if (!row) return false;
     
@@ -928,6 +950,254 @@ export default function Investissement() {
     console.log('Détection format utilisateur:', isUserFormat);
     
     return hasRequiredColumns || isUserFormat;
+  };
+
+  // Fonction pour détecter si c'est le format Binance
+  const detectBinanceFormat = (row: any): boolean => {
+    if (!row) return false;
+    
+    // Normaliser les noms de colonnes
+    const normalizedKeys = Object.keys(row).map(key => 
+      key.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '')
+    );
+    
+    console.log('Colonnes normalisées pour détection format Binance:', normalizedKeys);
+    
+    // Vérifier si les colonnes correspondent au format Binance
+    const requiredColumns = [
+      'dateutc',
+      'date(utc)',
+      'orderno',
+      'pair',
+      'type',
+      'side',
+      'tradingtotal',
+      'trading_total'
+    ];
+    
+    // Vérifier si au moins 4 des colonnes requises sont présentes
+    const matchCount = requiredColumns.filter(col => 
+      normalizedKeys.some(key => key === col || key.includes(col))
+    ).length;
+    
+    console.log('Détection format Binance - colonnes correspondantes:', matchCount);
+    
+    return matchCount >= 4;
+  };
+
+  // Fonction pour traiter une ligne au format Binance
+  const processBinanceRow = (row: any, bankId: string, importErrors: string[], rowIndex: number): any => {
+    try {
+      console.log('Traitement ligne CSV format Binance:', row);
+      
+      // Vérifier que bankId est valide
+      if (!bankId) {
+        importErrors.push(`Ligne ${rowIndex + 2}: Compte d'investissement non spécifié`);
+        return null;
+      }
+      
+      // Extraire les données nécessaires avec gestion des différentes variantes de noms de colonnes
+      const dateValue = row['date(utc)'] || row['dateutc'] || row['date'] || row['utcdate'] || row['time'] || row['timestamp'];
+      const orderNo = row['orderno'] || row['order_no'] || row['orderid'] || row['order_id'] || row['id'] || row['transaction_id'];
+      const pair = row['pair'] || row['symbol'] || row['market'] || row['coin'] || row['asset'];
+      const type = row['type'] || row['ordertype'] || row['order_type'] || row['operation'] || row['operation_type'];
+      const side = row['side'] || row['direction'] || row['tradeside'] || row['trade_side'] || row['operation'];
+      
+      // Recherche plus approfondie pour le montant
+      let amountValue;
+      const possibleAmountFields = ['tradingtotal', 'trading_total', 'total', 'amount', 'value', 'eur', 'usd', 'fiat_amount', 'fiat', 'cost', 'total_cost'];
+      
+      for (const field of possibleAmountFields) {
+        // Vérifier les variantes de casse (majuscules, minuscules, camelCase)
+        const variants = [field, field.toLowerCase(), field.toUpperCase(), field.charAt(0).toUpperCase() + field.slice(1)];
+        
+        for (const variant of variants) {
+          if (row[variant] !== undefined && row[variant] !== '') {
+            amountValue = row[variant];
+            break;
+          }
+        }
+        
+        if (amountValue !== undefined) break;
+      }
+      
+      // Si toujours pas de montant, essayer de le calculer à partir du prix et de la quantité
+      if ((!amountValue && amountValue !== 0) || amountValue === '') {
+        const priceValue = row['averageprice'] || row['average_price'] || row['price'] || row['unitprice'] || row['unit_price'] || row['price_eur'] || row['price_usd'];
+        const quantityValue = row['executed'] || row['quantity'] || row['qty'] || row['size'] || row['volume'] || row['amount'];
+        
+        if (priceValue && quantityValue) {
+          try {
+            const price = parseFloat(String(priceValue).replace(/[^0-9.-]/g, '').replace(',', '.'));
+            const qty = parseFloat(String(quantityValue).replace(/[^0-9.-]/g, '').replace(',', '.'));
+            amountValue = price * qty;
+            console.log(`Calculated amount from price (${price}) * quantity (${qty}) = ${amountValue}`);
+          } catch (e) {
+            console.warn('Failed to calculate amount from price and quantity:', e);
+          }
+        }
+      }
+      
+      // Parser la date (format Binance: YYYY-MM-DD HH:MM:SS)
+      let parsedDate: Date;
+      try {
+        if (dateValue) {
+          parsedDate = new Date(dateValue);
+          if (isNaN(parsedDate.getTime())) {
+            // Essayer d'autres formats de date
+            const formats = [
+              // Format timestamp (millisecondes)
+              (val: string) => new Date(parseInt(val)),
+              // Format DD/MM/YYYY
+              (val: string) => {
+                const parts = val.split('/');
+                return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+              },
+              // Format MM/DD/YYYY
+              (val: string) => {
+                const parts = val.split('/');
+                return new Date(parseInt(parts[2]), parseInt(parts[0]) - 1, parseInt(parts[1]));
+              }
+            ];
+            
+            for (const format of formats) {
+              try {
+                const date = format(dateValue);
+                if (!isNaN(date.getTime())) {
+                  parsedDate = date;
+                  break;
+                }
+              } catch (e) {
+                // Continuer avec le prochain format
+              }
+            }
+            
+            if (isNaN(parsedDate.getTime())) {
+              // Si toujours pas valide, utiliser la date actuelle
+              console.warn(`Format de date non reconnu (${dateValue}), utilisation de la date actuelle`);
+              parsedDate = new Date();
+            }
+          }
+        } else {
+          // Si pas de date, utiliser la date actuelle
+          parsedDate = new Date();
+        }
+      } catch (error) {
+        console.warn(`Erreur de parsing de la date (${dateValue}), utilisation de la date actuelle`);
+        parsedDate = new Date();
+      }
+      
+      // Parser le montant
+      let amount: number;
+      try {
+        if (amountValue !== undefined && amountValue !== null && amountValue !== '') {
+          // Nettoyer la valeur du montant
+          const amountStr = String(amountValue).trim().replace(/\s/g, '');
+          amount = parseFloat(amountStr.replace(/[^0-9.-]/g, '').replace(',', '.'));
+          
+          if (isNaN(amount)) {
+            console.warn(`Montant invalide (${amountValue}), utilisation de 0`);
+            amount = 0;
+          }
+        } else {
+          // Si pas de montant, utiliser 0
+          console.warn('Aucun montant trouvé, utilisation de 0');
+          amount = 0;
+        }
+        
+        // Si c'est une vente (SELL), le montant est positif, sinon c'est un achat (BUY) et le montant est négatif
+        if (side) {
+          const upperSide = side.toUpperCase();
+          if (upperSide === 'BUY' || upperSide === 'PURCHASE' || upperSide === 'ACHAT') {
+            amount = -Math.abs(amount); // Achat = sortie d'argent = montant négatif
+          } else if (upperSide === 'SELL' || upperSide === 'SALE' || upperSide === 'VENTE') {
+            amount = Math.abs(amount); // Vente = entrée d'argent = montant positif
+          }
+        }
+      } catch (error) {
+        console.warn(`Erreur de parsing du montant (${amountValue}), utilisation de 0`);
+        amount = 0;
+      }
+      
+      // Parser le prix unitaire
+      let unitPrice: number | null = null;
+      const priceValue = row['averageprice'] || row['average_price'] || row['price'] || row['unitprice'] || row['unit_price'] || row['price_eur'] || row['price_usd'];
+      if (priceValue) {
+        try {
+          const priceStr = String(priceValue).trim().replace(/\s/g, '');
+          unitPrice = parseFloat(priceStr.replace(/[^0-9.-]/g, '').replace(',', '.'));
+          if (isNaN(unitPrice)) unitPrice = null;
+        } catch (error) {
+          // Ne pas bloquer l'import si le prix unitaire est invalide
+          console.warn(`Warning: Invalid unit price at row ${rowIndex + 2}: ${priceValue}`);
+        }
+      }
+      
+      // Parser la quantité
+      let quantity: number | null = null;
+      const quantityValue = row['executed'] || row['quantity'] || row['qty'] || row['size'] || row['volume'] || row['amount'];
+      if (quantityValue) {
+        try {
+          const quantityStr = String(quantityValue).trim().replace(/\s/g, '');
+          quantity = parseFloat(quantityStr.replace(/[^0-9.-]/g, '').replace(',', '.'));
+          if (isNaN(quantity)) quantity = null;
+        } catch (error) {
+          // Ne pas bloquer l'import si la quantité est invalide
+          console.warn(`Warning: Invalid quantity at row ${rowIndex + 2}: ${quantityValue}`);
+        }
+      }
+      
+      // Créer une description significative
+      let description = '';
+      
+      if (side && pair) {
+        description = `${side || ''} ${pair || ''} ${type || ''}`.trim();
+        if (orderNo) {
+          description += ` (${orderNo})`;
+        }
+      } else if (pair) {
+        description = `Transaction ${pair} ${type || ''}`.trim();
+      } else {
+        // Fallback description
+        description = 'Transaction Binance';
+      }
+      
+      // S'assurer que la description n'est pas vide
+      if (!description || description.trim() === '') {
+        description = 'Transaction Binance';
+      }
+      
+      // Créer la transaction avec tous les champs requis
+      const transaction = {
+        amount,
+        description: description.trim(),
+        date: parsedDate.toISOString(),
+        createdAt: parsedDate.toISOString(),
+        bankId,
+        checked: false,
+        unitPrice,
+        quantity
+      };
+      
+      // Vérification finale des champs obligatoires - toujours valide maintenant car nous avons des valeurs par défaut
+      return transaction;
+    } catch (error) {
+      console.error('Erreur lors du traitement de la ligne Binance:', error);
+      importErrors.push(`Ligne ${rowIndex + 2}: Erreur lors du traitement de la ligne Binance: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      
+      // En cas d'erreur, créer une transaction par défaut avec les informations minimales requises
+      return {
+        amount: 0,
+        description: `Transaction Binance (ligne ${rowIndex + 2})`,
+        date: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        bankId,
+        checked: false
+      };
+    }
   };
   
   // Fonction pour traiter une ligne au format Boursobank Investissement
