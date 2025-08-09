@@ -248,9 +248,11 @@ export const useAppStore = create<AppState>()(
         try {
           const state = get();
           const params = new URLSearchParams({
-            page: page.toString(),
-            limit: itemsPerPage.toString()
+            limit: itemsPerPage.toString(),
           });
+          // Backend expects 'offset' for pagination
+          const offset = Math.max(0, (page - 1) * itemsPerPage);
+          params.append('offset', offset.toString());
           
           // Ajouter les filtres de dates
           if (state.dateRange.startDate && state.dateRange.startDate !== '') {
