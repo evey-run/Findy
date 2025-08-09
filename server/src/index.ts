@@ -50,8 +50,8 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
-// 404 handler
-app.use('*', (req, res) => {
+// 404 handler (Express 5 compatible)
+app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 

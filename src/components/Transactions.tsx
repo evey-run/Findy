@@ -595,13 +595,6 @@ export default function Transactions() {
 
   // Fonction pour appliquer les modifications en lot
   const handleBulkEdit = async () => {
-    const targetTransactions = getBulkEditTargetTransactions();
-    
-    if (targetTransactions.length === 0) {
-      alert('Aucune transaction ne correspond aux critères de sélection.');
-      return;
-    }
-
     // Vérifier qu'au moins une action est activée
     const hasActions = bulkEditActions.replaceText.enabled || 
                       bulkEditActions.changeCategory.enabled || 
@@ -613,93 +606,51 @@ export default function Transactions() {
       return;
     }
 
-    if (!confirm(`Voulez-vous vraiment modifier ${targetTransactions.length} transaction(s) ?`)) {
-      return;
-    }
-
+    // Lancer la progression
     setBulkEditProgress({
       isProcessing: true,
       processed: 0,
-      total: targetTransactions.length,
+      total: 0,
       errors: []
     });
 
-    const errors: string[] = [];
+    try {
+      // Appeler le backend pour appliquer les modifications à TOUTES les transactions correspondantes en base
+      const resp = await fetch('/api/transactions/bulk-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filters: bulkEditFilters,
+          actions: bulkEditActions
+        })
+      });
 
-    for (let i = 0; i < targetTransactions.length; i++) {
-      const transaction = targetTransactions[i];
-      
-      try {
-        let updateData: any = {};
-        
-        // Remplacement de texte dans la description
-        if (bulkEditActions.replaceText.enabled) {
-          if (bulkEditActions.replaceText.replaceAll) {
-            // Remplacer toute la description
-            if (bulkEditActions.replaceText.to) {
-              updateData.description = bulkEditActions.replaceText.to;
-            }
-          } else {
-            // Remplacement partiel (mode existant)
-            if (bulkEditActions.replaceText.from) {
-              const newDescription = transaction.description.replace(
-                new RegExp(bulkEditActions.replaceText.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'),
-                bulkEditActions.replaceText.to
-              );
-              if (newDescription !== transaction.description) {
-                updateData.description = newDescription;
-              }
-            }
-          }
-        }
-        
-        // Changement de catégorie
-        if (bulkEditActions.changeCategory.enabled) {
-          updateData.categoryId = bulkEditActions.changeCategory.categoryId || null;
-        }
-        
-        // Changement du statut pointé
-        if (bulkEditActions.changeChecked.enabled) {
-          updateData.checked = bulkEditActions.changeChecked.checked;
-        }
-        
-        // Changement de banque
-        if (bulkEditActions.changeBank.enabled && bulkEditActions.changeBank.bankId) {
-          updateData.bankId = bulkEditActions.changeBank.bankId;
-        }
-        
-        // Appliquer les modifications si il y en a
-        if (Object.keys(updateData).length > 0) {
-          const response = await fetch(`/api/transactions/${transaction.id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(updateData),
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            errors.push(`Transaction ${i + 1}: ${errorData.error || 'Erreur lors de la modification'}`);
-          } else {
-            const updatedTransaction = await response.json();
-            updateTransaction(transaction.id, updatedTransaction);
-          }
-        }
-        
-      } catch (error) {
-        errors.push(`Transaction ${i + 1}: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        setBulkEditProgress(prev => ({ ...prev, isProcessing: false, errors: [err.error || 'Erreur lors de la modification en lot'] }));
+        alert('Erreur lors de la modification en lot');
+        return;
       }
-      
-      // Mettre à jour le progrès
-      setBulkEditProgress(prev => ({ ...prev, processed: i + 1, errors }));
-    }
-    
-    // Finaliser
-    setBulkEditProgress(prev => ({ ...prev, isProcessing: false }));
-    
-    if (errors.length === 0) {
-      alert(`✅ Modification en lot terminée!\n${targetTransactions.length} transaction(s) modifiée(s).`);
+
+      const { matchedCount, updatedCount } = await resp.json();
+
+      if (!matchedCount) {
+        setBulkEditProgress(prev => ({ ...prev, isProcessing: false, total: 0, processed: 0 }));
+        alert('Aucune transaction ne correspond aux critères de sélection.');
+        return;
+      }
+
+      // Mettre à jour la progression
+      setBulkEditProgress(prev => ({ ...prev, total: matchedCount, processed: updatedCount, isProcessing: false }));
+
+      // Recharger les transactions pour refléter l'état de la base
+      try {
+        await loadTransactions();
+      } catch (e) {
+        console.warn('Reload after bulk update failed:', e);
+      }
+
+      alert(`✅ Modification en lot terminée!\n${updatedCount}/${matchedCount} transaction(s) modifiée(s).`);
       setShowBulkEditModal(false);
       // Réinitialiser les filtres et actions
       setBulkEditFilters({
@@ -716,8 +667,10 @@ export default function Transactions() {
         changeChecked: { enabled: false, checked: false },
         changeBank: { enabled: false, bankId: '' }
       });
-    } else {
-      alert(`⚠️ Modification terminée avec ${errors.length} erreur(s).\nConsultez les détails dans la modal.`);
+    } catch (error: any) {
+      console.error('Bulk update error:', error);
+      setBulkEditProgress(prev => ({ ...prev, isProcessing: false, errors: [error?.message || 'Erreur inconnue'] }));
+      alert('Erreur lors de la modification en lot');
     }
   };
 
@@ -1161,7 +1114,8 @@ export default function Transactions() {
       setBulkEditTransactions(data.transactions || []);
       setBulkEditProgress(p => ({ ...p, isProcessing: false, errors: [] }));
     } catch (err) {
-      setBulkEditProgress(p => ({ ...p, isProcessing: false, errors: [err.message || 'Erreur lors de la recherche'] }));
+      const msg = err instanceof Error ? err.message : 'Erreur lors de la recherche';
+      setBulkEditProgress(p => ({ ...p, isProcessing: false, errors: [msg] }));
     }
   };
 

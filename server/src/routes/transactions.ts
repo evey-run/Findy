@@ -33,17 +33,15 @@ router.get('/', async (req, res) => {
       // Recherche avec plusieurs conditions OR pour maximiser les correspondances
       where.OR = [
         {
-          // Recherche standard insensible à la casse
+          // Recherche standard
           description: {
-            contains: searchWithAccents,
-            mode: 'insensitive'
+            contains: searchWithAccents
           }
         },
         {
           // Recherche avec la version normalisée (sans accents)
           description: {
-            contains: normalizedSearch,
-            mode: 'insensitive'
+            contains: normalizedSearch
           }
         }
       ];
@@ -359,6 +357,221 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Transaction not found' });
     }
     res.status(500).json({ error: 'Failed to delete transaction' });
+  }
+});
+
+// POST /api/transactions/bulk-update - Mettre à jour en lot selon des filtres
+router.post('/bulk-update', async (req, res) => {
+  try {
+    const { filters, actions } = req.body as {
+      filters: {
+        searchText?: string;
+        categoryId?: string;
+        bankId?: string;
+        checked?: string; // 'true' | 'false' | ''
+        startDate?: string;
+        endDate?: string;
+      };
+      actions: {
+        replaceText?: { enabled: boolean; from?: string; to?: string; replaceAll?: boolean };
+        changeCategory?: { enabled: boolean; categoryId?: string };
+        changeChecked?: { enabled: boolean; checked?: boolean };
+        changeBank?: { enabled: boolean; bankId?: string };
+      };
+    };
+
+    if (!filters || !actions) {
+      return res.status(400).json({ error: 'Missing filters or actions' });
+    }
+
+    // Construire la clause where depuis les filtres
+    const where: any = {};
+    const { searchText, categoryId, bankId, checked, startDate, endDate } = filters;
+    if (bankId) where.bankId = bankId;
+    if (categoryId) {
+      if (categoryId === 'undefined') {
+        where.categoryId = null;
+      } else {
+        where.categoryId = categoryId;
+      }
+    }
+    if (checked !== undefined && checked !== '') {
+      where.checked = checked === 'true';
+    }
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) {
+        const sd = new Date(startDate);
+        if (!isNaN(sd.getTime())) {
+          where.date.gte = sd;
+        }
+      }
+      if (endDate) {
+        const ed = new Date(endDate);
+        if (!isNaN(ed.getTime())) {
+          where.date.lte = ed;
+        }
+      }
+      // If neither date parsed validly, drop the date filter
+      if (Object.keys(where.date).length === 0) {
+        delete where.date;
+      }
+    }
+    if (searchText && searchText.trim() !== '') {
+      where.description = { contains: searchText.trim() };
+    }
+
+    // Construire les données de mise à jour communes (hors remplacement partiel de description)
+    const data: any = {};
+    if (actions.changeCategory?.enabled) {
+      const catId = actions.changeCategory.categoryId;
+      if (catId === 'undefined' || catId === '' || catId === undefined) {
+        data.categoryId = null;
+      } else {
+        // Validate category exists
+        const cat = await prisma.category.findUnique({ where: { id: catId } });
+        if (!cat) {
+          return res.status(400).json({ error: 'Invalid categoryId for changeCategory' });
+        }
+        data.categoryId = catId;
+      }
+    }
+    if (actions.changeChecked?.enabled && typeof actions.changeChecked.checked === 'boolean') {
+      data.checked = actions.changeChecked.checked;
+    }
+    if (actions.changeBank?.enabled && actions.changeBank.bankId) {
+      const bId = actions.changeBank.bankId;
+      // Validate bank exists
+      const bank = await prisma.bank.findUnique({ where: { id: bId } });
+      if (!bank) {
+        return res.status(400).json({ error: 'Invalid bankId for changeBank' });
+      }
+      data.bankId = bId;
+    }
+
+    const doReplace = actions.replaceText?.enabled;
+    const replaceAll = !!actions.replaceText?.replaceAll;
+    const replaceFrom = actions.replaceText?.from || '';
+    const replaceTo = actions.replaceText?.to || '';
+
+    // Compter les correspondances
+    const matchedCount = await prisma.transaction.count({ where });
+
+    let updatedCount = 0;
+
+    if (matchedCount === 0) {
+      return res.json({ matchedCount: 0, updatedCount: 0 });
+    }
+
+    if (doReplace) {
+      if (replaceAll) {
+        // Remplacer toute la description par "to" pour toutes les correspondances
+        const result = await prisma.transaction.updateMany({
+          where,
+          data: {
+            ...data,
+            ...(replaceTo !== undefined ? { description: replaceTo } : {})
+          }
+        });
+        updatedCount = result.count;
+      } else {
+        // Remplacement partiel: nécessite une mise à jour individuelle
+        const items = await prisma.transaction.findMany({
+          where,
+          select: { id: true, description: true }
+        });
+        for (const it of items) {
+          const current = it.description || '';
+          if (!replaceFrom) continue;
+          const newDesc = current.replace(new RegExp(replaceFrom.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceTo);
+          // Appliquer uniquement si un changement
+          const dataPerItem: any = { ...data };
+          if (newDesc !== current) {
+            dataPerItem.description = newDesc;
+          }
+          if (Object.keys(dataPerItem).length === 0) {
+            continue;
+          }
+          await prisma.transaction.update({ where: { id: it.id }, data: dataPerItem });
+          updatedCount += 1;
+        }
+      }
+    } else {
+      // Pas de remplacement description: updateMany simple
+      if (Object.keys(data).length === 0) {
+        return res.json({ matchedCount, updatedCount: 0 });
+      }
+      const result = await prisma.transaction.updateMany({ where, data });
+      updatedCount = result.count;
+    }
+
+    return res.json({ matchedCount, updatedCount });
+  } catch (error) {
+    console.error('Error in bulk-update:', error);
+    return res.status(500).json({ error: 'Failed to perform bulk update' });
+  }
+});
+
+// POST /api/transactions/search - Rechercher des transactions selon des filtres (utilisé par le formulaire de modification en lot)
+router.post('/search', async (req, res) => {
+  try {
+    const { searchText, categoryId, bankId, checked, startDate, endDate } = req.body as {
+      searchText?: string;
+      categoryId?: string;
+      bankId?: string;
+      checked?: string; // 'true' | 'false' | ''
+      startDate?: string;
+      endDate?: string;
+    };
+
+    const where: any = {};
+    if (bankId) where.bankId = bankId;
+    if (categoryId) {
+      if (categoryId === 'undefined') {
+        where.categoryId = null;
+      } else {
+        where.categoryId = categoryId;
+      }
+    }
+    if (checked !== undefined && checked !== '') {
+      where.checked = checked === 'true';
+    }
+    if (startDate || endDate) {
+      where.date = {};
+      if (startDate) {
+        const sd = new Date(startDate);
+        if (!isNaN(sd.getTime())) where.date.gte = sd;
+      }
+      if (endDate) {
+        const ed = new Date(endDate);
+        if (!isNaN(ed.getTime())) where.date.lte = ed;
+      }
+      if (Object.keys(where.date).length === 0) delete where.date;
+    }
+    if (searchText && searchText.trim() !== '') {
+      where.description = { contains: searchText.trim() };
+    }
+
+    const [transactions, count] = await Promise.all([
+      prisma.transaction.findMany({
+        where,
+        include: {
+          bank: {
+            select: { id: true, name: true, shortName: true, color: true, image: true, balance: true }
+          },
+          category: {
+            select: { id: true, name: true, type: true, color: true, icon: true }
+          }
+        },
+        orderBy: { date: 'desc' }
+      }),
+      prisma.transaction.count({ where })
+    ]);
+
+    return res.json({ count, transactions });
+  } catch (error: any) {
+    console.error('Error in /transactions/search:', error);
+    return res.status(500).json({ error: 'Failed to search transactions', details: error?.message || String(error) });
   }
 });
 

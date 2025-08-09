@@ -7,23 +7,15 @@ const prisma = new PrismaClient();
 // GET /api/budgets - Récupérer tous les budgets
 router.get('/', async (req, res) => {
   try {
-    const { userId, categoryId, shared } = req.query;
+    const { categoryId, shared } = req.query;
     
     const where: any = {};
-    if (userId) where.userId = userId;
     if (categoryId) where.categoryId = categoryId;
     if (shared !== undefined) where.shared = shared === 'true';
     
     const budgets = await prisma.budget.findMany({
       where,
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            color: true
-          }
-        },
         category: {
           select: {
             id: true,
@@ -49,7 +41,7 @@ router.get('/', async (req, res) => {
 // POST /api/budgets - Créer un nouveau budget
 router.post('/', async (req, res) => {
   try {
-    const { amount, period, startDate, shared, userId, categoryId } = req.body;
+    const { amount, period, startDate, shared, categoryId } = req.body;
     
     if (!amount || !categoryId) {
       return res.status(400).json({ 
@@ -63,17 +55,9 @@ router.post('/', async (req, res) => {
         period: period || 'MONTHLY',
         startDate: startDate ? new Date(startDate) : new Date(),
         shared: shared || false,
-        userId: userId || null,
         categoryId
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            color: true
-          }
-        },
         category: {
           select: {
             id: true,
@@ -108,13 +92,6 @@ router.put('/:id', async (req, res) => {
         ...(shared !== undefined && { shared })
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            color: true
-          }
-        },
         category: {
           select: {
             id: true,
