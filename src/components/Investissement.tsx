@@ -631,6 +631,17 @@ export default function Investissement() {
           }
           
           setImportProgress(prev => ({ ...prev, total: data.length }));
+
+          // Déterminer l'ID de banque à utiliser pour l'import (fallbacks)
+          const chosenBankId = importBankId || localSelectedBank?.id || (banks.find(b => b.accountType === 'INVESTMENT')?.id || '');
+
+          // Si aucune banque valide, arrêter proprement et demander à l'utilisateur d'en choisir une
+          if (!chosenBankId) {
+            const errMsg = 'Aucun compte d\'investissement sélectionné. Veuillez choisir une banque avant d\'importer.';
+            console.error(errMsg);
+            setImportProgress(prev => ({ ...prev, isImporting: false, errors: [errMsg] }));
+            return;
+          }
           
           // Détecter le format du fichier CSV
           const isBoursobankInvestmentFormat = detectBoursobankInvestmentFormat(data[0]);
@@ -655,17 +666,25 @@ export default function Investissement() {
                 normalizedRow[normalizedKey] = row[key];
               });
               
+              // Ignorer les lignes vides (toutes colonnes vides)
+              const allEmpty = Object.values(normalizedRow).every(v => v === null || v === undefined || String(v).trim() === '');
+              if (allEmpty) {
+                // Avancer le compteur mais ne pas créer d'erreur
+                setImportProgress(prev => ({ ...prev, imported: i + 1 }));
+                continue;
+              }
+              
               let transactionData;
               
               // Traitement spécifique selon le format détecté
               if (isBoursobankInvestmentFormat) {
-                transactionData = processBoursobankInvestmentRow(normalizedRow, importBankId, importErrors, i);
+                transactionData = processBoursobankInvestmentRow(normalizedRow, chosenBankId, importErrors, i);
                 if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
               } else if (isBinanceFormat) {
-                transactionData = processBinanceRow(normalizedRow, importBankId, importErrors, i);
+                transactionData = processBinanceRow(normalizedRow, chosenBankId, importErrors, i);
                 if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
               } else if (isPeerBerryFormat) {
-                transactionData = processPeerBerryRow(normalizedRow, importBankId, importErrors, i);
+                transactionData = processPeerBerryRow(normalizedRow, chosenBankId, importErrors, i);
                 if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
               } else {
                 // Traitement standard pour les autres formats
@@ -675,7 +694,7 @@ export default function Investissement() {
                 // Essayer différents noms de colonnes couramment utilisés
                 const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop', 'lastmovementdate'];
                 const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label', 'name', 'title', 'project', 'type'];
-                const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur', 'amountvariation'];
+                const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur', 'amountvariation', 'sum', 'cashflow', 'paymentamount'];
                 const unitPriceKeys = ['unitprice', 'prixunitaire', 'prix_unitaire', 'prix', 'price', 'lastprice', 'coursunitaire', 'cours'];
                 const quantityKeys = ['quantity', 'quantite', 'nombre', 'nombre_parts', 'parts', 'qte', 'qty'];
                 
@@ -692,6 +711,13 @@ export default function Investissement() {
                   if (normalizedRow[key] !== undefined && normalizedRow[key] !== '') {
                     descriptionValue = normalizedRow[key];
                     break;
+                  }
+                }
+                // Support des colonnes concaténées PeerBerry (ex: projecttitle)
+                if (!descriptionValue) {
+                  const keyWithProject = Object.keys(normalizedRow).find(k => k.includes('projecttitle') || k.includes('projectname'));
+                  if (keyWithProject && normalizedRow[keyWithProject]) {
+                    descriptionValue = normalizedRow[keyWithProject];
                   }
                 }
                 
@@ -735,12 +761,19 @@ export default function Investissement() {
                 
                 console.log(`🔍 Ligne ${i + 1} - Date: "${dateValue}", Description: "${descriptionValue}", Montant: "${amountValue}"`);
                 
-                if (!dateValue || !descriptionValue || amountValue === undefined) {
-                  const missingFields = [];
+                // Si description absente, essayer de la construire à partir de type/title/project/comment
+                if (!descriptionValue) {
+                  const typeVal = normalizedRow['type'] || normalizedRow['operation'] || normalizedRow['category'];
+                  const projectVal = normalizedRow['project'] || normalizedRow['title'] || normalizedRow['loanname'] || normalizedRow['name'];
+                  const commentVal = normalizedRow['comment'] || normalizedRow['note'] || normalizedRow['details'];
+                  const parts = [typeVal, projectVal, commentVal].map(v => (v !== undefined && v !== null ? String(v).trim() : '')).filter(Boolean);
+                  if (parts.length > 0) descriptionValue = parts.join(' - ').replace(/\s+-\s+/g, ' - ');
+                }
+
+                if (!dateValue || amountValue === undefined) {
+                  const missingFields = [] as string[];
                   if (!dateValue) missingFields.push('date');
-                  if (!descriptionValue) missingFields.push('description');
                   if (amountValue === undefined) missingFields.push('montant');
-                  
                   importErrors.push(`Ligne ${i + 2}: Données manquantes (${missingFields.join(', ')}) - Colonnes disponibles: ${Object.keys(normalizedRow).join(', ')}`);
                   continue;
                 }
@@ -788,6 +821,11 @@ export default function Investissement() {
                   importErrors.push(`Ligne ${i + 2}: Montant invalide (${amountStr})`);
                   continue;
                 }
+                // Si libellé = INVESTEMENT/INVESTMENT, forcer signe négatif
+                const upperDesc = String(descriptionValue || '').trim().toUpperCase();
+                if ((upperDesc === 'INVESTEMENT' || upperDesc === 'INVESTMENT') && amount > 0) {
+                  amount = -amount;
+                }
                 
                 // Parser le prix unitaire
                 let unitPrice: number | null = null;
@@ -820,10 +858,10 @@ export default function Investissement() {
                 // Créer la transaction
                 transactionData = {
                   amount,
-                  description: String(descriptionValue).trim(),
+                  description: String(descriptionValue || 'Import CSV').trim(),
                   date: parsedDate.toISOString(),
                   createdAt: parsedDate.toISOString(), // Utiliser la date de la transaction
-                  bankId: importBankId,
+                  bankId: chosenBankId,
                   checked: false,
                   unitPrice,
                   quantity
@@ -1009,19 +1047,23 @@ export default function Investissement() {
       'type',
       'project',
       'title',
+      'loanname',
+      'loanid',
       'amount',
+      'sum',
+      'cashflow',
+      'paymentamount',
       'currency',
       'comment',
       'note',
       'balance',
-      'loanid',
       'id'
     ];
 
     // Doit contenir au moins date et amount et au moins l'un de type/project/title
     const hasDate = normalizedKeys.some(k => k === 'date' || k.includes('date'));
-    const hasAmount = normalizedKeys.some(k => k === 'amount' || k.includes('amount'));
-    const hasDescriptor = normalizedKeys.some(k => ['type', 'project', 'title'].some(t => k === t || k.includes(t)));
+    const hasAmount = normalizedKeys.some(k => k === 'amount' || k.includes('amount') || k === 'sum' || k.includes('cashflow') || k.includes('paymentamount'));
+    const hasDescriptor = normalizedKeys.some(k => ['type', 'project', 'title', 'loanname'].some(t => k === t || k.includes(t)));
 
     const matchCount = candidates.filter(col => normalizedKeys.some(k => k === col || k.includes(col))).length;
 
@@ -1042,10 +1084,10 @@ export default function Investissement() {
 
       // Extraire valeurs possibles
       const dateValue = row['date'] || row['transactiondate'] || row['dateoperation'] || row['dateop'];
-      const amountValue = row['amount'] || row['montant'];
+      const amountValue = row['amount'] || row['montant'] || row['sum'] || row['cashflow'] || row['paymentamount'];
       const currency = row['currency'] || row['devise'];
       const type = row['type'] || row['operation'] || row['category'];
-      const project = row['project'] || row['title'] || row['projet'] || row['name'];
+      const project = row['project'] || row['title'] || row['loanname'] || row['projet'] || row['name'];
       const comment = row['comment'] || row['note'] || row['description'] || row['details'];
 
       if (!dateValue || amountValue === undefined) {
@@ -1087,13 +1129,21 @@ export default function Investissement() {
         return null;
       }
 
+      // Ajustement de signe selon type/libellé demandé (INVESTEMENT/INVESTMENT)
+      const upperType = String(type || '').trim().toUpperCase();
+      if ((upperType === 'INVESTEMENT' || upperType === 'INVESTMENT') && amount > 0) {
+        amount = -amount;
+      }
+
       // Construire la description si manquante: "<Type> - <Project> <Comment>"
       const parts = [type, project, comment].map(v => (v !== undefined && v !== null ? String(v).trim() : '')).filter(Boolean);
       const description = parts.length > 0 ? parts.join(' - ').replace(/\s+-\s+/g, ' - ') : 'PeerBerry';
+      // Si description finit par un séparateur accidentel, nettoyer
+      const cleanDescription = description.replace(/\s*-\s*$/,'').trim();
 
       return {
         amount,
-        description,
+        description: cleanDescription,
         date: parsedDate.toISOString(),
         createdAt: parsedDate.toISOString(),
         bankId,
