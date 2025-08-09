@@ -749,6 +749,30 @@ export default function Categories() {
                                   {ratio > 0 && (
                                     <path d={sectorPath(fillOuter, 0, start, end)} fill={d.color} />
                                   )}
+                                  {/* Label du montant dépensé sur le camembert */}
+                                  {d.spending > 0 && (end - start) > 0.15 && (
+                                    (() => {
+                                      const mid = (start + end) / 2;
+                                      // Positionner le label vers l'intérieur du rayon rempli, avec un minimum pour lisibilité
+                                      const labelRadius = Math.max(24, Math.min(fillOuter, radius) * 0.65);
+                                      const pos = polar(labelRadius, mid);
+                                      const pct = d.budget > 0 ? Math.round((d.spending / d.budget) * 100) : 0;
+                                      return (
+                                        <text
+                                          x={pos.x}
+                                          y={pos.y}
+                                          transform={`rotate(90 ${pos.x} ${pos.y})`}
+                                          textAnchor="middle"
+                                          dominantBaseline="middle"
+                                          className="fill-white text-xs"
+                                          style={{ pointerEvents: 'none' }}
+                                        >
+                                          <tspan x={pos.x} dy="-0.35em">{formatCurrency(d.spending)}</tspan>
+                                          <tspan x={pos.x} dy="1.2em">({pct}%)</tspan>
+                                        </text>
+                                      );
+                                    })()
+                                  )}
                                 </g>
                               );
                             })}

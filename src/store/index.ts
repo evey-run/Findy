@@ -38,8 +38,8 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean }) => Promise<void>;
-  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string }) => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
   // Budgets
@@ -202,7 +202,7 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -222,6 +222,14 @@ export const useAppStore = create<AppState>()(
           // Le filtrage par banque est conservé uniquement dans la page Transactions
           if (options?.searchText) {
             params.append('search', options.searchText);
+          }
+          // Filtre par catégorie s'il est fourni
+          if (options?.categoryId && options.categoryId !== '') {
+            // On n'envoie pas de filtre spécial pour 'undefined' ici faute de spécification backend
+            // Seules les catégories avec un id explicite sont transmises
+            if (options.categoryId !== 'undefined') {
+              params.append('categoryId', options.categoryId);
+            }
           }
           
           // Ajouter le filtre de banque si une banque est sélectionnée
@@ -245,8 +253,8 @@ export const useAppStore = create<AppState>()(
           console.error('Failed to load transactions:', error);
         }
       },
-      
-      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean }) => {
+       
+      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -267,6 +275,16 @@ export const useAppStore = create<AppState>()(
           // et si on ne force pas l'ignorance de ce filtre
           if (state.selectedBank && !options?.forceIgnoreSelectedBank) {
             params.append('bankId', state.selectedBank.id);
+          }
+          // Filtre de recherche si fourni (pour cohérence avec le chargement initial)
+          if (options?.searchText) {
+            params.append('search', options.searchText);
+          }
+          // Filtre par catégorie si fourni
+          if (options?.categoryId && options.categoryId !== '') {
+            if (options.categoryId !== 'undefined') {
+              params.append('categoryId', options.categoryId);
+            }
           }
           
           // Ajouter le filtre par type de compte si spécifié

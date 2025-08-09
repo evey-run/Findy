@@ -950,7 +950,10 @@ export default function Transactions() {
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
-      const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE);
+      const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE, {
+        searchText: filters.searchText,
+        categoryId: filters.categoryId
+      });
       
       if (result.newTransactions.length > 0) {
         appendTransactions(result.newTransactions);
@@ -1073,31 +1076,30 @@ export default function Transactions() {
     }
   };
 
-  // Réinitialiser la pagination quand les filtres changent
+  // Réinitialiser la pagination et recharger quand les filtres ou la banque changent
   useEffect(() => {
-    setPage(1);
-    setHasMore(true);
-    loadTransactions(); // Recharger les transactions depuis le début
-  }, [filters, selectedBank]); // Retirer loadTransactions des dépendances
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
-      </div>
-    );
-  }
+    const fetchWithFilters = async () => {
+      setLoading(true);
+      try {
+        setPage(1);
+        setHasMore(true);
+        await loadTransactions({
+          searchText: filters.searchText,
+          categoryId: filters.categoryId,
+        });
+      } catch (e) {
+        console.error('Erreur lors du rechargement avec filtres:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchWithFilters();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters, selectedBank]);
 
   const handleSearch = async () => {
+    // Déclenche le rechargement via l'effet dépendant de filters
     setFilters({ ...filters, searchText: searchInput });
-    setLoading(true);
-    try {
-      await loadTransactions({ searchText: searchInput });
-    } catch (error) {
-      console.error('Erreur lors de la recherche:', error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Fonction pour rechercher des transactions dans le formulaire de modification en lot
