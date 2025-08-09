@@ -635,8 +635,10 @@ export default function Investissement() {
           // Détecter le format du fichier CSV
           const isBoursobankInvestmentFormat = detectBoursobankInvestmentFormat(data[0]);
           const isBinanceFormat = detectBinanceFormat(data[0]);
+          const isPeerBerryFormat = detectPeerBerryFormat(data[0]);
           console.log('Format Boursobank pour investissements détecté:', isBoursobankInvestmentFormat);
           console.log('Format Binance détecté:', isBinanceFormat);
+          console.log('Format PeerBerry détecté:', isPeerBerryFormat);
           
           // Traiter chaque ligne
           for (let i = 0; i < data.length; i++) {
@@ -662,6 +664,9 @@ export default function Investissement() {
               } else if (isBinanceFormat) {
                 transactionData = processBinanceRow(normalizedRow, importBankId, importErrors, i);
                 if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
+              } else if (isPeerBerryFormat) {
+                transactionData = processPeerBerryRow(normalizedRow, importBankId, importErrors, i);
+                if (!transactionData) continue; // Si le traitement a échoué, passer à la ligne suivante
               } else {
                 // Traitement standard pour les autres formats
                 // Détecter les colonnes de date, description et montant
@@ -669,7 +674,7 @@ export default function Investissement() {
                 
                 // Essayer différents noms de colonnes couramment utilisés
                 const dateKeys = ['date', 'dateoperaton', 'dateval', 'datevaleur', 'date_operation', 'date_valeur', 'date_compta', 'datecomptable', 'dateop', 'lastmovementdate'];
-                const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label', 'name'];
+                const descriptionKeys = ['description', 'libelle', 'intitule', 'operation', 'designation', 'motif', 'reference', 'communication', 'label', 'name', 'title', 'project', 'type'];
                 const amountKeys = ['montant', 'amount', 'debit', 'credit', 'somme', 'valeur', 'amountvariation'];
                 const unitPriceKeys = ['unitprice', 'prixunitaire', 'prix_unitaire', 'prix', 'price', 'lastprice', 'coursunitaire', 'cours'];
                 const quantityKeys = ['quantity', 'quantite', 'nombre', 'nombre_parts', 'parts', 'qte', 'qty'];
@@ -984,6 +989,129 @@ export default function Investissement() {
     console.log('Détection format Binance - colonnes correspondantes:', matchCount);
     
     return matchCount >= 4;
+  };
+
+  // Détection du format PeerBerry
+  const detectPeerBerryFormat = (row: any): boolean => {
+    if (!row) return false;
+
+    const normalizedKeys = Object.keys(row).map(key =>
+      key
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, '')
+    );
+
+    // Colonnes typiques PeerBerry (extraits depuis export: Date, Type, Project/Title, Amount, Currency, Balance, Comment)
+    const candidates = [
+      'date',
+      'type',
+      'project',
+      'title',
+      'amount',
+      'currency',
+      'comment',
+      'note',
+      'balance',
+      'loanid',
+      'id'
+    ];
+
+    // Doit contenir au moins date et amount et au moins l'un de type/project/title
+    const hasDate = normalizedKeys.some(k => k === 'date' || k.includes('date'));
+    const hasAmount = normalizedKeys.some(k => k === 'amount' || k.includes('amount'));
+    const hasDescriptor = normalizedKeys.some(k => ['type', 'project', 'title'].some(t => k === t || k.includes(t)));
+
+    const matchCount = candidates.filter(col => normalizedKeys.some(k => k === col || k.includes(col))).length;
+
+    const isPeerBerry = hasDate && hasAmount && hasDescriptor && matchCount >= 3;
+    if (isPeerBerry) {
+      console.log('Détection format PeerBerry - colonnes:', normalizedKeys);
+    }
+    return isPeerBerry;
+  };
+
+  // Traitement d'une ligne PeerBerry
+  const processPeerBerryRow = (row: any, bankId: string, importErrors: string[], rowIndex: number): any => {
+    try {
+      if (!bankId) {
+        importErrors.push(`Ligne ${rowIndex + 2}: Compte d'investissement non spécifié`);
+        return null;
+      }
+
+      // Extraire valeurs possibles
+      const dateValue = row['date'] || row['transactiondate'] || row['dateoperation'] || row['dateop'];
+      const amountValue = row['amount'] || row['montant'];
+      const currency = row['currency'] || row['devise'];
+      const type = row['type'] || row['operation'] || row['category'];
+      const project = row['project'] || row['title'] || row['projet'] || row['name'];
+      const comment = row['comment'] || row['note'] || row['description'] || row['details'];
+
+      if (!dateValue || amountValue === undefined) {
+        importErrors.push(`Ligne ${rowIndex + 2}: Données manquantes (date ou montant)`);
+        return null;
+      }
+
+      // Parser la date (PeerBerry utilise souvent dd.MM.yyyy hh:mm ou dd.MM.yyyy)
+      let parsedDate: Date | null = null;
+      const rawDate = String(dateValue).trim();
+
+      // Essais multiples
+      if (/^\d{2}\.\d{2}\.\d{4}(\s+\d{2}:\d{2}(:\d{2})?)?$/.test(rawDate)) {
+        const [dpart, tpart] = rawDate.split(/\s+/);
+        const [d, m, y] = dpart.split('.');
+        parsedDate = new Date(`${y}-${m}-${d}${tpart ? 'T' + tpart : ''}`);
+      } else if (/^\d{4}-\d{2}-\d{2}/.test(rawDate)) {
+        parsedDate = new Date(rawDate);
+      } else if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawDate)) {
+        const [d, m, y] = rawDate.split('/');
+        parsedDate = new Date(`${y}-${m}-${d}`);
+      }
+
+      if (!parsedDate || isNaN(parsedDate.getTime())) {
+        importErrors.push(`Ligne ${rowIndex + 2}: Format de date PeerBerry non reconnu (${rawDate})`);
+        return null;
+      }
+
+      // Parser le montant (euros, peut inclure signe, virgule)
+      let amount: number;
+      const amountStr = String(amountValue).trim().replace(/\s/g, '');
+      if (amountStr.includes(',') && !amountStr.includes('.')) {
+        amount = parseFloat(amountStr.replace(/[^0-9,-]/g, '').replace(',', '.'));
+      } else {
+        amount = parseFloat(amountStr.replace(/[^0-9.-]/g, ''));
+      }
+      if (isNaN(amount)) {
+        importErrors.push(`Ligne ${rowIndex + 2}: Montant PeerBerry invalide (${amountStr})`);
+        return null;
+      }
+
+      // Construire la description si manquante: "<Type> - <Project> <Comment>"
+      const parts = [type, project, comment].map(v => (v !== undefined && v !== null ? String(v).trim() : '')).filter(Boolean);
+      const description = parts.length > 0 ? parts.join(' - ').replace(/\s+-\s+/g, ' - ') : 'PeerBerry';
+
+      return {
+        amount,
+        description,
+        date: parsedDate.toISOString(),
+        createdAt: parsedDate.toISOString(),
+        bankId,
+        checked: false,
+        unitPrice: null,
+        quantity: null,
+        metadata: {
+          platform: 'PeerBerry',
+          currency: currency || 'EUR',
+          type: type || undefined,
+          project: project || undefined
+        }
+      };
+    } catch (e) {
+      console.error(`Error processing PeerBerry row ${rowIndex + 1}:`, e);
+      importErrors.push(`Ligne ${rowIndex + 2}: Erreur traitement PeerBerry`);
+      return null;
+    }
   };
 
   // Fonction pour traiter une ligne au format Binance
