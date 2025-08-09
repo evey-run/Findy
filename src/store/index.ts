@@ -272,10 +272,20 @@ export const useAppStore = create<AppState>()(
           
           const response = await fetch(`/api/transactions?${params}`);
           const data = await response.json();
-          
+
+          // Normalize backend response: it may be either { transactions, hasMore } or a plain array
+          const newTransactions: Transaction[] = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.transactions)
+            ? data.transactions
+            : [];
+          const hasMore: boolean = typeof data?.hasMore === 'boolean'
+            ? data.hasMore
+            : newTransactions.length === itemsPerPage;
+
           return {
-            hasMore: data.hasMore,
-            newTransactions: data.transactions
+            hasMore,
+            newTransactions
           };
         } catch (error) {
           console.error('Failed to load more transactions:', error);
