@@ -93,8 +93,7 @@ router.post('/', async (req, res) => {
     const kws = Array.isArray(keywords) ? keywords.filter(Boolean).map(v => v.trim()).filter(v => v.length > 0) : [];
     if (kws.length > 0) {
       const result = await prisma.categoryKeyword.createMany({
-        data: kws.map((value) => ({ value, categoryId: category.id })),
-        skipDuplicates: true
+        data: kws.map((value) => ({ value, categoryId: category.id }))
       });
       console.log(`📝 POST /api/categories - keywords persisted: ${result.count}`);
     }
@@ -123,29 +122,38 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid category type' });
     }
 
-    // Update category basic fields
-    await prisma.category.update({
-      where: { id },
-      data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(type !== undefined ? { type } : {}),
-        ...(color !== undefined ? { color } : {}),
-        ...(icon !== undefined ? { icon } : {})
-      }
-    });
+    // Build transactional operations: update fields, then replace keywords (if provided)
+    const operations: any[] = [
+      prisma.category.update({
+        where: { id },
+        data: {
+          ...(name !== undefined ? { name } : {}),
+          ...(type !== undefined ? { type } : {}),
+          ...(color !== undefined ? { color } : {}),
+          ...(icon !== undefined ? { icon } : {})
+        }
+      })
+    ];
 
-    // Update keywords if provided
     if (keywords !== undefined) {
-      const kws = Array.isArray(keywords) ? keywords.filter(Boolean).map(v => v.trim()).filter(v => v.length > 0) : [];
-      console.log('📝 PUT /api/categories/:id - normalized keywords:', kws);
-      const operations: any[] = [];
+      const kws = (Array.isArray(keywords) ? keywords : [])
+        .filter(Boolean)
+        .map(v => v.trim())
+        .filter(v => v.length > 0);
+
       operations.push(prisma.categoryKeyword.deleteMany({ where: { categoryId: id } }));
       if (kws.length > 0) {
-        operations.push(prisma.categoryKeyword.createMany({ data: kws.map((value) => ({ value, categoryId: id })), skipDuplicates: true }));
+        operations.push(
+          prisma.categoryKeyword.createMany({
+            data: kws.map(value => ({ value, categoryId: id }))
+          })
+        );
       }
-      const txResult = await prisma.$transaction(operations);
-      console.log('📝 PUT /api/categories/:id - keywords updated, ops:', txResult.length);
     }
+
+    const txResult = await prisma.$transaction(operations);
+    const createdOp = txResult.find((op: any) => typeof op === 'object' && op.count !== undefined);
+    console.log('📝 PUT /api/categories/:id - ops:', txResult.length, 'created keywords:', createdOp?.count ?? 0);
 
     const updated = await prisma.category.findUnique({
       where: { id },
