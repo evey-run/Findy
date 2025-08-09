@@ -38,8 +38,8 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string }) => Promise<void>;
-  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean }) => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
   // Budgets

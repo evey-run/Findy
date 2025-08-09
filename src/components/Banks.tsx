@@ -140,7 +140,7 @@ export default function Banks() {
       setLoading(true);
       try {
         await loadBanks();
-        await loadTransactions({ forceLoadAll: true }); // Forcer le chargement global
+        await loadTransactions({ forceLoadAll: true, forceIgnoreSelectedBank: true }); // Forcer le chargement global sans filtre de banque
         if (showArchived) {
           await loadArchivedBanks();
         }
