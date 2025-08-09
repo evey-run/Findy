@@ -202,19 +202,21 @@ export const useAppStore = create<AppState>()(
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
             page: '1',
             limit: options?.forceLoadAll ? '1000' : '50' // Limiter à 50 transactions par défaut
           });
-          // Ajouter les filtres de dates
-          if (state.dateRange.startDate && state.dateRange.startDate !== '') {
-            params.append('startDate', state.dateRange.startDate);
-          }
-          if (state.dateRange.endDate && state.dateRange.endDate !== '') {
-            params.append('endDate', state.dateRange.endDate);
+          // Ajouter les filtres de dates sauf si explicitement ignorés
+          if (!options?.ignoreDateRange) {
+            if (state.dateRange.startDate && state.dateRange.startDate !== '') {
+              params.append('startDate', state.dateRange.startDate);
+            }
+            if (state.dateRange.endDate && state.dateRange.endDate !== '') {
+              params.append('endDate', state.dateRange.endDate);
+            }
           }
           // Ne jamais filtrer par banque pour les transactions dans les pages catégories et objectifs
           // Le filtrage par banque est conservé uniquement dans la page Transactions

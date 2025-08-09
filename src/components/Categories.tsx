@@ -159,7 +159,8 @@ export default function Categories() {
         await loadCategories();
         // Charger tous les budgets, indépendamment de la banque sélectionnée
         await loadBudgets(true);
-        await loadTransactions();
+        // Charger plus d'historique de transactions et ignorer la banque sélectionnée et la plage de dates pour les graphiques
+        await loadTransactions({ forceLoadAll: true, forceIgnoreSelectedBank: true, ignoreDateRange: true });
         await loadUsers();
       } catch (error) {
         console.error('Error loading data:', error);
