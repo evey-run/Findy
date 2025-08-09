@@ -39,6 +39,7 @@ export interface Category {
   type: 'INCOME' | 'EXPENSE' | 'FIXED';
   color: string;
   icon?: string;
+  keywords?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -179,6 +180,7 @@ export interface CreateCategoryData {
   type: 'INCOME' | 'EXPENSE' | 'FIXED';
   color?: string;
   icon?: string;
+  keywords?: string[];
 }
 
 export interface CreateBudgetData {

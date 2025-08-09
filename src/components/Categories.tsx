@@ -91,6 +91,7 @@ interface EditingCategory {
   type: 'INCOME' | 'EXPENSE' | 'FIXED';
   color: string;
   icon?: string;
+  keywords?: string[];
   budget?: {
     amount: string;
     period: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
@@ -122,7 +123,8 @@ export default function Categories() {
     removeCategory,
     addBudget,
     updateBudget,
-    removeBudget 
+    removeBudget,
+    updateTransaction 
   } = useAppStore();
   
   const [loading, setLoading] = useState(true);
@@ -132,6 +134,8 @@ export default function Categories() {
   const [showPieChart, setShowPieChart] = useState(false);
   const [chartMonth, setChartMonth] = useState<Date>(new Date());
   const [budgetSpending, setBudgetSpending] = useState<{ [key: string]: BudgetSpending }>({});
+  const [keywordInput, setKeywordInput] = useState('');
+  const [showColorPicker, setShowColorPicker] = useState(false);
   
   // Couleurs prédéfinies
   const predefinedColors = [
@@ -272,6 +276,44 @@ export default function Categories() {
     }).format(amount);
   };
 
+  // Auto-assign uncategorized transactions based on category keywords
+  const autoAssignCategories = async () => {
+    try {
+      const rules = categories
+        .filter(c => c.keywords && c.keywords.length > 0)
+        .map(c => ({
+          categoryId: c.id,
+          keywords: (c.keywords || [])
+            .map(k => k.toLowerCase().trim())
+            .filter(Boolean)
+        }));
+
+      if (rules.length === 0) return;
+
+      const txToUpdate = transactions.filter(t => !t.categoryId && t.description);
+      for (const t of txToUpdate) {
+        const desc = (t.description || '').toLowerCase();
+        const match = rules.find(r => r.keywords.some(k => desc.includes(k)));
+        if (match) {
+          try {
+            const response = await fetch(`/api/transactions/${t.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ categoryId: match.categoryId })
+            });
+            if (response.ok) {
+              updateTransaction(t.id, { categoryId: match.categoryId });
+            }
+          } catch (e) {
+            console.error('Failed to auto-assign transaction', t.id, e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Auto-assign categories failed:', e);
+    }
+  };
+
   const handleEdit = (category: Category) => {
     const categoryBudget = getCategoryBudget(category.id);
     // Fermer le formulaire d'ajout si ouvert
@@ -283,6 +325,7 @@ export default function Categories() {
       type: category.type,
       color: category.color,
       icon: category.icon,
+      keywords: category.keywords || [],
       budget: categoryBudget ? {
         amount: categoryBudget.amount.toString(),
         period: categoryBudget.period,
@@ -309,7 +352,8 @@ export default function Categories() {
           name: editingCategory.name,
           type: editingCategory.type,
           color: editingCategory.color,
-          icon: editingCategory.icon || null
+          icon: editingCategory.icon || null,
+          keywords: editingCategory.keywords || []
         }),
       });
 
@@ -370,6 +414,9 @@ export default function Categories() {
         setEditingId(null);
         setEditingCategory(null);
         toast.success('Catégorie et budget sauvegardés avec succès');
+
+        // Auto-assign after save to reflect keyword changes immediately
+        await autoAssignCategories();
       }
     } catch (error) {
       console.error('Error updating category:', error);
@@ -429,7 +476,8 @@ export default function Categories() {
           name: editingCategory.name,
           type: editingCategory.type,
           color: editingCategory.color,
-          icon: editingCategory.icon || null
+          icon: editingCategory.icon || null,
+          keywords: editingCategory.keywords || []
         }),
       });
 
@@ -462,6 +510,9 @@ export default function Categories() {
         setShowAddForm(false);
         setEditingCategory(null);
         toast.success('Catégorie créée avec succès');
+
+        // Auto-assign categories to transactions based on keywords
+        await autoAssignCategories();
       }
     } catch (error) {
       console.error('Error adding category:', error);
@@ -695,13 +746,31 @@ export default function Categories() {
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center">
                         <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+                          className="relative w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
                           style={{ backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
-                          title="Couleur de la catégorie"
+                          title="Changer la couleur (cliquer)"
+                          onClick={() => setShowColorPicker(prev => !prev)}
                         >
                           <span className="text-lg font-bold">
                             {editingCategory?.icon || editingCategory?.name?.charAt(0).toUpperCase() || ''}
                           </span>
+                          {showColorPicker && (
+                            <div
+                              className="absolute z-50 top-14 left-0 p-2 rounded-lg shadow-lg flex flex-row flex-wrap gap-2"
+                              style={{ backgroundColor: '#1f2226', border: '1px solid #374151', width: 420 }}
+                            >
+                              {predefinedColors.slice(0, 16).map(color => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setEditingCategory(prev => prev ? { ...prev, color } : null); setShowColorPicker(false); }}
+                                  className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-gray-600'}`}
+                                  style={{ backgroundColor: color }}
+                                  title={color}
+                                />
+                              ))}
+                            </div>
+                          )}
                         </div>
                         
                         <div className="ml-4 flex-1">
@@ -739,19 +808,64 @@ export default function Categories() {
                       </div>
                     </div>
                     
+                    
+
+                    {/* Keywords section */}
                     <div className="mb-4">
-                      <label className="block text-sm text-gray-300 mb-2">Couleur</label>
-                      <div className="flex flex-wrap gap-1">
-                        {predefinedColors.slice(0, 16).map(color => (
-                          <button
-                            key={color}
-                            type="button"
-                            onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
-                            className={`w-5 h-5 rounded-full border-2 ${
-                              editingCategory?.color === color ? 'border-white' : 'border-gray-600'
-                            }`}
-                            style={{ backgroundColor: color }}
-                          />
+                      <label className="block text-sm text-gray-300 mb-2">Mots-clés (séparez par Entrée)</label>
+                      <div className="flex items-center gap-2 mb-2">
+                        <input
+                          type="text"
+                          value={keywordInput}
+                          onChange={(e) => setKeywordInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const value = keywordInput.trim();
+                              if (!value) return;
+                              setEditingCategory(prev => prev ? {
+                                ...prev,
+                                keywords: Array.from(new Set([...(prev.keywords || []), value]))
+                              } : null);
+                              setKeywordInput('');
+                            }
+                          }}
+                          className="text-sm text-white border-none focus:ring-0 p-2 bg-[#1f2226] rounded-md w-full"
+                          placeholder="Ex: amazon, uber, loyer"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const value = keywordInput.trim();
+                            if (!value) return;
+                            setEditingCategory(prev => prev ? {
+                              ...prev,
+                              keywords: Array.from(new Set([...(prev.keywords || []), value]))
+                            } : null);
+                            setKeywordInput('');
+                          }}
+                          className="px-3 py-2 text-xs border border-transparent rounded text-white hover:opacity-80"
+                          style={{ backgroundColor: '#6227f5' }}
+                        >
+                          Ajouter
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {(editingCategory?.keywords || []).map((kw, idx) => (
+                          <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#1f2226', color: '#e5e7eb', border: '1px solid #374151' }}>
+                            {kw}
+                            <button
+                              type="button"
+                              onClick={() => setEditingCategory(prev => prev ? {
+                                ...prev,
+                                keywords: (prev.keywords || []).filter(k => k !== kw)
+                              } : null)}
+                              className="ml-1 text-gray-400 hover:text-white"
+                              aria-label={`Supprimer le mot-clé ${kw}`}
+                            >
+                              ×
+                            </button>
+                          </span>
                         ))}
                       </div>
                     </div>
@@ -985,13 +1099,31 @@ export default function Categories() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
                     <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
+                      className="relative w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
                       style={{ backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
-                      title="Couleur de la catégorie"
+                      title="Changer la couleur (cliquer)"
+                      onClick={() => setShowColorPicker(prev => !prev)}
                     >
                       <span className="text-lg font-bold">
                         {editingCategory?.icon || editingCategory?.name?.charAt(0).toUpperCase() || ''}
                       </span>
+                      {showColorPicker && (
+                        <div
+                          className="absolute z-50 top-14 left-0 p-2 rounded-lg shadow-lg flex flex-row flex-wrap gap-2"
+                          style={{ backgroundColor: '#1f2226', border: '1px solid #374151', width: 420 }}
+                        >
+                          {predefinedColors.slice(0, 16).map(color => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setEditingCategory(prev => prev ? { ...prev, color } : null); setShowColorPicker(false); }}
+                              className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-gray-600'}`}
+                              style={{ backgroundColor: color }}
+                              title={color}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                     
                     <div className="ml-4 flex-1">
@@ -1029,19 +1161,64 @@ export default function Categories() {
                   </div>
                 </div>
                 
+                
+
+                {/* Keywords section */}
                 <div className="mb-4">
-                  <label className="block text-sm text-gray-300 mb-2">Couleur</label>
-                  <div className="flex flex-wrap gap-1">
-                    {predefinedColors.slice(0, 16).map(color => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => setEditingCategory(prev => prev ? {...prev, color} : null)}
-                        className={`w-5 h-5 rounded-full border-2 ${
-                          editingCategory?.color === color ? 'border-white' : 'border-gray-600'
-                        }`}
-                        style={{ backgroundColor: color }}
-                      />
+                  <label className="block text-sm text-gray-300 mb-2">Mots-clés (séparez par Entrée)</label>
+                  <div className="flex items-center gap-2 mb-2">
+                    <input
+                      type="text"
+                      value={keywordInput}
+                      onChange={(e) => setKeywordInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          const value = keywordInput.trim();
+                          if (!value) return;
+                          setEditingCategory(prev => prev ? {
+                            ...prev,
+                            keywords: Array.from(new Set([...(prev.keywords || []), value]))
+                          } : null);
+                          setKeywordInput('');
+                        }
+                      }}
+                      className="text-sm text-white border-none focus:ring-0 p-2 bg-[#1f2226] rounded-md w-full"
+                      placeholder="Ex: amazon, uber, loyer"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const value = keywordInput.trim();
+                        if (!value) return;
+                        setEditingCategory(prev => prev ? {
+                          ...prev,
+                          keywords: Array.from(new Set([...(prev.keywords || []), value]))
+                        } : null);
+                        setKeywordInput('');
+                      }}
+                      className="px-3 py-2 text-xs border border-transparent rounded text-white hover:opacity-80"
+                      style={{ backgroundColor: '#6227f5' }}
+                    >
+                      Ajouter
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(editingCategory?.keywords || []).map((kw, idx) => (
+                      <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#1f2226', color: '#e5e7eb', border: '1px solid #374151' }}>
+                        {kw}
+                        <button
+                          type="button"
+                          onClick={() => setEditingCategory(prev => prev ? {
+                            ...prev,
+                            keywords: (prev.keywords || []).filter(k => k !== kw)
+                          } : null)}
+                          className="ml-1 text-gray-400 hover:text-white"
+                          aria-label={`Supprimer le mot-clé ${kw}`}
+                        >
+                          ×
+                        </button>
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -1146,6 +1323,7 @@ export default function Categories() {
                 type: 'EXPENSE',
                 color: predefinedColors[0],
                 icon: '',
+                keywords: [],
                 budget: {
                   amount: '',
                   period: 'MONTHLY',
