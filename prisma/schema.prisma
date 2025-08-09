@@ -2,6 +2,16 @@ generator client {
   provider = "prisma-client-js"
 }
 
+model CategoryKeyword {
+  id         String   @id @default(cuid())
+  value      String
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, value])
+  @@map("category_keywords")
+}
+
 datasource db {
   provider = "sqlite"
   url      = "file:./dev.db"
@@ -61,6 +71,7 @@ model Category {
   budgets      Budget[]
   recurrences  Recurrence[]
   transactions Transaction[]
+  keywords     CategoryKeyword[]
 
   @@map("categories")
 }

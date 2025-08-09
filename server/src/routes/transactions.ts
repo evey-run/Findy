@@ -210,6 +210,33 @@ router.post('/', async (req, res) => {
       }
     }
     
+    // Auto-assign category based on keywords if not provided
+    let assignedCategoryId: string | null = categoryId || null;
+    if (!assignedCategoryId && description) {
+      try {
+        const allKeywords = await prisma.categoryKeyword.findMany({
+          select: { value: true, categoryId: true }
+        });
+        const rulesByCategory: Record<string, string[]> = {};
+        for (const k of allKeywords) {
+          const v = (k.value || '').toLowerCase().trim();
+          if (!v) continue;
+          if (!rulesByCategory[k.categoryId]) rulesByCategory[k.categoryId] = [];
+          rulesByCategory[k.categoryId].push(v);
+        }
+        const desc = (description || '').toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        outer: for (const [cid, kws] of Object.entries(rulesByCategory)) {
+          for (const kw of kws) {
+            const kwNorm = kw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (desc.includes(kwNorm)) { assignedCategoryId = cid; break outer; }
+          }
+        }
+      } catch (e) {
+        console.error('Auto-assign on create failed:', e);
+      }
+    }
+
     // Préparer les données à envoyer à Prisma
     const transactionData = {
       amount: parseFloat(amount),
@@ -217,7 +244,7 @@ router.post('/', async (req, res) => {
       date: date ? new Date(date) : new Date(),
       shared: shared || false,
       bankId,
-      categoryId: categoryId || null,
+      categoryId: assignedCategoryId,
       unitPrice: unitPrice ? parseFloat(unitPrice) : null,
       quantity: quantity ? parseFloat(quantity) : null
     };

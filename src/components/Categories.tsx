@@ -314,6 +314,29 @@ export default function Categories() {
     }
   };
 
+  // Appeler l'API backend pour appliquer les mots-clés d'une catégorie
+  const applyKeywordsToExisting = async (categoryId: string, includeAlreadyCategorized = false) => {
+    try {
+      const resp = await fetch(`/api/categories/${categoryId}/apply-keywords`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ includeAlreadyCategorized })
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        toast.success(`Mots-clés appliqués: ${data.updatedCount} transaction(s) mise(s) à jour`);
+        // Recharger les transactions pour refléter les changements
+        await loadTransactions();
+      } else {
+        const err = await resp.json();
+        toast.error(err.error || "Échec de l'application des mots-clés");
+      }
+    } catch (e) {
+      console.error('applyKeywordsToExisting failed', e);
+      toast.error("Erreur lors de l'application des mots-clés");
+    }
+  };
+
   const handleEdit = (category: Category) => {
     const categoryBudget = getCategoryBudget(category.id);
     // Fermer le formulaire d'ajout si ouvert
@@ -342,7 +365,17 @@ export default function Categories() {
     if (!editingCategory) return;
 
     try {
+      // Conserver l'état précédent pour détecter les nouveaux mots-clés
+      const previous = categories.find(c => c.id === editingCategory.id);
+      const prevKeywords = (previous?.keywords || []).map(k => k.toLowerCase().trim());
+
       // Sauvegarder la catégorie
+      // Inclure un éventuel mot-clé saisi mais non ajouté (keywordInput)
+      const pendingKw = (keywordInput || '').trim();
+      const keywords = Array.from(new Set([
+        ...(editingCategory.keywords || []),
+        ...(pendingKw ? [pendingKw] : [])
+      ].map(k => k.trim().toLowerCase()).filter(Boolean)));
       const categoryResponse = await fetch(`/api/categories/${editingCategory.id}`, {
         method: 'PUT',
         headers: {
@@ -353,7 +386,7 @@ export default function Categories() {
           type: editingCategory.type,
           color: editingCategory.color,
           icon: editingCategory.icon || null,
-          keywords: editingCategory.keywords || []
+          keywords
         }),
       });
 
@@ -413,10 +446,21 @@ export default function Categories() {
 
         setEditingId(null);
         setEditingCategory(null);
+        setKeywordInput('');
         toast.success('Catégorie et budget sauvegardés avec succès');
 
-        // Auto-assign after save to reflect keyword changes immediately
-        await autoAssignCategories();
+        // Proposer d'appliquer les nouveaux mots-clés aux transactions existantes
+        const newKeywords = (updatedCategory.keywords || []).map((k: string) => k.toLowerCase().trim());
+        const added = newKeywords.filter((k: string) => !prevKeywords.includes(k));
+        if (added.length > 0) {
+          const confirmApply = window.confirm(`Appliquer ${added.length} nouveau(x) mot(s)-clé(s) aux transactions existantes ?`);
+          if (confirmApply) {
+            await applyKeywordsToExisting(updatedCategory.id, false);
+          }
+        }
+
+        // Rafraîchir depuis l'API pour refléter exactement l'état DB
+        await loadCategories();
       }
     } catch (error) {
       console.error('Error updating category:', error);
@@ -466,6 +510,12 @@ export default function Categories() {
     if (!editingCategory) return;
 
     try {
+      // Inclure un éventuel mot-clé saisi mais non ajouté (keywordInput)
+      const pendingKw = (keywordInput || '').trim();
+      const keywords = Array.from(new Set([
+        ...(editingCategory.keywords || []),
+        ...(pendingKw ? [pendingKw] : [])
+      ].map(k => k.trim().toLowerCase()).filter(Boolean)));
       // Créer la catégorie
       const categoryResponse = await fetch('/api/categories', {
         method: 'POST',
@@ -477,7 +527,7 @@ export default function Categories() {
           type: editingCategory.type,
           color: editingCategory.color,
           icon: editingCategory.icon || null,
-          keywords: editingCategory.keywords || []
+          keywords
         }),
       });
 
@@ -509,10 +559,19 @@ export default function Categories() {
 
         setShowAddForm(false);
         setEditingCategory(null);
+        setKeywordInput('');
         toast.success('Catégorie créée avec succès');
 
-        // Auto-assign categories to transactions based on keywords
-        await autoAssignCategories();
+        // Proposer d'appliquer immédiatement les mots-clés de la nouvelle catégorie
+        if ((newCategory.keywords || []).length > 0) {
+          const confirmApply = window.confirm('Appliquer ces mots-clés aux transactions existantes non catégorisées ?');
+          if (confirmApply) {
+            await applyKeywordsToExisting(newCategory.id, false);
+          }
+        }
+
+        // Rafraîchir depuis l'API pour refléter exactement l'état DB
+        await loadCategories();
       }
     } catch (error) {
       console.error('Error adding category:', error);
@@ -589,9 +648,6 @@ export default function Categories() {
                   <ChevronRightIcon className="h-5 w-5" />
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2 text-center">
-                Taille des parts = part du budget mensuel par catégorie. Remplissage = dépenses du mois / budget.
-              </p>
             </div>
             {(() => {
               // Filtrer les transactions selon le mois sélectionné
@@ -821,7 +877,7 @@ export default function Categories() {
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                               e.preventDefault();
-                              const value = keywordInput.trim();
+                              const value = keywordInput.trim().toLowerCase();
                               if (!value) return;
                               setEditingCategory(prev => prev ? {
                                 ...prev,
@@ -836,7 +892,7 @@ export default function Categories() {
                         <button
                           type="button"
                           onClick={() => {
-                            const value = keywordInput.trim();
+                            const value = keywordInput.trim().toLowerCase();
                             if (!value) return;
                             setEditingCategory(prev => prev ? {
                               ...prev,
@@ -1174,7 +1230,7 @@ export default function Categories() {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
-                          const value = keywordInput.trim();
+                          const value = keywordInput.trim().toLowerCase();
                           if (!value) return;
                           setEditingCategory(prev => prev ? {
                             ...prev,
@@ -1189,7 +1245,7 @@ export default function Categories() {
                     <button
                       type="button"
                       onClick={() => {
-                        const value = keywordInput.trim();
+                        const value = keywordInput.trim().toLowerCase();
                         if (!value) return;
                         setEditingCategory(prev => prev ? {
                           ...prev,
