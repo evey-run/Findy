@@ -405,8 +405,6 @@ export default function Investissement() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette transaction ?')) return;
-
     try {
       console.log('Attempting to delete transaction:', id);
       const response = await fetch(`/api/transactions/${id}`, {
