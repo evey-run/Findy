@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Category, Budget } from '../types';
 import { 
-  ChartBarIcon
+  ChartBarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -127,6 +129,8 @@ export default function Categories() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<EditingCategory | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showPieChart, setShowPieChart] = useState(false);
+  const [chartMonth, setChartMonth] = useState<Date>(new Date());
   const [budgetSpending, setBudgetSpending] = useState<{ [key: string]: BudgetSpending }>({});
   
   // Couleurs prédéfinies
@@ -490,10 +494,168 @@ export default function Categories() {
             Gérez vos catégories de transactions et leurs budgets associés
           </p>
         </div>
+        <div className="mt-4 md:mt-0 md:ml-4 flex items-center">
+          <button
+            type="button"
+            onClick={() => setShowPieChart(prev => !prev)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white hover:opacity-80"
+            style={{ backgroundColor: '#6227f5' }}
+            title={showPieChart ? 'Masquer le camembert' : 'Afficher le camembert'}
+          >
+            <ChartBarIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            {showPieChart ? 'Masquer le camembert' : 'Camembert des catégories'}
+          </button>
+        </div>
       </div>
 
+      {/* Pie Chart (Camembert) */}
+      {showPieChart && (
+        <div className="flex items-center justify-center min-h-[70vh]">
+          <div className="w-full max-w-5xl">
+            <div className="mb-4">
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setChartMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
+                  className="p-2 rounded-md text-white hover:opacity-80"
+                  style={{ backgroundColor: '#1f2226' }}
+                  aria-label="Mois précédent"
+                  title="Mois précédent"
+                >
+                  <ChevronLeftIcon className="h-5 w-5" />
+                </button>
+                <h3 className="text-xl sm:text-2xl font-semibold text-white select-none">
+                  {new Date(chartMonth).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setChartMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
+                  className="p-2 rounded-md text-white hover:opacity-80"
+                  style={{ backgroundColor: '#1f2226' }}
+                  aria-label="Mois suivant"
+                  title="Mois suivant"
+                >
+                  <ChevronRightIcon className="h-5 w-5" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mt-2 text-center">Basé sur la somme absolue des montants des transactions, toutes catégories confondues.</p>
+            </div>
+            {(() => {
+              // Filtrer les transactions selon le mois sélectionné
+              const base = new Date(chartMonth.getFullYear(), chartMonth.getMonth(), 1);
+              const month = base.getMonth();
+              const year = base.getFullYear();
+
+              const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+
+              // Fonction utilitaire: budget mensuel équivalent selon la période
+              const getMonthlyBudget = (categoryId: string) => {
+                const b = budgets.find(bu => bu.categoryId === categoryId);
+                if (!b) return null;
+                switch (b.period) {
+                  case 'MONTHLY':
+                    return b.amount;
+                  case 'WEEKLY':
+                    return b.amount * 4.345; // ~52.14/12
+                  case 'QUARTERLY':
+                    return b.amount / 3;
+                  case 'YEARLY':
+                    return b.amount / 12;
+                  default:
+                    return b.amount;
+                }
+              };
+
+              // Inclure toutes les catégories; agréger la somme absolue du mois courant
+              const data = categories.map(c => {
+                const monthlyValue = transactions
+                  .filter(t => t.categoryId === c.id)
+                  .filter(t => {
+                    const dt = new Date(t.date);
+                    return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                  })
+                  .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
+
+                const monthlyBudget = getMonthlyBudget(c.id);
+                return { label: c.name, color: c.color, value: monthlyValue, monthlyBudget };
+              });
+
+              const total = data.reduce((sum, d) => sum + d.value, 0);
+
+              if (total <= 0) {
+                return (
+                  <div className="text-sm text-gray-300 text-center">Aucune donnée disponible. Ajoutez des transactions pour afficher le camembert.</div>
+                );
+              }
+
+              const size = 520;
+              const radius = 200;
+              const strokeW = 48;
+              const circumference = 2 * Math.PI * radius;
+              let offset = 0;
+
+              // Ordonner par valeur décroissante pour lisibilité
+              const sorted = [...data].sort((a, b) => b.value - a.value);
+
+              return (
+                <div className="flex flex-col items-center gap-6">
+                  <svg width={size} height={size}>
+                    <g transform={`translate(${size / 2}, ${size / 2}) rotate(-90)`}>
+                      {/* Base invisible (pas de fond) */}
+                      {/* Segments */}
+                      {sorted.map((d, idx) => {
+                        const dash = (d.value / total) * circumference;
+                        const dashArray = `${dash} ${circumference - dash}`;
+                        const strokeDashoffset = -offset;
+                        offset += dash;
+                        return (
+                          <circle
+                            key={idx}
+                            r={radius}
+                            fill="none"
+                            stroke={d.color}
+                            strokeWidth={strokeW}
+                            strokeDasharray={dashArray}
+                            strokeDashoffset={strokeDashoffset}
+                          />
+                        );
+                      })}
+                    </g>
+                  </svg>
+                  <div className="w-full max-w-2xl">
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6">
+                      {sorted.map((d, idx) => (
+                        <li key={idx} className="flex items-center justify-between">
+                          <div className="flex items-center min-w-0">
+                            <span className="inline-block w-3 h-3 rounded-sm mr-2 flex-shrink-0" style={{ backgroundColor: d.color }} />
+                            <span className="text-sm text-gray-200 truncate">{d.label}</span>
+                          </div>
+                          <div className="text-right ml-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-300">
+                              {formatCurrency(d.value)}
+                              <span className="text-xs text-gray-500 ml-2">{((d.value / total) * 100).toFixed(1)}%</span>
+                            </div>
+                            {typeof d.monthlyBudget === 'number' && (
+                              <div className="text-xs text-gray-500">Budget mensuel: {formatCurrency(d.monthlyBudget)}</div>
+                            )}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-4 text-sm text-gray-300 text-center">
+                      Total: <span className="font-medium text-white">{formatCurrency(total)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Categories List */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr">{categories.map((category) => {
+      {!showPieChart && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr">{categories.map((category) => {
           const categorySpending = getCategorySpending(category.id);
           const categoryBudget = getCategoryBudget(category.id);
           
@@ -978,6 +1140,7 @@ export default function Categories() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }
