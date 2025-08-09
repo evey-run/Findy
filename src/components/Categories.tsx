@@ -114,9 +114,11 @@ export default function Categories() {
     categories, 
     budgets,
     transactions,
+    allTransactions,
     loadCategories, 
     loadBudgets,
     loadTransactions,
+    loadAllTransactions,
     loadUsers,
     addCategory, 
     updateCategory, 
@@ -159,8 +161,8 @@ export default function Categories() {
         await loadCategories();
         // Charger tous les budgets, indépendamment de la banque sélectionnée
         await loadBudgets(true);
-        // Charger plus d'historique de transactions et ignorer la banque sélectionnée et la plage de dates pour les graphiques
-        await loadTransactions({ forceLoadAll: true, forceIgnoreSelectedBank: true, ignoreDateRange: true });
+        // Charger toutes les transactions (toute l'historique), en ignorant la banque sélectionnée et la plage de dates
+        await loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
         await loadUsers();
       } catch (error) {
         console.error('Error loading data:', error);
@@ -170,13 +172,13 @@ export default function Categories() {
     };
     
     initializeData();
-  }, [loadCategories, loadBudgets, loadTransactions, loadUsers]);
+  }, [loadCategories, loadBudgets, loadAllTransactions, loadUsers]);
 
   // Calcul des dépenses pour chaque budget
   const calculateBudgetSpending = () => {
     console.log('📊 Calculating budget spending...');
     console.log('📊 Budgets:', budgets.length);
-    console.log('📊 Transactions:', transactions.length);
+    console.log('📊 AllTransactions:', allTransactions.length);
     
     const spending: { [key: string]: BudgetSpending } = {};
     
@@ -204,8 +206,8 @@ export default function Categories() {
       
       console.log(`📊 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
       
-      // Filtrer les transactions pour ce budget
-      const relevantTransactions = transactions.filter(t => {
+      // Filtrer les transactions (toute l'historique) pour ce budget
+      const relevantTransactions = allTransactions.filter(t => {
         const transactionDate = new Date(t.date);
         const isInCategory = t.categoryId === budget.categoryId;
         const isExpense = t.amount < 0; // Seulement les dépenses
@@ -240,11 +242,11 @@ export default function Categories() {
 
   // Effet pour recalculer les budgets - ajout des dépendances manquantes
   useEffect(() => {
-    console.log('📊 Effect triggered - budgets:', budgets.length, 'transactions:', transactions.length);
-    if (budgets.length > 0 && transactions.length >= 0) { // Permet les calculs même avec 0 transaction
+    console.log('📊 Effect triggered - budgets:', budgets.length, 'allTransactions:', allTransactions.length);
+    if (budgets.length > 0 && allTransactions.length >= 0) { // Permet les calculs même avec 0 transaction
       calculateBudgetSpending();
     }
-  }, [budgets, transactions, categories]); // Ajout de categories pour recalculer si nécessaire
+  }, [budgets, allTransactions, categories]);
 
   // Force le recalcul périodique pour s'assurer que les données sont à jour
   useEffect(() => {
@@ -327,7 +329,7 @@ export default function Categories() {
         const data = await resp.json();
         toast.success(`Mots-clés appliqués: ${data.updatedCount} transaction(s) mise(s) à jour`);
         // Recharger les transactions pour refléter les changements
-        await loadTransactions();
+        await loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
       } else {
         const err = await resp.json();
         toast.error(err.error || "Échec de l'application des mots-clés");

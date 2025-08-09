@@ -35,11 +35,13 @@ interface AppState {
   transactions: Transaction[];
   allTransactions: Transaction[];
   setTransactions: (transactions: Transaction[]) => void;
+  setAllTransactions: (transactions: Transaction[]) => void;
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
   loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string }) => Promise<void>;
   loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadAllTransactions: (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean }) => Promise<void>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
   // Budgets
@@ -80,6 +82,59 @@ export const useAppStore = create<AppState>()(
         set({ selectedUser: user, selectedBank: null });
         // Reload banks when user changes
         get().loadBanks();
+      },
+
+      // Charger toutes les transactions en plusieurs lots pour les pages analytiques (Catégories, Objectifs)
+      loadAllTransactions: async (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean }) => {
+        try {
+          const state = get();
+          const batchSize = 500;
+          let offset = 0;
+          let hasMore = true;
+          const all: Transaction[] = [];
+
+          while (hasMore) {
+            const params = new URLSearchParams({
+              limit: batchSize.toString(),
+              offset: offset.toString(),
+            });
+
+            // Filtres de dates sauf si ignorés
+            if (!options?.ignoreDateRange) {
+              if (state.dateRange.startDate && state.dateRange.startDate !== '') params.append('startDate', state.dateRange.startDate);
+              if (state.dateRange.endDate && state.dateRange.endDate !== '') params.append('endDate', state.dateRange.endDate);
+            }
+
+            // Ignorer le filtre banque si demandé (par défaut pour pages analytiques)
+            if (state.selectedBank && !options?.forceIgnoreSelectedBank) {
+              params.append('bankId', state.selectedBank.id);
+            }
+
+            if (options?.accountType) params.append('accountType', options.accountType);
+
+            const resp = await fetch(`/api/transactions?${params}`);
+            const data = await resp.json();
+            const batch: Transaction[] = Array.isArray(data)
+              ? data
+              : Array.isArray(data?.transactions)
+              ? data.transactions
+              : [];
+            all.push(...batch);
+
+            const serverHasMore: boolean | undefined = typeof data?.hasMore === 'boolean' ? data.hasMore : undefined;
+            if (serverHasMore !== undefined) {
+              hasMore = serverHasMore;
+            } else {
+              hasMore = batch.length === batchSize;
+            }
+            offset += batchSize;
+          }
+
+          set({ allTransactions: all });
+        } catch (error) {
+          console.error('Failed to load all transactions:', error);
+          set({ allTransactions: [] });
+        }
       },
       loadUsers: async () => {
         try {
@@ -170,10 +225,12 @@ export const useAppStore = create<AppState>()(
       
       // Transactions
       transactions: [],
+      allTransactions: [],
       setTransactions: (transactions: Transaction[]) => set({ transactions }),
-      addTransaction: (transaction: Transaction) => 
-        set((state) => ({ 
-          transactions: [transaction, ...state.transactions] 
+      setAllTransactions: (transactions: Transaction[]) => set({ allTransactions: transactions }),
+      addTransaction: (transaction: Transaction) =>
+        set((state) => ({
+          transactions: [transaction, ...state.transactions],
         })),
       updateTransaction: (id: string, updatedTransaction: Partial<Transaction>) =>
         set((state) => ({
