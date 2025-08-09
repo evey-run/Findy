@@ -115,14 +115,8 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
   }
 };
 
-// Définition de l'interface User pour éviter les erreurs de typage
-interface User {
-  id: string;
-  name: string;
-}
-
 export default function Banks() {
-  const { banks, transactions, loadBanks, loadTransactions, selectedUser } = useAppStore();
+  const { banks, transactions, users, loadBanks, loadTransactions, selectedUser } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -139,9 +133,6 @@ export default function Banks() {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  
-  // État pour les soldes des banques
-  // Suppression de la redéclaration de bankBalances qui est déjà définie plus loin
 
   useEffect(() => {
     // Charger les banques et les transactions
@@ -443,53 +434,38 @@ export default function Banks() {
       </div>
     );
   }
-  
+
   // Calculer les statistiques pour le bandeau récapitulatif
   const calculateBankStats = () => {
-    if (!banks || banks.length === 0) return {
-      totalBalance: 0,
-      accountCount: 0,
-      lastUpdate: '',
-      totalAccounts: 0,
-      currentAccounts: 0,
-      savingsAccounts: 0,
-      investmentAccounts: 0
-    };
-
-    // Calculer le solde total
-    const totalBalance = banks.reduce((total, bank) => {
-      const currentBalance = getCurrentBalance(bank.id, bank.balance);
-      return total + currentBalance;
-    }, 0);
-
-    // Nombre de comptes
-    const accountCount = banks.length;
-    const totalAccounts = accountCount;
+    if (!banks || banks.length === 0) return { totalBalance: 0, totalAccounts: 0, currentAccounts: 0, savingsAccounts: 0, investmentAccounts: 0 };
     
-    // Compter les différents types de comptes
-    const currentAccounts = banks.filter(bank => bank.accountType === 'CURRENT').length;
-    const savingsAccounts = banks.filter(bank => bank.accountType === 'SAVINGS').length;
-    const investmentAccounts = banks.filter(bank => bank.accountType === 'INVESTMENT').length;
-
-    // Dernière mise à jour (utiliser la date la plus récente des transactions)
-    let lastUpdate = '';
-    if (transactions && transactions.length > 0) {
-      // Trier les transactions par date décroissante
-      const sortedTransactions = [...transactions].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
+    let totalBalance = 0;
+    let currentAccounts = 0;
+    let savingsAccounts = 0;
+    let investmentAccounts = 0;
+    
+    banks.forEach(bank => {
+      // Utiliser le solde calculé si disponible, sinon le solde initial
+      const balance = getCurrentBalance(bank.id, bank.balance);
+      totalBalance += balance;
       
-      // Prendre la date de la transaction la plus récente
-      if (sortedTransactions[0]) {
-        lastUpdate = new Date(sortedTransactions[0].date).toLocaleDateString('fr-FR');
+      // Compter les types de comptes
+      switch (bank.accountType) {
+        case 'CURRENT':
+          currentAccounts++;
+          break;
+        case 'SAVINGS':
+          savingsAccounts++;
+          break;
+        case 'INVESTMENT':
+          investmentAccounts++;
+          break;
       }
-    }
-
+    });
+    
     return {
       totalBalance,
-      accountCount,
-      lastUpdate,
-      totalAccounts,
+      totalAccounts: banks.length,
       currentAccounts,
       savingsAccounts,
       investmentAccounts
@@ -511,15 +487,6 @@ export default function Banks() {
               : 'Cliquez sur une banque pour voir ses transactions'
             }
           </p>
-        </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
-          <button
-            type="button"
-            onClick={() => setShowArchived(!showArchived)}
-            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-          >
-            {showArchived ? 'Voir les banques actives' : 'Voir les banques archivées'}
-          </button>
         </div>
       </div>
       
@@ -565,13 +532,107 @@ export default function Banks() {
           </div>
         </div>
       )}
-        {/* Grille des banques */}
-      {!showArchived && banks && banks.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-          {banks.slice().reverse().map((bank: Bank) => (
-            <div key={bank.id}>
-              {/* Si la banque est en cours d'édition, afficher le formulaire d'édition */}
-              {editingBank?.id === bank.id ? (
+        <div className="space-y-4">
+          <div className="border-t pt-6">
+            <div className="border-l-4 border-yellow-500 p-4 mb-4" style={{ backgroundColor: '#3a3d42' }}>
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-200">
+                    <strong>Attention :</strong> La suppression définitive d'une banque archivée effacera également toutes ses transactions, budgets et récurrences associés. Cette action est irréversible.
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <h3 className="text-lg font-medium text-white mb-4">
+              Banques archivées ({archivedBanks.length})
+            </h3>
+            
+            {archivedBanks.length === 0 ? (
+              <div className="text-center py-8">
+                <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8l6 6m0 0l6-6m-6 6V3" />
+                </svg>
+                <p className="mt-2 text-sm text-gray-500">Aucune banque archivée</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+                {archivedBanks.slice().reverse().map((bank) => (
+                  <div key={bank.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f', opacity: '0.85' }}>
+                    <div className="p-6 flex-1 flex flex-col">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          {bank.image ? (
+                            <img
+                              src={`http://localhost:3001${bank.image}`}
+                              alt={bank.name}
+                              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                              style={{ opacity: '0.7' }}
+                            />
+                          ) : (
+                            <div 
+                              className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
+                              style={{ backgroundColor: '#6226fa', opacity: '0.7' }}
+                            >
+                              {bank.shortName}
+                            </div>
+                          )}
+                          <div className="ml-4">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-lg font-medium text-white">{bank.name}</h3>
+                              <span className="text-xs text-gray-400">
+                                Archivé le {bank.archivedAt ? new Date(bank.archivedAt).toLocaleDateString('fr-FR') : 'N/A'}
+                              </span>
+                            </div>
+                            <p className="text-sm text-gray-300">
+                              {getAccountTypeInfo(bank.accountType).label}
+                              {!selectedUser && bank.users && bank.users.length > 0 && (
+                                <span className="ml-2 text-violet-300">
+                                  • {bank.users.map(u => u.name).join(', ')}
+                                </span>
+                              )}
+                            </p>
+                            {bank.iban && (
+                              <p className="text-xs text-gray-400 mt-1 font-mono">
+                                {formatIBAN(bank.iban)}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            title="Supprimer définitivement cette banque et toutes ses données"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Supprimer
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-auto">
+                        <div className="text-xl font-bold text-white">
+                          {formatAmount(bank.balance)}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Solde lors de l'archivage
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Regular Banks Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+        {banks.slice().reverse().map((bank) => (
+          <div key={bank.id}>
+            {/* Si la banque est en cours d'édition, afficher le formulaire d'édition */}
+            {editingBank?.id === bank.id ? (
               <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
                 <form onSubmit={handleSubmit} className="flex flex-col h-full">
                   {/* Section principale - même structure qu'une carte de banque */}
@@ -1179,93 +1240,7 @@ export default function Banks() {
             </form>
           </div>
         )}
-        </div>
-      )}
-
-      {/* Archived Banks Section - Moved below the main banks list */}
-      {showArchived && archivedBanks && archivedBanks.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-xl font-bold text-white mb-4">Banques archivées</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-            {archivedBanks.map((bank: Bank) => (
-              <div key={bank.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f', opacity: '0.85' }}>
-                <div className="p-6 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      {bank.image ? (
-                        <img
-                          src={`http://localhost:3001${bank.image}`}
-                          alt={bank.name}
-                          className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                          style={{ opacity: '0.7' }}
-                        />
-                      ) : (
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                          style={{ backgroundColor: '#6226fa', opacity: '0.7' }}
-                        >
-                          {bank.shortName}
-                        </div>
-                      )}
-                      <div className="ml-4">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-medium text-white">{bank.name}</h3>
-                          <span className="text-xs text-gray-400">
-                            Archivé le {bank.archivedAt ? new Date(bank.archivedAt).toLocaleDateString('fr-FR') : 'N/A'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-300">
-                          {getAccountTypeInfo(bank.accountType).label}
-                          {!selectedUser && bank.users && bank.users.length > 0 && (
-                            <span className="ml-2 text-violet-300">
-                              • {bank.users.map((u: {name: string}) => u.name).join(', ')}
-                            </span>
-                          )}
-                        </p>
-                        {bank.iban && (
-                          <p className="text-xs text-gray-400 mt-1 font-mono">
-                            {formatIBAN(bank.iban)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleRestore(bank.id)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-violet-700 hover:bg-violet-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-                        title="Remettre cette banque en service"
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                        </svg>
-                        Restaurer
-                      </button>
-                      <button
-                        onClick={() => handlePermanentDelete(bank.id, bank.name)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                        title="Supprimer définitivement cette banque et toutes ses données"
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Supprimer
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-auto">
-                    <div className="text-xl font-bold text-white">
-                      {formatAmount(bank.balance)}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      Solde lors de l'archivage
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
