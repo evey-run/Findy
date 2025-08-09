@@ -538,7 +538,9 @@ export default function Categories() {
                   <ChevronRightIcon className="h-5 w-5" />
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2 text-center">Basé sur la somme absolue des montants des transactions, toutes catégories confondues.</p>
+              <p className="text-xs text-gray-400 mt-2 text-center">
+                Taille des parts = part du budget mensuel par catégorie. Remplissage = dépenses du mois / budget.
+              </p>
             </div>
             {(() => {
               // Filtrer les transactions selon le mois sélectionné
@@ -566,23 +568,26 @@ export default function Categories() {
                 }
               };
 
-              // Inclure toutes les catégories; agréger la somme absolue du mois courant
-              const data = categories.map(c => {
-                const monthlyValue = transactions
-                  .filter(t => t.categoryId === c.id)
-                  .filter(t => {
-                    const dt = new Date(t.date);
-                    return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
-                  })
-                  .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
+              // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
+              const data = categories
+                .filter(c => c.type === 'EXPENSE')
+                .map(c => {
+                  const monthlySpending = transactions
+                    .filter(t => t.categoryId === c.id)
+                    .filter(t => {
+                      const dt = new Date(t.date);
+                      return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                    })
+                    .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
 
-                const monthlyBudget = getMonthlyBudget(c.id);
-                return { label: c.name, color: c.color, value: monthlyValue, monthlyBudget };
-              });
+                  const monthlyBudget = getMonthlyBudget(c.id);
+                  return { label: c.name, color: c.color, spending: monthlySpending, budget: monthlyBudget ?? 0 };
+                })
+                .filter(d => (d.budget ?? 0) > 0);
 
-              const total = data.reduce((sum, d) => sum + d.value, 0);
+              const totalBudget = data.reduce((sum, d) => sum + d.budget, 0);
 
-              if (total <= 0) {
+              if (totalBudget <= 0) {
                 return (
                   <div className="text-sm text-gray-300 text-center">Aucune donnée disponible. Ajoutez des transactions pour afficher le camembert.</div>
                 );
@@ -592,34 +597,56 @@ export default function Categories() {
               const radius = 200;
               const strokeW = 48;
               const circumference = 2 * Math.PI * radius;
-              let offset = 0;
+              let angleOffset = 0; // in radians
 
-              // Ordonner par valeur décroissante pour lisibilité
-              const sorted = [...data].sort((a, b) => b.value - a.value);
+              // Ordonner par budget décroissant pour lisibilité
+              const sorted = [...data].sort((a, b) => b.budget - a.budget);
 
               return (
                 <div className="flex flex-col items-center gap-6">
                   <svg width={size} height={size}>
                     <g transform={`translate(${size / 2}, ${size / 2}) rotate(-90)`}>
-                      {/* Base invisible (pas de fond) */}
-                      {/* Segments */}
-                      {sorted.map((d, idx) => {
-                        const dash = (d.value / total) * circumference;
-                        const dashArray = `${dash} ${circumference - dash}`;
-                        const strokeDashoffset = -offset;
-                        offset += dash;
+                      {(() => {
+                        // Helpers to draw sector paths
+                        const polar = (r: number, a: number) => ({ x: r * Math.cos(a), y: r * Math.sin(a) });
+                        const sectorPath = (rOuter: number, rInner: number, a0: number, a1: number) => {
+                          const largeArc = a1 - a0 > Math.PI ? 1 : 0;
+                          const p0 = polar(rOuter, a0);
+                          const p1 = polar(rOuter, a1);
+                          if (rInner <= 0) {
+                            // Wedge from center
+                            return `M 0 0 L ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`;
+                          }
+                          const q0 = polar(rInner, a0);
+                          const q1 = polar(rInner, a1);
+                          return `M ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} L ${q1.x} ${q1.y} A ${rInner} ${rInner} 0 ${largeArc} 0 ${q0.x} ${q0.y} Z`;
+                        };
+
                         return (
-                          <circle
-                            key={idx}
-                            r={radius}
-                            fill="none"
-                            stroke={d.color}
-                            strokeWidth={strokeW}
-                            strokeDasharray={dashArray}
-                            strokeDashoffset={strokeDashoffset}
-                          />
+                          <>
+                            {sorted.map((d, idx) => {
+                              const sliceAngle = (d.budget / totalBudget) * 2 * Math.PI;
+                              const start = angleOffset;
+                              const end = angleOffset + sliceAngle;
+                              angleOffset = end;
+
+                              const ratio = d.budget > 0 ? Math.min(d.spending / d.budget, 1) : 0;
+                              const fillOuter = radius * ratio;
+
+                              return (
+                                <g key={idx}>
+                                  {/* Fond (budget total) */}
+                                  <path d={sectorPath(radius, 0, start, end)} fill={d.color} fillOpacity={0.25} />
+                                  {/* Remplissage radial (dépenses) */}
+                                  {ratio > 0 && (
+                                    <path d={sectorPath(fillOuter, 0, start, end)} fill={d.color} />
+                                  )}
+                                </g>
+                              );
+                            })}
+                          </>
                         );
-                      })}
+                      })()}
                     </g>
                   </svg>
                   <div className="w-full max-w-2xl">
@@ -632,18 +659,18 @@ export default function Categories() {
                           </div>
                           <div className="text-right ml-4 whitespace-nowrap">
                             <div className="text-sm text-gray-300">
-                              {formatCurrency(d.value)}
-                              <span className="text-xs text-gray-500 ml-2">{((d.value / total) * 100).toFixed(1)}%</span>
+                              Dépenses: {formatCurrency(d.spending)}
+                              <span className="text-xs text-gray-500 ml-2">
+                                {((d.budget ? d.spending / d.budget : 0) * 100).toFixed(0)}%
+                              </span>
                             </div>
-                            {typeof d.monthlyBudget === 'number' && (
-                              <div className="text-xs text-gray-500">Budget mensuel: {formatCurrency(d.monthlyBudget)}</div>
-                            )}
+                            <div className="text-xs text-gray-500">Budget mensuel: {formatCurrency(d.budget)} ({((d.budget / totalBudget) * 100).toFixed(1)}%)</div>
                           </div>
                         </li>
                       ))}
                     </ul>
                     <div className="mt-4 text-sm text-gray-300 text-center">
-                      Total: <span className="font-medium text-white">{formatCurrency(total)}</span>
+                      Budget total: <span className="font-medium text-white">{formatCurrency(totalBudget)}</span>
                     </div>
                   </div>
                 </div>
