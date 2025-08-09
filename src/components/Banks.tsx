@@ -435,8 +435,118 @@ export default function Banks() {
     );
   }
 
+  // Calculer les statistiques pour le bandeau récapitulatif
+  const calculateBankStats = () => {
+    if (!banks || banks.length === 0) return { totalBalance: 0, totalAccounts: 0, currentAccounts: 0, savingsAccounts: 0, investmentAccounts: 0 };
+    
+    let totalBalance = 0;
+    let currentAccounts = 0;
+    let savingsAccounts = 0;
+    let investmentAccounts = 0;
+    
+    banks.forEach(bank => {
+      // Utiliser le solde calculé si disponible, sinon le solde initial
+      const balance = getCurrentBalance(bank.id, bank.balance);
+      totalBalance += balance;
+      
+      // Compter les types de comptes
+      switch (bank.accountType) {
+        case 'CURRENT':
+          currentAccounts++;
+          break;
+        case 'SAVINGS':
+          savingsAccounts++;
+          break;
+        case 'INVESTMENT':
+          investmentAccounts++;
+          break;
+      }
+    });
+    
+    return {
+      totalBalance,
+      totalAccounts: banks.length,
+      currentAccounts,
+      savingsAccounts,
+      investmentAccounts
+    };
+  };
+  
+  const bankStats = calculateBankStats();
+  
   return (
     <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
+      {/* Bandeau récapitulatif */}
+      {!showArchived && banks.length > 0 && (
+        <div className="p-6 rounded-lg shadow-lg mb-6" style={{ backgroundColor: '#272a2f', borderLeft: '4px solid #6226fa' }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Solde total */}
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-400 mb-1">Solde total</span>
+              <span className="text-2xl font-bold text-white">{formatAmount(bankStats.totalBalance)}</span>
+            </div>
+            
+            {/* Nombre de comptes */}
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-400 mb-1">Nombre de comptes</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl font-bold text-white">{bankStats.totalAccounts}</span>
+                <div className="flex flex-col text-xs">
+                  <span className="text-gray-300">{bankStats.currentAccounts} courants</span>
+                  <span className="text-violet-300">{bankStats.savingsAccounts} épargne</span>
+                  <span className="text-purple-300">{bankStats.investmentAccounts} investissement</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Répartition */}
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-400 mb-1">Répartition</span>
+              <div className="flex items-center h-8 w-full rounded-full overflow-hidden">
+                {bankStats.currentAccounts > 0 && (
+                  <div 
+                    className="h-full bg-white" 
+                    style={{ width: `${(bankStats.currentAccounts / bankStats.totalAccounts) * 100}%` }}
+                    title={`${bankStats.currentAccounts} comptes courants`}
+                  ></div>
+                )}
+                {bankStats.savingsAccounts > 0 && (
+                  <div 
+                    className="h-full bg-violet-500" 
+                    style={{ width: `${(bankStats.savingsAccounts / bankStats.totalAccounts) * 100}%` }}
+                    title={`${bankStats.savingsAccounts} comptes d'épargne`}
+                  ></div>
+                )}
+                {bankStats.investmentAccounts > 0 && (
+                  <div 
+                    className="h-full bg-purple-500" 
+                    style={{ width: `${(bankStats.investmentAccounts / bankStats.totalAccounts) * 100}%` }}
+                    title={`${bankStats.investmentAccounts} comptes d'investissement`}
+                  ></div>
+                )}
+              </div>
+            </div>
+            
+            {/* Dernière mise à jour */}
+            <div className="flex flex-col">
+              <span className="text-sm text-gray-400 mb-1">Dernière mise à jour</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-white">{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                <button 
+                  onClick={refreshBalances}
+                  className="p-1 rounded hover:bg-gray-700 transition-colors"
+                  title="Rafraîchir les soldes"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
