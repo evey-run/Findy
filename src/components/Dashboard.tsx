@@ -101,6 +101,8 @@ export default function Dashboard() {
     loadDashboardOverview,
     selectedUser,
     transactions,
+    allTransactions,
+    loadAllTransactions,
     categories,
     budgets,
     isLoading,
@@ -135,9 +137,11 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    // Charger toutes les allTransactions pour les analyses et graphiques
+    loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
     loadDashboardOverview();
     loadObjectives();
-  }, [loadDashboardOverview, selectedUser, selectedMonth]);
+  }, [loadDashboardOverview, loadAllTransactions, selectedUser, selectedMonth]);
   
   // Charger les objectifs depuis l'API
   const loadObjectives = async () => {
@@ -305,7 +309,7 @@ export default function Dashboard() {
             </h3>
             <div className="flex flex-col md:flex-row items-center justify-center md:justify-between">
               {(() => {
-                // Filtrer les transactions du mois en cours
+                // Filtrer les allTransactions du mois en cours
                 // Utiliser le mois sélectionné au lieu du mois actuel
                 const month = selectedMonth.getMonth();
                 const year = selectedMonth.getFullYear();
@@ -321,7 +325,7 @@ export default function Dashboard() {
                     if (!budget) return null;
                     
                     // Calculer le montant dépensé ce mois-ci
-                    const spent = transactions
+                    const spent = allTransactions
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
@@ -491,7 +495,7 @@ export default function Dashboard() {
             </div>
             <div className="h-80 flex items-center justify-center pt-4">
               {(() => {
-                // Filtrer les transactions du mois en cours
+                // Filtrer les allTransactions du mois en cours
                 // Utiliser le mois sélectionné au lieu du mois actuel
                 const month = selectedMonth.getMonth();
                 const year = selectedMonth.getFullYear();
@@ -521,7 +525,7 @@ export default function Dashboard() {
                 const data = categories
                   .filter(c => c.type === 'EXPENSE')
                   .map(c => {
-                    const monthlySpending = transactions
+                    const monthlySpending = allTransactions
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
@@ -595,7 +599,7 @@ export default function Dashboard() {
             {/* Légende des catégories */}
             <div className="mt-10 grid grid-cols-2 gap-2 max-w-xs mx-auto">
               {(() => {
-                // Filtrer les transactions du mois en cours
+                // Filtrer les allTransactions du mois en cours
                 // Utiliser le mois sélectionné au lieu du mois actuel
                 const month = selectedMonth.getMonth();
                 const year = selectedMonth.getFullYear();
@@ -625,7 +629,7 @@ export default function Dashboard() {
                 const data = categories
                   .filter(c => c.type === 'EXPENSE')
                   .map(c => {
-                    const monthlySpending = transactions
+                    const monthlySpending = allTransactions
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
@@ -667,14 +671,14 @@ export default function Dashboard() {
           <h3 className="text-lg leading-6 font-medium text-white mb-4">
             Transactions récentes
           </h3>
-          {transactions.slice(0, 5).length === 0 ? (
+          {allTransactions.slice(0, 5).length === 0 ? (
             <p className="text-gray-400 text-center py-8">
               Aucune transaction récente
             </p>
           ) : (
             <div className="flow-root">
               <ul className="-my-5 divide-y divide-gray-700">
-                {transactions
+                {allTransactions
                 .filter(transaction => {
                   const transactionDate = new Date(transaction.date);
                   return transactionDate.getMonth() === selectedMonth.getMonth() && 
