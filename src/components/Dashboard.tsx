@@ -6,6 +6,8 @@ import {
   ShoppingCartIcon,
   UsersIcon,
   TrophyIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import type { Objective } from '../types';
 
@@ -106,11 +108,36 @@ export default function Dashboard() {
   
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: number }>({});
+  
+  // État pour la navigation par mois
+  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  
+  // Fonction pour obtenir le nom du mois en français
+  const getMonthName = (date: Date): string => {
+    return date.toLocaleString('fr-FR', { month: 'long' });
+  };
+  
+  // Fonctions pour naviguer entre les mois
+  const goToPreviousMonth = () => {
+    setSelectedMonth(prevMonth => {
+      const newMonth = new Date(prevMonth);
+      newMonth.setMonth(newMonth.getMonth() - 1);
+      return newMonth;
+    });
+  };
+  
+  const goToNextMonth = () => {
+    setSelectedMonth(prevMonth => {
+      const newMonth = new Date(prevMonth);
+      newMonth.setMonth(newMonth.getMonth() + 1);
+      return newMonth;
+    });
+  };
 
   useEffect(() => {
     loadDashboardOverview();
     loadObjectives();
-  }, [loadDashboardOverview, selectedUser]);
+  }, [loadDashboardOverview, selectedUser, selectedMonth]);
   
   // Charger les objectifs depuis l'API
   const loadObjectives = async () => {
@@ -220,6 +247,27 @@ export default function Dashboard() {
             </p>
           )}
         </div>
+        
+        {/* Navigation par mois */}
+        <div className="flex items-center space-x-2 bg-gray-800 rounded-xl px-4 py-2 mt-4 md:mt-0">
+          <button 
+            onClick={goToPreviousMonth}
+            className="text-white hover:text-violet-400 focus:outline-none"
+            aria-label="Mois précédent"
+          >
+            <ChevronLeftIcon className="h-5 w-5" />
+          </button>
+          <span className="text-white font-medium capitalize px-2">
+            {getMonthName(selectedMonth)}
+          </span>
+          <button 
+            onClick={goToNextMonth}
+            className="text-white hover:text-violet-400 focus:outline-none"
+            aria-label="Mois suivant"
+          >
+            <ChevronRightIcon className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {/* Top Grid: Stats Cards (2x2) and Devices */}
@@ -258,11 +306,12 @@ export default function Dashboard() {
             <div className="flex flex-col md:flex-row items-center justify-center md:justify-between">
               {(() => {
                 // Filtrer les transactions du mois en cours
-                const now = new Date();
-                const month = now.getMonth();
-                const year = now.getFullYear();
+                // Utiliser le mois sélectionné au lieu du mois actuel
+                const month = selectedMonth.getMonth();
+                const year = selectedMonth.getFullYear();
                 
-                const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                // Vérifier si une date est dans le mois sélectionné
+                const isInSelectedMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
                 
                 // Sélectionner les 3 principales catégories avec budget
                 const topCategories = categories
@@ -276,7 +325,7 @@ export default function Dashboard() {
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                        return !isNaN(dt.getTime()) && isInSelectedMonth(dt);
                       })
                       .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0);
                     
@@ -443,11 +492,12 @@ export default function Dashboard() {
             <div className="h-80 flex items-center justify-center pt-4">
               {(() => {
                 // Filtrer les transactions du mois en cours
-                const now = new Date();
-                const month = now.getMonth();
-                const year = now.getFullYear();
+                // Utiliser le mois sélectionné au lieu du mois actuel
+                const month = selectedMonth.getMonth();
+                const year = selectedMonth.getFullYear();
                 
-                const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                // Vérifier si une date est dans le mois sélectionné
+                const isInSelectedMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
                 
                 // Fonction utilitaire: budget mensuel équivalent selon la période
                 const getMonthlyBudget = (categoryId: string) => {
@@ -475,7 +525,7 @@ export default function Dashboard() {
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                        return !isNaN(dt.getTime()) && isInSelectedMonth(dt);
                       })
                       .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
                     
@@ -546,11 +596,12 @@ export default function Dashboard() {
             <div className="mt-10 grid grid-cols-2 gap-2 max-w-xs mx-auto">
               {(() => {
                 // Filtrer les transactions du mois en cours
-                const now = new Date();
-                const month = now.getMonth();
-                const year = now.getFullYear();
+                // Utiliser le mois sélectionné au lieu du mois actuel
+                const month = selectedMonth.getMonth();
+                const year = selectedMonth.getFullYear();
                 
-                const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                // Vérifier si une date est dans le mois sélectionné
+                const isInSelectedMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
                 
                 // Fonction utilitaire: budget mensuel équivalent selon la période
                 const getMonthlyBudget = (categoryId: string) => {
@@ -578,7 +629,7 @@ export default function Dashboard() {
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                        return !isNaN(dt.getTime()) && isInSelectedMonth(dt);
                       })
                       .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
                     
@@ -623,7 +674,14 @@ export default function Dashboard() {
           ) : (
             <div className="flow-root">
               <ul className="-my-5 divide-y divide-gray-700">
-                {transactions.slice(0, 5).map((transaction) => (
+                {transactions
+                .filter(transaction => {
+                  const transactionDate = new Date(transaction.date);
+                  return transactionDate.getMonth() === selectedMonth.getMonth() && 
+                         transactionDate.getFullYear() === selectedMonth.getFullYear();
+                })
+                .slice(0, 5)
+                .map((transaction) => (
                   <li key={transaction.id} className="py-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex-shrink-0">
