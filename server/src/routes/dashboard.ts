@@ -4,7 +4,7 @@ import { PrismaClient } from '@prisma/client';
 const router = express.Router();
 const prisma = new PrismaClient();
 
-// GET /api/dashboard/overview - Vue d'ensemble pour le couple
+// GET /api/dashboard/overview - Vue d'ensemble pour le tableau de bord
 router.get('/overview', async (req, res) => {
   try {
     const { userId, startDate, endDate } = req.query;
@@ -41,14 +41,64 @@ router.get('/overview', async (req, res) => {
       })
     ]);
     
-    // Revenus vs Dépenses
-    const [incomeSum, expenseSum] = await Promise.all([
+    // Revenus vs Dépenses par type de compte
+    const [incomeSum, expenseSum, currentAccountIncome, currentAccountExpense, savingsAccountIncome, investmentAccountExpense] = await Promise.all([
+      // Total income
       prisma.transaction.aggregate({
         where: { ...transactionWhere, amount: { gt: 0 } },
         _sum: { amount: true }
       }),
+      // Total expense
       prisma.transaction.aggregate({
         where: { ...transactionWhere, amount: { lt: 0 } },
+        _sum: { amount: true }
+      }),
+      // Current account income (for the current month)
+      prisma.transaction.aggregate({
+        where: { 
+          ...transactionWhere, 
+          amount: { gt: 0 },
+          bank: { accountType: 'CURRENT' },
+          date: {
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+          }
+        },
+        _sum: { amount: true }
+      }),
+      // Current account expense (for the current month)
+      prisma.transaction.aggregate({
+        where: { 
+          ...transactionWhere, 
+          amount: { lt: 0 },
+          bank: { accountType: 'CURRENT' },
+          date: {
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+          }
+        },
+        _sum: { amount: true }
+      }),
+      // Savings account income (all time)
+      prisma.transaction.aggregate({
+        where: { 
+          ...transactionWhere, 
+          amount: { gt: 0 },
+          bank: { accountType: 'SAVINGS' }
+        },
+        _sum: { amount: true }
+      }),
+      // Investment account expense (for the current month)
+      prisma.transaction.aggregate({
+        where: { 
+          ...transactionWhere, 
+          amount: { lt: 0 },
+          bank: { accountType: 'INVESTMENT' },
+          date: {
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+          }
+        },
         _sum: { amount: true }
       })
     ]);
@@ -56,6 +106,12 @@ router.get('/overview', async (req, res) => {
     const totalIncome = incomeSum._sum.amount || 0;
     const totalExpenses = Math.abs(expenseSum._sum.amount || 0);
     const balance = totalIncome - totalExpenses;
+    
+    // Statistiques spécifiques par type de compte
+    const currentMonthIncome = currentAccountIncome._sum.amount || 0;
+    const currentMonthExpense = Math.abs(currentAccountExpense._sum.amount || 0);
+    const savingsTotal = savingsAccountIncome._sum.amount || 0;
+    const investmentMonthTotal = Math.abs(investmentAccountExpense._sum.amount || 0);
     
     // Dépenses par catégorie
     const expensesByCategory = await prisma.transaction.groupBy({
@@ -103,7 +159,12 @@ router.get('/overview', async (req, res) => {
         balance,
         transactionCount: summary._count || 0,
         totalUsers,
-        totalCategories
+        totalCategories,
+        // Nouvelles statistiques par type de compte
+        currentMonthIncome,
+        currentMonthExpense,
+        savingsTotal,
+        investmentMonthTotal
       },
       recentTransactions,
       expensesByCategory: categoriesData,

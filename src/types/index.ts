@@ -137,6 +137,11 @@ export interface DashboardSummary {
   transactionCount: number;
   totalUsers: number;
   totalCategories: number;
+  // Nouvelles statistiques par type de compte
+  currentMonthIncome: number;
+  currentMonthExpense: number;
+  savingsTotal: number;
+  investmentMonthTotal: number;
 }
 
 export interface ExpenseByCategory {

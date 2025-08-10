@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../store';
 import {
-  CurrencyEuroIcon,
   ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
   ChartBarIcon,
+  ShoppingCartIcon,
+  UsersIcon,
+  MapIcon,
 } from '@heroicons/react/24/outline';
 
 // Styles pour la barre de scroll personnalisée
@@ -97,7 +98,6 @@ export default function Dashboard() {
     loadDashboardOverview,
     selectedUser,
     transactions,
-    budgets,
     isLoading,
   } = useAppStore();
 
@@ -113,41 +113,48 @@ export default function Dashboard() {
     );
   }
 
-  const stats = [
+  // Statistiques pour les cartes du haut
+  const topStats = [
     {
       name: 'Revenus du mois',
-      value: formatCurrency(dashboardData.summary.totalIncome),
+      value: formatCurrency(dashboardData.summary.currentMonthIncome || 0),
       icon: ArrowTrendingUpIcon,
       color: 'text-green-400',
       bgColor: 'bg-green-900 bg-opacity-50',
+      description: 'Comptes courants',
+      action: <ArrowTrendingUpIcon className="h-4 w-4 text-green-400" />
     },
     {
       name: 'Dépenses du mois',
-      value: formatCurrency(dashboardData.summary.totalExpenses),
-      icon: ArrowTrendingDownIcon,
+      value: formatCurrency(dashboardData.summary.currentMonthExpense || 0),
+      icon: ShoppingCartIcon,
       color: 'text-red-400',
       bgColor: 'bg-red-900 bg-opacity-50',
+      description: 'Comptes courants',
+      action: <ShoppingCartIcon className="h-4 w-4 text-red-400" />
     },
     {
-      name: 'Solde',
-      value: formatCurrency(dashboardData.summary.balance),
-      icon: CurrencyEuroIcon,
-      color: dashboardData.summary.balance >= 0 ? 'text-green-400' : 'text-red-400',
-      bgColor: dashboardData.summary.balance >= 0 ? 'bg-green-900 bg-opacity-50' : 'bg-red-900 bg-opacity-50',
-    },
-    {
-      name: 'Budgets actifs',
-      value: budgets.length.toString(),
-      icon: ChartBarIcon,
+      name: 'Économies',
+      value: formatCurrency(dashboardData.summary.savingsTotal || 0),
+      icon: UsersIcon,
       color: 'text-violet-400',
       bgColor: 'bg-violet-900 bg-opacity-50',
+      description: 'Livrets d\'épargne',
+      action: <UsersIcon className="h-4 w-4 text-violet-400" />
+    },
+    {
+      name: 'Investissements',
+      value: formatCurrency(dashboardData.summary.investmentMonthTotal || 0),
+      icon: ChartBarIcon,
+      color: 'text-blue-400',
+      bgColor: 'bg-blue-900 bg-opacity-50',
+      description: 'Dépenses du mois',
+      action: <ChartBarIcon className="h-4 w-4 text-blue-400" />
     },
   ];
 
-  const recentTransactions = transactions.slice(0, 5);
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
@@ -162,45 +169,228 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
-          <div
-            key={stat.name}
-            className="relative pt-5 px-4 pb-12 sm:pt-6 sm:px-6 shadow rounded-lg overflow-hidden border border-gray-700"
-            style={{ backgroundColor: '#272a2f' }}
-          >
-            <dt>
-              <div className={`absolute ${stat.bgColor} rounded-md p-3`}>
-                <stat.icon className={`h-6 w-6 ${stat.color}`} aria-hidden="true" />
+      {/* Top Grid: Stats Cards (2x2) and Devices */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Stats Cards - Left Side (2x2 grid) - Now smaller (2 columns out of 5) */}
+        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {topStats.map((stat) => (
+            <div
+              key={stat.name}
+              className="relative p-3 shadow rounded-lg overflow-hidden border border-gray-700 flex flex-col"
+              style={{ backgroundColor: '#272a2f' }}
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-medium text-gray-400 mb-1">
+                    {stat.name}
+                  </p>
+                  <p className="text-xl font-bold text-white">
+                    {stat.value}
+                  </p>
+                </div>
+                <div className="flex items-center justify-center h-5 w-5">
+                  {stat.action}
+                </div>
               </div>
-              <p className="ml-16 text-sm font-medium text-gray-300 truncate">
-                {stat.name}
-              </p>
-            </dt>
-            <dd className="ml-16 pb-6 flex items-baseline sm:pb-7">
-              <p className={`text-2xl font-semibold ${stat.color}`}>
-                {stat.value}
-              </p>
-            </dd>
+            </div>
+          ))}
+        </div>
+        
+        {/* Devices - Right Side - Now larger (3 columns out of 5) */}
+        <div className="lg:col-span-3 shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+          <div className="px-6 py-6 sm:p-8">
+            <h3 className="text-sm font-medium text-gray-300 mb-6">
+              Devices
+            </h3>
+            <div className="flex flex-col md:flex-row items-center justify-center md:justify-between">
+              <div className="relative h-40 w-40 mb-4 md:mb-0">
+                <div className="absolute inset-0 rounded-full border-8 border-gray-700"></div>
+                <div 
+                  className="absolute inset-0 rounded-full border-8 border-violet-500" 
+                  style={{ 
+                    clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 75% 100%, 50% 75%)'
+                  }}
+                ></div>
+                <div className="absolute inset-0 flex items-center justify-center flex-col">
+                  <span className="text-3xl font-bold text-white">12.350</span>
+                  <span className="text-sm text-gray-400">Devices</span>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="h-3 w-3 rounded-full bg-violet-500"></div>
+                  <span className="text-sm text-gray-300">Mobile</span>
+                  <span className="text-sm font-medium text-white ml-2">65%</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="h-3 w-3 rounded-full bg-gray-300"></div>
+                  <span className="text-sm text-gray-300">Desktop</span>
+                  <span className="text-sm font-medium text-white ml-2">25%</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <div className="h-3 w-3 rounded-full bg-gray-600"></div>
+                  <span className="text-sm text-gray-300">Tablet</span>
+                  <span className="text-sm font-medium text-white ml-2">10%</span>
+                </div>
+              </div>
+            </div>
           </div>
-        ))}
+        </div>
       </div>
 
-      {/* Recent Transactions */}
-      <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+      {/* Charts Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column: Projections and Goals + Revenue by Period */}
+        <div className="space-y-6">
+          {/* Chart 1: Projections and Goals */}
+          <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-sm font-medium text-gray-300 mb-4">
+                Projections and goals
+              </h3>
+              <div className="h-64 flex items-center justify-center">
+                <div className="w-full h-full flex items-end justify-between space-x-2">
+                  {[40, 65, 30, 80, 45, 60, 35, 70, 50, 75, 55, 65].map((height, index) => (
+                    <div key={index} className="flex flex-col items-center space-y-1 flex-1">
+                      <div className="w-full flex items-end justify-center space-x-1">
+                        <div 
+                          className={`w-2 ${index % 3 === 0 ? 'bg-violet-500' : index % 3 === 1 ? 'bg-white' : 'bg-green-400'}`} 
+                          style={{ height: `${height}%` }}
+                        ></div>
+                      </div>
+                      <div className="text-xs text-gray-500">{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Revenue by Period - Circle Charts */}
+          <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+            <div className="px-4 py-5 sm:p-6">
+              <h3 className="text-sm font-medium text-gray-300 mb-4">
+                Revenue by period
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Today */}
+                <div className="flex flex-col items-center">
+                  <div className="relative h-32 w-32 mb-2">
+                    <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
+                    <div 
+                      className="absolute inset-0 rounded-full border-4 border-violet-500" 
+                      style={{ 
+                        clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 50%)'
+                      }}
+                    ></div>
+                    <div className="absolute inset-0 flex items-center justify-center flex-col">
+                      <span className="text-xl font-bold text-white">$1.2k</span>
+                      <span className="text-xs text-gray-400">Today</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* This week */}
+                <div className="flex flex-col items-center">
+                  <div className="relative h-32 w-32 mb-2">
+                    <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
+                    <div 
+                      className="absolute inset-0 rounded-full border-4 border-violet-500" 
+                      style={{ 
+                        clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 75%, 75% 100%, 50% 100%)'
+                      }}
+                    ></div>
+                    <div className="absolute inset-0 flex items-center justify-center flex-col">
+                      <span className="text-xl font-bold text-white">$7.2k</span>
+                      <span className="text-xs text-gray-400">This week</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* This month */}
+                <div className="flex flex-col items-center">
+                  <div className="relative h-32 w-32 mb-2">
+                    <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
+                    <div 
+                      className="absolute inset-0 rounded-full border-4 border-violet-500" 
+                      style={{ 
+                        clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 50% 100%)'
+                      }}
+                    ></div>
+                    <div className="absolute inset-0 flex items-center justify-center flex-col">
+                      <span className="text-xl font-bold text-white">$28.5k</span>
+                      <span className="text-xs text-gray-400">This month</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Chart 2: Revenue by Location */}
+        <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-medium text-gray-300">
+                Revenue by location
+              </h3>
+              <div className="bg-blue-500 p-1 rounded">
+                <MapIcon className="h-3 w-3 text-white" />
+              </div>
+            </div>
+            <div className="h-64 flex items-center justify-center text-gray-500">
+              <div className="relative w-full h-full">
+                {/* Simplified world map visualization */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <p className="text-gray-500 text-sm">World Map Visualization</p>
+                </div>
+                {/* Dots representing locations */}
+                <div className="absolute top-1/4 left-1/4 h-3 w-3 rounded-full bg-violet-500"></div>
+                <div className="absolute top-1/3 right-1/3 h-3 w-3 rounded-full bg-violet-500"></div>
+                <div className="absolute bottom-1/4 right-1/4 h-3 w-3 rounded-full bg-violet-500"></div>
+              </div>
+            </div>
+            {/* Country stats */}
+            <div className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-400">USA</span>
+                  <span className="text-xs text-gray-400">100k</span>
+                </div>
+                <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-violet-500" style={{ width: '75%' }}></div>
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-xs text-gray-400">Brazil</span>
+                  <span className="text-xs text-gray-400">100k</span>
+                </div>
+                <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-violet-500" style={{ width: '60%' }}></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Recent Transactions - Moved to bottom */}
+      <div className="shadow rounded-lg border border-gray-700 mt-6" style={{ backgroundColor: '#272a2f' }}>
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-lg leading-6 font-medium text-white mb-4">
             Transactions récentes
           </h3>
-          {recentTransactions.length === 0 ? (
+          {transactions.slice(0, 5).length === 0 ? (
             <p className="text-gray-400 text-center py-8">
               Aucune transaction récente
             </p>
           ) : (
             <div className="flow-root">
               <ul className="-my-5 divide-y divide-gray-700">
-                {recentTransactions.map((transaction) => (
+                {transactions.slice(0, 5).map((transaction) => (
                   <li key={transaction.id} className="py-4">
                     <div className="flex items-center space-x-4">
                       <div className="flex-shrink-0">
@@ -244,60 +434,6 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-
-      {/* Budget Progress */}
-      {budgets.length > 0 && (
-        <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
-          <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-white mb-4">
-              Progression des budgets
-            </h3>
-            <div className="space-y-4">
-              {budgets
-                .slice(0, 3)
-                .map((budget) => {
-                  const spent = transactions
-                    .filter(t => 
-                      t.categoryId === budget.categoryId && 
-                      t.category?.type === 'EXPENSE' &&
-                      new Date(t.date) >= new Date(budget.startDate)
-                    )
-                    .reduce((sum, t) => sum + t.amount, 0);
-                  
-                  const percentage = Math.min((Math.abs(spent) / budget.amount) * 100, 100);
-                  const isOverBudget = Math.abs(spent) > budget.amount;
-
-                  return (
-                    <div key={budget.id}>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-white">
-                          {budget.category?.name}
-                        </p>
-                        <p className="text-sm text-gray-400">
-                          {formatCurrency(Math.abs(spent))} / {formatCurrency(budget.amount)}
-                        </p>
-                      </div>
-                      <div className="mt-1">
-                        <div className="bg-gray-700 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full transition-all duration-300 ${
-                              isOverBudget
-                                ? 'bg-red-500'
-                                : percentage > 80
-                                ? 'bg-yellow-500'
-                                : 'bg-green-500'
-                            }`}
-                            style={{ width: `${Math.min(percentage, 100)}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
