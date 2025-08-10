@@ -122,7 +122,7 @@ interface User {
 }
 
 export default function Banks() {
-  const { banks, transactions, loadBanks, loadTransactions, selectedUser } = useAppStore();
+  const { banks, transactions, loadBanks, loadTransactions, selectedUser, users, loadUsers } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -143,24 +143,31 @@ export default function Banks() {
   // État pour les soldes des banques
   // Suppression de la redéclaration de bankBalances qui est déjà définie plus loin
 
+  // Effet pour charger les données initiales (banques, transactions, utilisateurs)
   useEffect(() => {
-    // Charger les banques et les transactions
     const initBanks = async () => {
       setLoading(true);
       try {
+        await loadUsers(); // Charger les utilisateurs
         await loadBanks();
-        await loadTransactions({ forceLoadAll: true, forceIgnoreSelectedBank: true }); // Forcer le chargement global sans filtre de banque
-        if (showArchived) {
-          await loadArchivedBanks();
-        }
+        await loadTransactions();
       } catch (error) {
         console.error('Error loading banks:', error);
       } finally {
         setLoading(false);
       }
     };
+    
     initBanks();
-  }, [loadBanks, loadTransactions, showArchived, selectedUser]);
+  }, [loadBanks, loadTransactions, loadUsers]); // Retirer banks des dépendances
+  
+  // Effet séparé pour mettre à jour les banques archivées quand banks change
+  useEffect(() => {
+    if (banks) {
+      const archived = banks.filter(bank => bank.archived);
+      setArchivedBanks(archived);
+    }
+  }, [banks]);
 
 
 
