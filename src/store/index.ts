@@ -415,6 +415,7 @@ export const useAppStore = create<AppState>()(
       setDashboardData: (data: DashboardOverview | null) => set({ dashboardData: data }),
       loadDashboardOverview: async () => {
         try {
+          console.log('Loading dashboard overview...');
           const state = get();
           const params = new URLSearchParams();
           if (state.dateRange.startDate && state.dateRange.startDate !== '') {
@@ -426,11 +427,17 @@ export const useAppStore = create<AppState>()(
           if (state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
-          const response = await fetch(`/api/dashboard?${params}`);
+          console.log(`Fetching dashboard data from: /api/dashboard/overview?${params}`);
+          const response = await fetch(`/api/dashboard/overview?${params}`);
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
+          }
           const dashboardData = await response.json();
+          console.log('Dashboard data loaded:', dashboardData);
           set({ dashboardData });
         } catch (error) {
           console.error('Failed to load dashboard overview:', error);
+          set({ dashboardData: null });
         }
       },
       

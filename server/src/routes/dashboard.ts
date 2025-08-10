@@ -28,8 +28,8 @@ router.get('/overview', async (req, res) => {
       prisma.transaction.findMany({
         where: transactionWhere,
         include: {
-          user: { select: { id: true, name: true, color: true } },
-          category: { select: { id: true, name: true, type: true, color: true, icon: true } }
+          category: { select: { id: true, name: true, type: true, color: true, icon: true } },
+          bank: { select: { id: true, name: true, color: true } }
         },
         orderBy: { date: 'desc' },
         take: 10
@@ -67,10 +67,10 @@ router.get('/overview', async (req, res) => {
     
     const categoriesData = await Promise.all(
       expensesByCategory.map(async (item) => {
-        const category = await prisma.category.findUnique({
+        const category = item.categoryId ? await prisma.category.findUnique({
           where: { id: item.categoryId },
           select: { name: true, color: true, icon: true }
-        });
+        }) : null;
         return {
           categoryId: item.categoryId,
           categoryName: category?.name || 'Unknown',
@@ -86,11 +86,11 @@ router.get('/overview', async (req, res) => {
       where: {
         active: true,
         nextDue: { lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }, // 7 jours
-        ...(userId && { userId: userId as string })
+        ...(userId && { bank: { userBanks: { some: { userId: userId as string } } } })
       },
       include: {
-        user: { select: { id: true, name: true, color: true } },
-        category: { select: { id: true, name: true, type: true, color: true, icon: true } }
+        category: { select: { id: true, name: true, type: true, color: true, icon: true } },
+        bank: { select: { id: true, name: true, color: true } }
       },
       orderBy: { nextDue: 'asc' },
       take: 5
@@ -166,7 +166,7 @@ router.get('/budget-status', async (req, res) => {
       },
       include: {
         category: { select: { id: true, name: true, color: true, icon: true } },
-        user: { select: { id: true, name: true, color: true } }
+        bank: { select: { id: true, name: true, color: true } }
       }
     });
     
@@ -180,7 +180,7 @@ router.get('/budget-status', async (req, res) => {
               lte: endOfMonth
             },
             amount: { lt: 0 },
-            ...(budget.userId && { userId: budget.userId })
+            ...(budget.bankId && { bankId: budget.bankId })
           },
           _sum: { amount: true }
         });
