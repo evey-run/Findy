@@ -1204,7 +1204,7 @@ export default function Banks() {
             {archivedBanks.map((bank: Bank) => (
               <div key={bank.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f', opacity: '0.85' }}>
                 <div className="p-6 flex-1 flex flex-col">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <div className="flex items-center">
                       {bank.image ? (
                         <img
@@ -1243,35 +1243,39 @@ export default function Banks() {
                         )}
                       </div>
                     </div>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleRestore(bank.id)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-violet-700 hover:bg-violet-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-                        title="Remettre cette banque en service"
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                        </svg>
-                        Restaurer
-                      </button>
-                      <button
-                        onClick={() => handlePermanentDelete(bank.id, bank.name)}
-                        className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                        title="Supprimer définitivement cette banque et toutes ses données"
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Supprimer
-                      </button>
-                    </div>
                   </div>
                   <div className="mt-auto">
-                    <div className="text-xl font-bold text-white">
-                      {formatAmount(bank.balance)}
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      Solde lors de l'archivage
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xl font-bold text-white">
+                          {formatAmount(bank.balance)}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          Solde lors de l'archivage
+                        </div>
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleRestore(bank.id)}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-violet-700 hover:bg-violet-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
+                          title="Remettre cette banque en service"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                          </svg>
+                          Restaurer
+                        </button>
+                        <button
+                          onClick={() => handlePermanentDelete(bank.id, bank.name)}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                          title="Supprimer définitivement cette banque et toutes ses données"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Supprimer
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
