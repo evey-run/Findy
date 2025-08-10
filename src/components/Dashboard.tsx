@@ -112,8 +112,17 @@ export default function Dashboard() {
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: number }>({});
   
-  // État pour la navigation par mois
-  const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
+  // Types de périodes disponibles
+  type PeriodType = 'week' | 'month' | 'year';
+  
+  // État pour le type de période sélectionné
+  const [periodType, setPeriodType] = useState<PeriodType>('month');
+  
+  // État pour la date sélectionnée (peut être une semaine, un mois ou une année)
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  
+  // Alias pour la compatibilité avec le code existant
+  const selectedMonth = selectedDate;
   
   // État pour stocker les données du mois précédent
   const [previousMonthData, setPreviousMonthData] = useState<{
@@ -128,40 +137,139 @@ export default function Dashboard() {
     investmentMonthTotal: 0 
   });
   
-  // Fonction pour obtenir le nom du mois et l'année en français
-  const getMonthName = (date: Date): string => {
-    return date.toLocaleString('fr-FR', { month: 'long' }) + ' ' + date.getFullYear();
+  // Fonction pour obtenir le nom de la période
+  const getPeriodName = (date: Date, type: PeriodType): string => {
+    switch (type) {
+      case 'week':
+        // Obtenir le lundi de la semaine
+        const startOfWeek = new Date(date);
+        const dayOfWeek = startOfWeek.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
+        startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek + 1); // Aller au lundi
+        
+        // Obtenir le dimanche de la semaine
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(endOfWeek.getDate() + 6);
+        
+        // Format: "10-16 janvier 2025"
+        return `${startOfWeek.getDate()}-${endOfWeek.getDate()} ${startOfWeek.toLocaleString('fr-FR', { month: 'long' })} ${startOfWeek.getFullYear()}`;
+        
+      case 'month':
+        // Format: "janvier 2025"
+        return date.toLocaleString('fr-FR', { month: 'long' }) + ' ' + date.getFullYear();
+        
+      case 'year':
+        // Format: "2025"
+        return date.getFullYear().toString();
+        
+      default:
+        return date.toLocaleString('fr-FR', { month: 'long' }) + ' ' + date.getFullYear();
+    }
   };
   
-  // Fonctions pour naviguer entre les mois
-  const goToPreviousMonth = () => {
-    setSelectedMonth(prevMonth => {
-      const newMonth = new Date(prevMonth);
-      newMonth.setMonth(newMonth.getMonth() - 1);
-      return newMonth;
-    });
-  };
-  
-  const goToNextMonth = () => {
-    setSelectedMonth(prevMonth => {
-      const newMonth = new Date(prevMonth);
-      newMonth.setMonth(newMonth.getMonth() + 1);
+  // Fonctions pour naviguer entre les périodes
+  const goToPrevious = () => {
+    setSelectedDate(prevDate => {
+      const newDate = new Date(prevDate);
       
-      // Vérifier si le nouveau mois est dans le futur
-      const currentDate = new Date();
-      if (newMonth > currentDate) {
-        // Si c'est dans le futur, rester au mois actuel
-        return prevMonth;
+      switch (periodType) {
+        case 'week':
+          // Reculer d'une semaine
+          newDate.setDate(newDate.getDate() - 7);
+          break;
+        case 'month':
+          // Reculer d'un mois
+          newDate.setMonth(newDate.getMonth() - 1);
+          break;
+        case 'year':
+          // Reculer d'une année
+          newDate.setFullYear(newDate.getFullYear() - 1);
+          break;
       }
       
-      return newMonth;
+      return newDate;
     });
+  };
+  
+  const goToNext = () => {
+    setSelectedDate(prevDate => {
+      const newDate = new Date(prevDate);
+      
+      switch (periodType) {
+        case 'week':
+          // Avancer d'une semaine
+          newDate.setDate(newDate.getDate() + 7);
+          break;
+        case 'month':
+          // Avancer d'un mois
+          newDate.setMonth(newDate.getMonth() + 1);
+          break;
+        case 'year':
+          // Avancer d'une année
+          newDate.setFullYear(newDate.getFullYear() + 1);
+          break;
+      }
+      
+      // Vérifier si la nouvelle date est dans le futur
+      const currentDate = new Date();
+      if (newDate > currentDate) {
+        // Si c'est dans le futur, rester à la date actuelle
+        return prevDate;
+      }
+      
+      return newDate;
+    });
+  };
+  
+  // Fonction pour changer le type de période
+  const changePeriodType = (type: PeriodType) => {
+    setPeriodType(type);
   };
 
   useEffect(() => {
-    // Mettre à jour la plage de dates dans le store en fonction du mois sélectionné
-    const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
-    const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+    // Déterminer la plage de dates en fonction du type de période sélectionné
+    let startDate: Date;
+    let endDate: Date;
+    let previousStartDate: Date;
+    let previousEndDate: Date;
+    
+    switch (periodType) {
+      case 'week':
+        // Début de la semaine (lundi)
+        startDate = new Date(selectedDate);
+        const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi, convert 0 to 7
+        startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
+        
+        // Fin de la semaine (dimanche)
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 6);
+        
+        // Semaine précédente
+        previousStartDate = new Date(startDate);
+        previousStartDate.setDate(previousStartDate.getDate() - 7);
+        previousEndDate = new Date(endDate);
+        previousEndDate.setDate(previousEndDate.getDate() - 7);
+        break;
+        
+      case 'month':
+        // Début et fin du mois
+        startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+        endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+        
+        // Mois précédent
+        previousStartDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+        previousEndDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0);
+        break;
+        
+      case 'year':
+        // Début et fin de l'année
+        startDate = new Date(selectedDate.getFullYear(), 0, 1);
+        endDate = new Date(selectedDate.getFullYear(), 11, 31);
+        
+        // Année précédente
+        previousStartDate = new Date(selectedDate.getFullYear() - 1, 0, 1);
+        previousEndDate = new Date(selectedDate.getFullYear() - 1, 11, 31);
+        break;
+    }
     
     // Mettre à jour la plage de dates dans le store
     setDateRange({
@@ -169,45 +277,39 @@ export default function Dashboard() {
       endDate: endDate.toISOString()
     });
     
-    // Charger toutes les allTransactions pour les analyses et graphiques
-    loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
+    // Charger les données du tableau de bord et des transactions
     loadDashboardOverview();
+    loadAllTransactions({ forceIgnoreSelectedBank: true });
+    
+    // Charger les objectifs
     loadObjectives();
     
-    // Charger les données du mois précédent pour comparaison
-    const fetchPreviousMonthData = async () => {
+    // Charger les données de la période précédente pour calculer les tendances
+    const fetchPreviousPeriodData = async () => {
       try {
-        // Créer une date pour le mois précédent
-        const prevMonth = new Date(selectedMonth);
-        prevMonth.setMonth(prevMonth.getMonth() - 1);
-        
         // Construire les paramètres de requête
         const params = new URLSearchParams();
-        if (selectedUser) params.append('userId', selectedUser.id);
+        params.append('startDate', previousStartDate.toISOString());
+        params.append('endDate', previousEndDate.toISOString());
         
-        // Définir la plage de dates pour le mois précédent
-        const prevStartDate = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
-        const prevEndDate = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0);
-        params.append('startDate', prevStartDate.toISOString());
-        params.append('endDate', prevEndDate.toISOString());
+        // Faire la requête API
+        const response = await fetch(`/api/dashboard/overview?${params}`);
+        const data = await response.json();
         
-        const response = await fetch(`/api/dashboard/overview?${params.toString()}`);
-        if (response.ok) {
-          const data = await response.json();
-          setPreviousMonthData({
-            currentMonthIncome: data.summary.currentMonthIncome || 0,
-            currentMonthExpense: data.summary.currentMonthExpense || 0,
-            savingsTotal: data.summary.savingsTotal || 0,
-            investmentMonthTotal: data.summary.investmentMonthTotal || 0
-          });
-        }
+        // Mettre à jour l'état avec les données de la période précédente
+        setPreviousMonthData({
+          currentMonthIncome: data.summary.currentMonthIncome || 0,
+          currentMonthExpense: data.summary.currentMonthExpense || 0,
+          savingsTotal: data.summary.savingsTotal || 0,
+          investmentMonthTotal: data.summary.investmentMonthTotal || 0
+        });
       } catch (error) {
-        console.error('Error fetching previous month data:', error);
+        console.error('Erreur lors de la récupération des données de la période précédente:', error);
       }
     };
     
-    fetchPreviousMonthData();
-  }, [loadDashboardOverview, loadAllTransactions, selectedUser, selectedMonth, setDateRange]);
+    fetchPreviousPeriodData();
+  }, [loadDashboardOverview, loadAllTransactions, selectedUser, selectedDate, periodType, setDateRange]);
   
   // Charger les objectifs depuis l'API
   const loadObjectives = async () => {
@@ -348,25 +450,50 @@ export default function Dashboard() {
           )}
         </div>
         
-        {/* Navigation par mois */}
-        <div className="flex items-center space-x-2 bg-gray-800 rounded-xl px-4 py-2 mt-4 md:mt-0">
-          <button 
-            onClick={goToPreviousMonth}
-            className="text-white hover:text-violet-400 focus:outline-none"
-            aria-label="Mois précédent"
-          >
-            <ChevronLeftIcon className="h-5 w-5" />
-          </button>
-          <span className="text-white font-medium capitalize px-2">
-            {getMonthName(selectedMonth)}
-          </span>
-          <button 
-            onClick={goToNextMonth}
-            className="text-white hover:text-violet-400 focus:outline-none"
-            aria-label="Mois suivant"
-          >
-            <ChevronRightIcon className="h-5 w-5" />
-          </button>
+        {/* Sélecteur de période et navigation */}
+        <div className="flex items-center space-x-4 mt-4 md:mt-0">
+          {/* Sélecteur de période */}
+          <div className="flex items-center bg-gray-800 rounded-xl px-4 py-2">
+            <button 
+              onClick={() => changePeriodType('week')}
+              className={`text-sm px-2 py-1 rounded ${periodType === 'week' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
+            >
+              Semaine
+            </button>
+            <button 
+              onClick={() => changePeriodType('month')}
+              className={`text-sm px-2 py-1 rounded mx-1 ${periodType === 'month' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
+            >
+              Mois
+            </button>
+            <button 
+              onClick={() => changePeriodType('year')}
+              className={`text-sm px-2 py-1 rounded ${periodType === 'year' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
+            >
+              Année
+            </button>
+          </div>
+          
+          {/* Navigation par période */}
+          <div className="flex items-center space-x-2 bg-gray-800 rounded-xl px-4 py-2">
+            <button 
+              onClick={goToPrevious}
+              className="text-white hover:text-violet-400 focus:outline-none"
+              aria-label="Période précédente"
+            >
+              <ChevronLeftIcon className="h-5 w-5" />
+            </button>
+            <span className="text-white font-medium capitalize px-2">
+              {getPeriodName(selectedDate, periodType)}
+            </span>
+            <button 
+              onClick={goToNext}
+              className="text-white hover:text-violet-400 focus:outline-none"
+              aria-label="Période suivante"
+            >
+              <ChevronRightIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </div>
 
