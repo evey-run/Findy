@@ -13,6 +13,7 @@ import {
   ChevronUpIcon,
   FlagIcon,
 } from '@heroicons/react/24/outline';
+import { colors, borderRadius, textSizes, spacing, commonClasses } from '../styles/commonStyles';
 
 interface LayoutProps {
   children: ReactNode;
@@ -59,14 +60,14 @@ export default function Layout({ children }: LayoutProps) {
         <img
           src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:3001${user.avatar}`}
           alt={user.name}
-          className={`${size} rounded-full object-cover`}
+          className={`${size} ${borderRadius.full} object-cover`}
         />
       );
     } else {
       return (
         <div
-          className={`${size} rounded-full flex items-center justify-center text-white text-sm font-medium`} 
-          style={{ backgroundColor: '#6226fa' }}
+          className={`${size} ${borderRadius.full} flex items-center justify-center text-white text-sm font-medium`} 
+          style={{ backgroundColor: colors.primary }}
         >
           {user?.name?.charAt(0)?.toUpperCase() || '?'}
         </div>
@@ -75,10 +76,10 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="flex h-screen" style={{ backgroundColor: '#202427' }}>
+    <div className="flex h-screen" style={{ backgroundColor: colors.background }}>
       {/* Sidebar */}
       <div className="hidden md:flex md:w-64 md:flex-col">
-        <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto" style={{ backgroundColor: '#272a2f' }}>
+        <div className="flex flex-col flex-grow pt-5 pb-4 overflow-y-auto" style={{ backgroundColor: colors.cardBackground }}>
           
           {/* Section utilisateur avec avatar et menu déroulant */}
           <div className="px-4 mt-6">
