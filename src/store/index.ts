@@ -39,9 +39,9 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string }) => Promise<void>;
-  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
-  loadAllTransactions: (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean }) => Promise<void>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string }) => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadAllTransactions: (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; pageName?: string }) => Promise<void>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
   // Budgets
@@ -63,12 +63,24 @@ interface AppState {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   
-  // Filters
+  // Filters globaux (pour compatibilité)
   dateRange: {
     startDate: string;
     endDate: string;
   };
   setDateRange: (range: { startDate: string; endDate: string }) => void;
+  
+  // Filtres spécifiques par page
+  pageFilters: {
+    [pageName: string]: {
+      startDate: string;
+      endDate: string;
+      categoryId?: string;
+      searchText?: string;
+      checked?: string;
+    };
+  };
+  setPageFilter: (pageName: string, filter: { startDate?: string; endDate?: string; categoryId?: string; searchText?: string; checked?: string }) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -77,6 +89,20 @@ export const useAppStore = create<AppState>()(
       // Users
       users: [],
       selectedUser: null,
+      
+      // Filtres spécifiques par page
+      pageFilters: {},
+      setPageFilter: (pageName: string, filter: { startDate?: string; endDate?: string; categoryId?: string; searchText?: string }) => {
+        set((state) => ({
+          pageFilters: {
+            ...state.pageFilters,
+            [pageName]: {
+              ...state.pageFilters[pageName] || { startDate: '', endDate: '', categoryId: '', searchText: '' },
+              ...filter
+            }
+          }
+        }));
+      },
       setUsers: (users: User[]) => set({ users }),
       setSelectedUser: (user: User | null) => {
         set({ selectedUser: user, selectedBank: null });
@@ -253,33 +279,19 @@ export const useAppStore = create<AppState>()(
               };
             }
             return t;
-          }),
+          })
         })),
+      
       removeTransaction: (id: string) =>
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string }) => {
+      
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string }) => {
         try {
           const state = get();
-          const params = new URLSearchParams({
-            page: '1',
-            limit: options?.forceLoadAll ? '1000' : '50' // Limiter à 50 transactions par défaut
-          });
-          // Ajouter les filtres de dates sauf si explicitement ignorés
-          if (!options?.ignoreDateRange) {
-            if (state.dateRange.startDate && state.dateRange.startDate !== '') {
-              params.append('startDate', state.dateRange.startDate);
-            }
-            if (state.dateRange.endDate && state.dateRange.endDate !== '') {
-              params.append('endDate', state.dateRange.endDate);
-            }
-          }
-          // Ne jamais filtrer par banque pour les transactions dans les pages catégories et objectifs
-          // Le filtrage par banque est conservé uniquement dans la page Transactions
-          if (options?.searchText) {
-            params.append('search', options.searchText);
-          }
+          const params = new URLSearchParams();
+          
           // Filtre par catégorie s'il est fourni
           if (options?.categoryId && options.categoryId !== '') {
             // On n'envoie pas de filtre spécial pour 'undefined' ici faute de spécification backend

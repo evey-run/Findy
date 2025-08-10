@@ -516,7 +516,7 @@ export default function Dashboard() {
                 </p>
                 <div className="flex items-center justify-center mt-1">
                   {stat.trend.percentage > 0 ? (
-                    <div className={`flex items-center ${stat.name === 'Dépenses du mois' 
+                    <div className={`flex items-center ${stat.name === 'Dépenses' || stat.name === 'Dépenses du mois' 
                       ? (stat.trend.isUp ? 'text-red-400' : 'text-green-400') 
                       : (stat.trend.isUp ? 'text-green-400' : 'text-red-400')}`}>
                       {stat.trend.isUp ? (
