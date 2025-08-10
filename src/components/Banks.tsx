@@ -522,7 +522,14 @@ export default function Banks() {
         <div className="mt-4 flex md:mt-0 md:ml-4">
           <button
             type="button"
-            onClick={() => setShowArchived(!showArchived)}
+            onClick={() => {
+              const newShowArchived = !showArchived;
+              setShowArchived(newShowArchived);
+              if (newShowArchived) {
+                // Charger les banques archivées depuis l'API quand on active l'affichage
+                loadArchivedBanks();
+              }
+            }}
             className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
           >
             {showArchived ? 'Voir les banques actives' : 'Voir les banques archivées'}

@@ -555,10 +555,11 @@ export default function Investissement() {
     setHasMore(true);
     
     // Recharger les transactions avec la banque sélectionnée
+    // Toujours filtrer par type de compte INVESTMENT, même si aucune banque n'est sélectionnée
     await loadTransactions({
-      accountType: 'INVESTMENT',
+      accountType: 'INVESTMENT', // Toujours filtrer par type INVESTMENT
       forceIgnoreSelectedBank: true,
-      ...(bank ? { bankId: bank.id } : {})
+      bankId: bank ? bank.id : undefined // Si bank est null, on affiche toutes les banques de type INVESTMENT
     } as any);
   };
 

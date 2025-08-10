@@ -7,9 +7,20 @@ const prisma = new PrismaClient();
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
   try {
-    const { bankId, categoryId, shared, startDate, endDate, limit, offset, search } = req.query;
+    const { bankId, categoryId, shared, startDate, endDate, limit, offset, search, accountType } = req.query;
     const where: any = {};
+    
+    // Filtre par ID de banque
     if (bankId) where.bankId = bankId;
+    
+    // Filtre par type de compte (INVESTMENT, CHECKING, etc.)
+    if (accountType) {
+      // Joindre la table bank pour filtrer par accountType
+      where.bank = {
+        accountType: accountType as string
+      };
+    }
+    
     if (categoryId) where.categoryId = categoryId;
     if (shared !== undefined) where.shared = shared === 'true';
     if (startDate || endDate) {
