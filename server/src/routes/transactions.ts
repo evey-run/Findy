@@ -288,7 +288,15 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, description, date, shared, categoryId, unitPrice, quantity } = req.body;
+    const { amount, description, date, shared, categoryId, bankId, unitPrice, quantity } = req.body;
+    
+    // Vérifier que la banque existe si elle est fournie
+    if (bankId) {
+      const bank = await prisma.bank.findUnique({ where: { id: bankId } });
+      if (!bank) {
+        return res.status(404).json({ error: 'Bank not found' });
+      }
+    }
     
     // Vérifier que la catégorie existe si elle est fournie
     if (categoryId) {
@@ -306,6 +314,7 @@ router.put('/:id', async (req, res) => {
         ...(date && { date: new Date(date) }),
         ...(shared !== undefined && { shared }),
         ...(categoryId !== undefined && { categoryId }),
+        ...(bankId !== undefined && { bankId }),
         ...(unitPrice !== undefined && { unitPrice: unitPrice ? parseFloat(unitPrice) : null }),
         ...(quantity !== undefined && { quantity: quantity ? parseFloat(quantity) : null })
       },

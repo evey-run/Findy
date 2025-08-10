@@ -79,12 +79,16 @@ router.get('/overview', async (req, res) => {
         },
         _sum: { amount: true }
       }),
-      // Savings account income (all time)
+      // Savings account income (for the current month)
       prisma.transaction.aggregate({
         where: { 
           ...transactionWhere, 
           amount: { gt: 0 },
-          bank: { accountType: 'SAVINGS' }
+          bank: { accountType: 'SAVINGS' },
+          date: {
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+          }
         },
         _sum: { amount: true }
       }),
