@@ -423,6 +423,19 @@ export default function Transactions() {
     if (!editingTransaction) return;
 
     try {
+      // Vérifier que les données requises sont présentes
+      if (!editingTransaction.description || !editingTransaction.date || editingTransaction.amount === undefined) {
+        console.error('Données de transaction incomplètes');
+        return;
+      }
+
+      // S'assurer qu'une banque est sélectionnée
+      const bankId = editingTransaction.bankId || banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id;
+      if (!bankId) {
+        console.error('Aucune banque sélectionnée ou disponible');
+        return;
+      }
+
       const response = await fetch('/api/transactions', {
         method: 'POST',
         headers: {
@@ -430,7 +443,7 @@ export default function Transactions() {
         },
         body: JSON.stringify({
           ...editingTransaction,
-          bankId: editingTransaction.bankId || banks[0]?.id || ''
+          bankId: bankId
         }),
       });
 
@@ -451,10 +464,13 @@ export default function Transactions() {
           bankId: banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id || ''
         });
       } else {
-        console.error('Error creating transaction:', await response.text());
+        const errorText = await response.text();
+        console.error('Error creating transaction:', errorText);
+        alert(`Erreur lors de l'ajout de la transaction: ${errorText}`);
       }
     } catch (error) {
       console.error('Error creating transaction:', error);
+      alert(`Erreur lors de l'ajout de la transaction: ${error}`);
     }
   };
   

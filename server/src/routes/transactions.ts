@@ -177,7 +177,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 router.post('/', async (req, res) => {
   try {
-    const { amount, description, date, shared, bankId, categoryId, unitPrice, quantity } = req.body;
+    const { amount, description, date, bankId, categoryId, unitPrice, quantity } = req.body;
     
     // Logs de debug pour voir les valeurs reçues
     console.log('🔍 DEBUG - POST /api/transactions - Données reçues:');
@@ -240,7 +240,6 @@ router.post('/', async (req, res) => {
       amount: parseFloat(amount),
       description,
       date: date ? new Date(date) : new Date(),
-      shared: shared || false,
       bankId,
       categoryId: assignedCategoryId,
       unitPrice: unitPrice ? parseFloat(unitPrice) : null,
