@@ -633,8 +633,8 @@ export default function Banks() {
                                 console.log('🔧 Selected account type:', e.target.value);
                                 setFormData({...formData, accountType: e.target.value as any});
                               }}
-                              className="text-xs border-none focus:ring-0 rounded-md text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
-                              style={{ padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                              className="text-xs border-none focus:ring-0 rounded-md"
+                              style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                             >
                               <option value="CURRENT">Compte courant</option>
                               <option value="SAVINGS">Livret d'épargne</option>
@@ -677,8 +677,8 @@ export default function Banks() {
                           type="text"
                           value={formData.shortName}
                           onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
-                          style={{ '--tw-ring-color': '#6226fa' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
+                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
                           placeholder="Nom court (BNP)"
                           maxLength={3}
                           required
@@ -687,8 +687,8 @@ export default function Banks() {
                           type="date"
                           value={formData.createdAt}
                           onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
-                          style={{ '--tw-ring-color': '#6226fa' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
+                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
                           required
                         />
                         <input
@@ -697,7 +697,7 @@ export default function Banks() {
                           value={formData.balance}
                           onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
                           className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
-                          style={{ '--tw-ring-color': '#6226fa' } as any}
+                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
                           placeholder="Solde initial"
                           required
                         />
