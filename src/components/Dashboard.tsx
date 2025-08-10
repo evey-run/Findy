@@ -382,7 +382,7 @@ export default function Dashboard() {
   // Statistiques pour les cartes du haut
   const topStats = [
     {
-      name: 'Revenus du mois',
+      name: 'Revenus',
       value: formatCurrency(dashboardData.summary.currentMonthIncome || 0),
       icon: ArrowTrendingUpIcon,
       color: 'text-green-400',
@@ -395,7 +395,7 @@ export default function Dashboard() {
       )
     },
     {
-      name: 'Dépenses du mois',
+      name: 'Dépenses',
       value: formatCurrency(dashboardData.summary.currentMonthExpense || 0),
       icon: ShoppingCartIcon,
       color: 'text-red-400',
@@ -450,10 +450,31 @@ export default function Dashboard() {
           )}
         </div>
         
-        {/* Sélecteur de période et navigation */}
+        {/* Navigation et sélecteur de période */}
         <div className="flex items-center space-x-4 mt-4 md:mt-0">
+          {/* Navigation par période */}
+          <div className="flex items-center space-x-2 rounded-xl px-4 py-2">
+            <button 
+              onClick={goToPrevious}
+              className="text-white hover:text-violet-400 focus:outline-none"
+              aria-label="Période précédente"
+            >
+              <ChevronLeftIcon className="h-5 w-5" />
+            </button>
+            <span className="text-white font-medium capitalize px-2">
+              {getPeriodName(selectedDate, periodType)}
+            </span>
+            <button 
+              onClick={goToNext}
+              className="text-white hover:text-violet-400 focus:outline-none"
+              aria-label="Période suivante"
+            >
+              <ChevronRightIcon className="h-5 w-5" />
+            </button>
+          </div>
+          
           {/* Sélecteur de période */}
-          <div className="flex items-center bg-gray-800 rounded-xl px-4 py-2">
+          <div className="flex items-center rounded-xl px-4 py-2">
             <button 
               onClick={() => changePeriodType('week')}
               className={`text-sm px-2 py-1 rounded ${periodType === 'week' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
@@ -471,27 +492,6 @@ export default function Dashboard() {
               className={`text-sm px-2 py-1 rounded ${periodType === 'year' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
             >
               Année
-            </button>
-          </div>
-          
-          {/* Navigation par période */}
-          <div className="flex items-center space-x-2 bg-gray-800 rounded-xl px-4 py-2">
-            <button 
-              onClick={goToPrevious}
-              className="text-white hover:text-violet-400 focus:outline-none"
-              aria-label="Période précédente"
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
-            </button>
-            <span className="text-white font-medium capitalize px-2">
-              {getPeriodName(selectedDate, periodType)}
-            </span>
-            <button 
-              onClick={goToNext}
-              className="text-white hover:text-violet-400 focus:outline-none"
-              aria-label="Période suivante"
-            >
-              <ChevronRightIcon className="h-5 w-5" />
             </button>
           </div>
         </div>
@@ -550,8 +550,38 @@ export default function Dashboard() {
                 const month = selectedMonth.getMonth();
                 const year = selectedMonth.getFullYear();
                 
-                // Vérifier si une date est dans le mois sélectionné
-                const isInSelectedMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                // Déterminer la période de filtrage en fonction du type de période sélectionné
+                let isInSelectedPeriod: (d: Date) => boolean;
+                let startDate: Date = new Date();
+                let endDate: Date = new Date();
+                
+                switch (periodType) {
+                  case 'week':
+                    // Début de la semaine (lundi)
+                    startDate = new Date(selectedDate);
+                    const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
+                    startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
+                    
+                    // Fin de la semaine (dimanche)
+                    endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 6);
+                    
+                    isInSelectedPeriod = (d: Date) => d >= startDate && d <= endDate;
+                    break;
+                    
+                  case 'month':
+                    // Vérifier si une date est dans le mois sélectionné
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                    break;
+                    
+                  case 'year':
+                    // Vérifier si une date est dans l'année sélectionnée
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year;
+                    break;
+                    
+                  default:
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                }
                 
                 // Sélectionner les 3 principales catégories avec budget
                 const topCategories = categories
@@ -560,27 +590,67 @@ export default function Dashboard() {
                     const budget = budgets.find(b => b.categoryId === c.id);
                     if (!budget) return null;
                     
-                    // Calculer le montant dépensé ce mois-ci
+                    // Calculer le montant dépensé pour la période sélectionnée
                     const spent = allTransactions
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInSelectedMonth(dt);
+                        return !isNaN(dt.getTime()) && isInSelectedPeriod(dt);
                       })
                       .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0);
                     
-                    // Calculer le budget mensuel équivalent
-                    let monthlyBudget = budget.amount;
-                    switch (budget.period) {
-                      case 'WEEKLY':
-                        monthlyBudget *= 4.345; // ~52.14/12
-                        break;
-                      case 'QUARTERLY':
-                        monthlyBudget /= 3;
-                        break;
-                      case 'YEARLY':
-                        monthlyBudget /= 12;
-                        break;
+                    // Calculer le budget équivalent pour la période sélectionnée
+                    let periodBudget = budget.amount;
+                    
+                    // Convertir le budget selon la période du budget et la période sélectionnée
+                    if (periodType === 'week') {
+                      // Convertir en budget hebdomadaire
+                      switch (budget.period) {
+                        case 'WEEKLY':
+                          // Déjà hebdomadaire
+                          break;
+                        case 'MONTHLY':
+                          periodBudget /= 4.345; // ~12/52.14
+                          break;
+                        case 'QUARTERLY':
+                          periodBudget /= 13.035; // ~4.345*3
+                          break;
+                        case 'YEARLY':
+                          periodBudget /= 52.14;
+                          break;
+                      }
+                    } else if (periodType === 'month') {
+                      // Convertir en budget mensuel
+                      switch (budget.period) {
+                        case 'WEEKLY':
+                          periodBudget *= 4.345; // ~52.14/12
+                          break;
+                        case 'MONTHLY':
+                          // Déjà mensuel
+                          break;
+                        case 'QUARTERLY':
+                          periodBudget /= 3;
+                          break;
+                        case 'YEARLY':
+                          periodBudget /= 12;
+                          break;
+                      }
+                    } else if (periodType === 'year') {
+                      // Convertir en budget annuel
+                      switch (budget.period) {
+                        case 'WEEKLY':
+                          periodBudget *= 52.14;
+                          break;
+                        case 'MONTHLY':
+                          periodBudget *= 12;
+                          break;
+                        case 'QUARTERLY':
+                          periodBudget *= 4;
+                          break;
+                        case 'YEARLY':
+                          // Déjà annuel
+                          break;
+                      }
                     }
                     
                     return {
@@ -588,8 +658,8 @@ export default function Dashboard() {
                       name: c.name,
                       color: c.color,
                       spent,
-                      budget: monthlyBudget,
-                      progress: monthlyBudget > 0 ? Math.min(spent / monthlyBudget, 1) : 0
+                      budget: periodBudget,
+                      progress: periodBudget > 0 ? Math.min(spent / periodBudget, 1) : 0
                     };
                   })
                   .filter(Boolean)
@@ -723,7 +793,7 @@ export default function Dashboard() {
           <div className="px-4 py-5 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-sm font-medium text-gray-300">
-                Catégories du mois
+                Catégories
               </h3>
               <div className="bg-violet-500 p-1 rounded">
                 <ChartBarIcon className="h-3 w-3 text-white" />
@@ -737,24 +807,96 @@ export default function Dashboard() {
                 const year = selectedMonth.getFullYear();
                 
                 // Vérifier si une date est dans le mois sélectionné
-                const isInSelectedMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                // Déterminer la période de filtrage en fonction du type de période sélectionné
+                let isInSelectedPeriod: (d: Date) => boolean;
                 
-                // Fonction utilitaire: budget mensuel équivalent selon la période
+                switch (periodType) {
+                  case 'week':
+                    // Début de la semaine (lundi)
+                    const startDate = new Date(selectedDate);
+                    const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
+                    startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
+                    
+                    // Fin de la semaine (dimanche)
+                    const endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 6);
+                    
+                    isInSelectedPeriod = (d: Date) => d >= startDate && d <= endDate;
+                    break;
+                    
+                  case 'month':
+                    // Vérifier si une date est dans le mois sélectionné
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                    break;
+                    
+                  case 'year':
+                    // Vérifier si une date est dans l'année sélectionnée
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year;
+                    break;
+                    
+                  default:
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                }
+                
+                // Fonction utilitaire: budget adapté à la période sélectionnée
                 const getMonthlyBudget = (categoryId: string) => {
                   const b = budgets.find(bu => bu.categoryId === categoryId);
                   if (!b) return null;
-                  switch (b.period) {
-                    case 'MONTHLY':
-                      return b.amount;
-                    case 'WEEKLY':
-                      return b.amount * 4.345; // ~52.14/12
-                    case 'QUARTERLY':
-                      return b.amount / 3;
-                    case 'YEARLY':
-                      return b.amount / 12;
-                    default:
-                      return b.amount;
+                  
+                  let periodBudget = b.amount;
+                  
+                  // Convertir le budget selon la période du budget et la période sélectionnée
+                  if (periodType === 'week') {
+                    // Convertir en budget hebdomadaire
+                    switch (b.period) {
+                      case 'WEEKLY':
+                        // Déjà hebdomadaire
+                        break;
+                      case 'MONTHLY':
+                        periodBudget /= 4.345; // ~12/52.14
+                        break;
+                      case 'QUARTERLY':
+                        periodBudget /= 13.035; // ~4.345*3
+                        break;
+                      case 'YEARLY':
+                        periodBudget /= 52.14;
+                        break;
+                    }
+                  } else if (periodType === 'month') {
+                    // Convertir en budget mensuel
+                    switch (b.period) {
+                      case 'WEEKLY':
+                        periodBudget *= 4.345; // ~52.14/12
+                        break;
+                      case 'MONTHLY':
+                        // Déjà mensuel
+                        break;
+                      case 'QUARTERLY':
+                        periodBudget /= 3;
+                        break;
+                      case 'YEARLY':
+                        periodBudget /= 12;
+                        break;
+                    }
+                  } else if (periodType === 'year') {
+                    // Convertir en budget annuel
+                    switch (b.period) {
+                      case 'WEEKLY':
+                        periodBudget *= 52.14;
+                        break;
+                      case 'MONTHLY':
+                        periodBudget *= 12;
+                        break;
+                      case 'QUARTERLY':
+                        periodBudget *= 4;
+                        break;
+                      case 'YEARLY':
+                        // Déjà annuel
+                        break;
+                    }
                   }
+                  
+                  return periodBudget;
                 };
                 
                 // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
@@ -765,7 +907,7 @@ export default function Dashboard() {
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInSelectedMonth(dt);
+                        return !isNaN(dt.getTime()) && isInSelectedPeriod(dt);
                       })
                       .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
                     
@@ -841,24 +983,96 @@ export default function Dashboard() {
                 const year = selectedMonth.getFullYear();
                 
                 // Vérifier si une date est dans le mois sélectionné
-                const isInSelectedMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                // Déterminer la période de filtrage en fonction du type de période sélectionné
+                let isInSelectedPeriod: (d: Date) => boolean;
                 
-                // Fonction utilitaire: budget mensuel équivalent selon la période
+                switch (periodType) {
+                  case 'week':
+                    // Début de la semaine (lundi)
+                    const startDate = new Date(selectedDate);
+                    const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
+                    startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
+                    
+                    // Fin de la semaine (dimanche)
+                    const endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 6);
+                    
+                    isInSelectedPeriod = (d: Date) => d >= startDate && d <= endDate;
+                    break;
+                    
+                  case 'month':
+                    // Vérifier si une date est dans le mois sélectionné
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                    break;
+                    
+                  case 'year':
+                    // Vérifier si une date est dans l'année sélectionnée
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year;
+                    break;
+                    
+                  default:
+                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                }
+                
+                // Fonction utilitaire: budget adapté à la période sélectionnée
                 const getMonthlyBudget = (categoryId: string) => {
                   const b = budgets.find(bu => bu.categoryId === categoryId);
                   if (!b) return null;
-                  switch (b.period) {
-                    case 'MONTHLY':
-                      return b.amount;
-                    case 'WEEKLY':
-                      return b.amount * 4.345; // ~52.14/12
-                    case 'QUARTERLY':
-                      return b.amount / 3;
-                    case 'YEARLY':
-                      return b.amount / 12;
-                    default:
-                      return b.amount;
+                  
+                  let periodBudget = b.amount;
+                  
+                  // Convertir le budget selon la période du budget et la période sélectionnée
+                  if (periodType === 'week') {
+                    // Convertir en budget hebdomadaire
+                    switch (b.period) {
+                      case 'WEEKLY':
+                        // Déjà hebdomadaire
+                        break;
+                      case 'MONTHLY':
+                        periodBudget /= 4.345; // ~12/52.14
+                        break;
+                      case 'QUARTERLY':
+                        periodBudget /= 13.035; // ~4.345*3
+                        break;
+                      case 'YEARLY':
+                        periodBudget /= 52.14;
+                        break;
+                    }
+                  } else if (periodType === 'month') {
+                    // Convertir en budget mensuel
+                    switch (b.period) {
+                      case 'WEEKLY':
+                        periodBudget *= 4.345; // ~52.14/12
+                        break;
+                      case 'MONTHLY':
+                        // Déjà mensuel
+                        break;
+                      case 'QUARTERLY':
+                        periodBudget /= 3;
+                        break;
+                      case 'YEARLY':
+                        periodBudget /= 12;
+                        break;
+                    }
+                  } else if (periodType === 'year') {
+                    // Convertir en budget annuel
+                    switch (b.period) {
+                      case 'WEEKLY':
+                        periodBudget *= 52.14;
+                        break;
+                      case 'MONTHLY':
+                        periodBudget *= 12;
+                        break;
+                      case 'QUARTERLY':
+                        periodBudget *= 4;
+                        break;
+                      case 'YEARLY':
+                        // Déjà annuel
+                        break;
+                    }
                   }
+                  
+                  return periodBudget;
                 };
                 
                 // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
@@ -869,7 +1083,7 @@ export default function Dashboard() {
                       .filter(t => t.categoryId === c.id)
                       .filter(t => {
                         const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInSelectedMonth(dt);
+                        return !isNaN(dt.getTime()) && isInSelectedPeriod(dt);
                       })
                       .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
                     
