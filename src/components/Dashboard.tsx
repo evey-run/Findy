@@ -498,9 +498,9 @@ export default function Dashboard() {
       </div>
 
       {/* Top Grid: Stats Cards (2x2) and Devices */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Stats Cards - Left Side (2x2 grid) - Now smaller (2 columns out of 5) */}
-        <div className="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Stats Cards - Left Side (2x2 grid) */}
+        <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           {topStats.map((stat) => (
             <div
               key={stat.name}
@@ -537,164 +537,132 @@ export default function Dashboard() {
           ))}
         </div>
         
-        {/* Objectifs - Right Side - Now larger (3 columns out of 5) */}
-        <div className="lg:col-span-3 shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
+        {/* Dernières transactions - Right Side */}
+        <div className="lg:col-span-4 shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
           <div className="px-6 py-6 sm:p-8">
-            <h3 className="text-sm font-medium text-gray-300 mb-6">
-              Évolution des objectifs
+            <h3 className="text-sm font-medium text-gray-300 mb-4">
+              Dernières transactions
             </h3>
-            <div className="flex flex-col md:flex-row items-center justify-center md:justify-between">
-              {(() => {
-                // Filtrer les allTransactions du mois en cours
-                // Utiliser le mois sélectionné au lieu du mois actuel
-                const month = selectedMonth.getMonth();
-                const year = selectedMonth.getFullYear();
-                
-                // Déterminer la période de filtrage en fonction du type de période sélectionné
-                let isInSelectedPeriod: (d: Date) => boolean;
-                let startDate: Date = new Date();
-                let endDate: Date = new Date();
-                
-                switch (periodType) {
-                  case 'week':
-                    // Début de la semaine (lundi)
-                    startDate = new Date(selectedDate);
-                    const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
-                    startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
-                    
-                    // Fin de la semaine (dimanche)
-                    endDate = new Date(startDate);
-                    endDate.setDate(endDate.getDate() + 6);
-                    
-                    isInSelectedPeriod = (d: Date) => d >= startDate && d <= endDate;
-                    break;
-                    
-                  case 'month':
-                    // Vérifier si une date est dans le mois sélectionné
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
-                    break;
-                    
-                  case 'year':
-                    // Vérifier si une date est dans l'année sélectionnée
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year;
-                    break;
-                    
-                  default:
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
-                }
-                
-                // Sélectionner les 3 principales catégories avec budget
-                const topCategories = categories
-                  .filter(c => c.type === 'EXPENSE')
-                  .map(c => {
-                    const budget = budgets.find(b => b.categoryId === c.id);
-                    if (!budget) return null;
-                    
-                    // Calculer le montant dépensé pour la période sélectionnée
-                    const spent = allTransactions
-                      .filter(t => t.categoryId === c.id)
-                      .filter(t => {
-                        const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInSelectedPeriod(dt);
-                      })
-                      .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0);
-                    
-                    // Calculer le budget équivalent pour la période sélectionnée
-                    let periodBudget = budget.amount;
-                    
-                    // Convertir le budget selon la période du budget et la période sélectionnée
-                    if (periodType === 'week') {
-                      // Convertir en budget hebdomadaire
-                      switch (budget.period) {
-                        case 'WEEKLY':
-                          // Déjà hebdomadaire
-                          break;
-                        case 'MONTHLY':
-                          periodBudget /= 4.345; // ~12/52.14
-                          break;
-                        case 'QUARTERLY':
-                          periodBudget /= 13.035; // ~4.345*3
-                          break;
-                        case 'YEARLY':
-                          periodBudget /= 52.14;
-                          break;
-                      }
-                    } else if (periodType === 'month') {
-                      // Convertir en budget mensuel
-                      switch (budget.period) {
-                        case 'WEEKLY':
-                          periodBudget *= 4.345; // ~52.14/12
-                          break;
-                        case 'MONTHLY':
-                          // Déjà mensuel
-                          break;
-                        case 'QUARTERLY':
-                          periodBudget /= 3;
-                          break;
-                        case 'YEARLY':
-                          periodBudget /= 12;
-                          break;
-                      }
-                    } else if (periodType === 'year') {
-                      // Convertir en budget annuel
-                      switch (budget.period) {
-                        case 'WEEKLY':
-                          periodBudget *= 52.14;
-                          break;
-                        case 'MONTHLY':
-                          periodBudget *= 12;
-                          break;
-                        case 'QUARTERLY':
-                          periodBudget *= 4;
-                          break;
-                        case 'YEARLY':
-                          // Déjà annuel
-                          break;
-                      }
-                    }
-                    
-                    return {
-                      id: c.id,
-                      name: c.name,
-                      color: c.color,
-                      spent,
-                      budget: periodBudget,
-                      progress: periodBudget > 0 ? Math.min(spent / periodBudget, 1) : 0
-                    };
-                  })
-                  .filter(Boolean)
-                  .sort((a, b) => (b?.budget || 0) - (a?.budget || 0))
-                  .slice(0, 3);
-                
-                return (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
-                    {topCategories.map((cat, idx) => (
-                      <div key={idx} className="flex flex-col items-center">
-                        <div className="relative h-36 w-36 mb-3">
-                          {/* Cercle de fond */}
-                          <div className="absolute inset-0 rounded-full border-8 border-gray-700"></div>
-                          {/* Cercle de progression */}
-                          <div 
-                            className="absolute inset-0 rounded-full border-8" 
-                            style={{ 
-                              borderColor: cat?.color || '#6226fa',
-                              clipPath: `polygon(50% 50%, 50% 0%, ${cat && cat.progress >= 0.125 ? '100%' : '50%'} 0%, ${cat && cat.progress >= 0.375 ? '100%' : '50%'} ${cat && cat.progress >= 0.25 ? '100%' : '50%'}, ${cat && cat.progress >= 0.625 ? '100%' : '50%'} ${cat && cat.progress >= 0.5 ? '100%' : '50%'}, ${cat && cat.progress >= 0.875 ? '100%' : '50%'} ${cat && cat.progress >= 0.75 ? '100%' : '50%'}, 50% ${cat && cat.progress >= 1 ? '100%' : '50%'})`
-                            }}
-                          ></div>
-                          <div className="absolute inset-0 flex items-center justify-center flex-col">
-                            <span className="text-2xl font-bold text-white">{cat ? Math.round(cat.progress * 100) : 0}%</span>
-                            <span className="text-xs text-gray-400 mt-1 text-center px-2 truncate max-w-full">{cat?.name || 'N/A'}</span>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-sm font-medium text-white">{cat ? formatCurrency(cat.spent) : '0 €'}</div>
-                          <div className="text-xs text-gray-400">sur {cat ? formatCurrency(cat.budget) : '0 €'}</div>
+            <div className="flow-root">
+              {allTransactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-4">
+                  <ShoppingCartIcon className="h-10 w-10 text-gray-500 mb-2" />
+                  <p className="text-gray-400 text-center text-xs">Aucune transaction récente</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Colonne des dépenses */}
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-400 mb-2 text-center">Dépenses</h4>
+                    <ul className="-my-2 divide-y divide-gray-700">
+                      {allTransactions
+                        .filter(transaction => transaction.amount < 0)
+                        .slice(0, 3)
+                        .map((transaction) => (
+                          <li key={transaction.id} className="py-2">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-shrink-0">
+                                <div className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium bg-red-600">
+                                  -
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-white truncate">
+                                  {transaction.description}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {new Date(transaction.date).toLocaleDateString('fr-FR')}
+                                </p>
+                              </div>
+                              <div className="flex-shrink-0">
+                                <span className="text-xs font-medium text-red-400">
+                                  {formatCurrency(Math.abs(transaction.amount))}
+                                </span>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                  
+                  {/* Colonne des revenus */}
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-400 mb-2 text-center">Revenus</h4>
+                    <ul className="-my-2 divide-y divide-gray-700">
+                      {allTransactions
+                        .filter(transaction => transaction.amount > 0)
+                        .slice(0, 3)
+                        .map((transaction) => (
+                          <li key={transaction.id} className="py-2">
+                            <div className="flex items-center space-x-3">
+                              <div className="flex-shrink-0">
+                                <div className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium bg-green-600">
+                                  +
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-medium text-white truncate">
+                                  {transaction.description}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {new Date(transaction.date).toLocaleDateString('fr-FR')}
+                                </p>
+                              </div>
+                              <div className="flex-shrink-0">
+                                <span className="text-xs font-medium text-green-400">
+                                  {formatCurrency(Math.abs(transaction.amount))}
+                                </span>
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        
+        {/* Tricount - Right Side */}
+        <div className="lg:col-span-4 shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
+          <div className="px-6 py-6 sm:p-8">
+            <h3 className="text-sm font-medium text-gray-300 mb-4">
+              Tricount
+            </h3>
+            <div className="flow-root">
+              {/* Données fictives pour Tricount */}
+              <ul className="-my-2 divide-y divide-gray-700">
+                {[
+                  { id: 1, name: 'Soirée restaurant', amount: 45.50, paidBy: 'Vous', participants: ['Alex', 'Marie', 'Thomas'] },
+                  { id: 2, name: 'Location Airbnb', amount: 120.00, paidBy: 'Marie', participants: ['Vous', 'Marie', 'Thomas', 'Julie'] },
+                  { id: 3, name: 'Courses weekend', amount: 87.35, paidBy: 'Thomas', participants: ['Vous', 'Thomas'] },
+                  { id: 4, name: 'Cinéma', amount: 32.00, paidBy: 'Vous', participants: ['Vous', 'Julie'] },
+                ].map((expense) => (
+                  <li key={expense.id} className="py-2">
+                    <div className="flex items-center space-x-3">
+                      <div className="flex-shrink-0">
+                        <div className="h-6 w-6 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-medium">
+                          <UsersIcon className="h-3 w-3" />
                         </div>
                       </div>
-                    ))}
-                  </div>
-                );
-              })()}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white truncate">
+                          {expense.name}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          Payé par {expense.paidBy}
+                        </p>
+                      </div>
+                      <div className="flex-shrink-0">
+                        <span className="text-xs font-medium text-violet-400">
+                          {formatCurrency(expense.amount)}
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
@@ -1115,70 +1083,7 @@ export default function Dashboard() {
         </div>
       </div>
       
-      {/* Recent Transactions - Moved to bottom */}
-      <div className="shadow rounded-2xl mt-6" style={{ backgroundColor: '#272a2f' }}>
-        <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-white mb-4">
-            Transactions récentes
-          </h3>
-          {allTransactions.slice(0, 5).length === 0 ? (
-            <p className="text-gray-400 text-center py-8">
-              Aucune transaction récente
-            </p>
-          ) : (
-            <div className="flow-root">
-              <ul className="-my-5 divide-y divide-gray-700">
-                {allTransactions
-                .filter(transaction => {
-                  const transactionDate = new Date(transaction.date);
-                  return transactionDate.getMonth() === selectedMonth.getMonth() && 
-                         transactionDate.getFullYear() === selectedMonth.getFullYear();
-                })
-                .slice(0, 5)
-                .map((transaction) => (
-                  <li key={transaction.id} className="py-4">
-                    <div className="flex items-center space-x-4">
-                      <div className="flex-shrink-0">
-                        <div
-                          className={`h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-medium ${
-                            transaction.category?.type === 'INCOME'
-                              ? 'bg-green-600'
-                              : transaction.category?.type === 'EXPENSE'
-                              ? 'bg-red-600'
-                              : 'bg-violet-600'
-                          }`}
-                        >
-                          {transaction.category?.type === 'INCOME' ? '+' : '-'}
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
-                          {transaction.description}
-                        </p>
-                        <p className="text-sm text-gray-400">
-                          {transaction.category?.name} • {new Date(transaction.date).toLocaleDateString('fr-FR')}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <span
-                          className={`text-sm font-medium ${
-                            transaction.category?.type === 'INCOME'
-                              ? 'text-green-400'
-                              : 'text-red-400'
-                          }`}
-                        >
-                          {transaction.category?.type === 'INCOME' ? '+' : '-'}
-                          {formatCurrency(Math.abs(transaction.amount))}
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </div>
+
     </div>
   );
 }
