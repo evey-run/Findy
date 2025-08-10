@@ -1,12 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAppStore } from '../store';
 import {
   ArrowTrendingUpIcon,
   ChartBarIcon,
   ShoppingCartIcon,
   UsersIcon,
-  MapIcon,
+  TrophyIcon,
 } from '@heroicons/react/24/outline';
+import type { Objective } from '../types';
 
 // Styles pour la barre de scroll personnalisée
 const scrollbarStyles = `
@@ -98,12 +99,64 @@ export default function Dashboard() {
     loadDashboardOverview,
     selectedUser,
     transactions,
+    categories,
+    budgets,
     isLoading,
   } = useAppStore();
+  
+  const [objectives, setObjectives] = useState<Objective[]>([]);
+  const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: number }>({});
 
   useEffect(() => {
     loadDashboardOverview();
+    loadObjectives();
   }, [loadDashboardOverview, selectedUser]);
+  
+  // Charger les objectifs depuis l'API
+  const loadObjectives = async () => {
+    try {
+      const response = await fetch('/api/objectives');
+      if (response.ok) {
+        const data = await response.json();
+        setObjectives(data);
+        
+        // Charger les données de progression pour chaque objectif
+        data.forEach((objective: Objective) => {
+          fetchObjectiveProgress(objective.id);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading objectives:', error);
+    }
+  };
+  
+  // Récupérer la progression d'un objectif
+  const fetchObjectiveProgress = async (objectiveId: string) => {
+    try {
+      const response = await fetch(`/api/objectives/${objectiveId}/progress`);
+      if (response.ok) {
+        const data = await response.json();
+        setObjectiveProgress(prev => ({
+          ...prev,
+          [objectiveId]: data.percentage || 0
+        }));
+      }
+    } catch (error) {
+      console.error('Error fetching objective progress:', error);
+    }
+  };
+  
+  // Fonction pour générer le clipPath en fonction du pourcentage
+  const getClipPathForPercentage = (percentage: number): string => {
+    const p = Math.min(percentage, 100) / 100;
+    
+    if (p >= 1) return 'polygon(0 0, 100% 0, 100% 100%, 0 100%)';
+    
+    if (p <= 0) return 'polygon(50% 50%, 50% 0, 50% 0, 50% 0)';
+    
+    // Diviser le cercle en 8 segments pour une animation plus fluide
+    return `polygon(50% 50%, 50% 0%, ${p >= 0.125 ? '100%' : '50%'} 0%, ${p >= 0.375 ? '100%' : '50%'} ${p >= 0.25 ? '100%' : '50%'}, ${p >= 0.625 ? '100%' : '50%'} ${p >= 0.5 ? '100%' : '50%'}, ${p >= 0.875 ? '100%' : '50%'} ${p >= 0.75 ? '100%' : '50%'}, 50% ${p >= 1 ? '100%' : '50%'})`;
+  };
 
   if (isLoading || !dashboardData) {
     return (
@@ -176,7 +229,7 @@ export default function Dashboard() {
           {topStats.map((stat) => (
             <div
               key={stat.name}
-              className="relative p-3 shadow rounded-lg overflow-hidden border border-gray-700 flex flex-col"
+              className="relative p-3 shadow rounded-2xl overflow-hidden flex flex-col"
               style={{ backgroundColor: '#272a2f' }}
             >
               <div className="flex justify-between items-start">
@@ -196,44 +249,93 @@ export default function Dashboard() {
           ))}
         </div>
         
-        {/* Devices - Right Side - Now larger (3 columns out of 5) */}
-        <div className="lg:col-span-3 shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+        {/* Objectifs - Right Side - Now larger (3 columns out of 5) */}
+        <div className="lg:col-span-3 shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
           <div className="px-6 py-6 sm:p-8">
             <h3 className="text-sm font-medium text-gray-300 mb-6">
-              Devices
+              Évolution des objectifs
             </h3>
             <div className="flex flex-col md:flex-row items-center justify-center md:justify-between">
-              <div className="relative h-40 w-40 mb-4 md:mb-0">
-                <div className="absolute inset-0 rounded-full border-8 border-gray-700"></div>
-                <div 
-                  className="absolute inset-0 rounded-full border-8 border-violet-500" 
-                  style={{ 
-                    clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 75% 100%, 50% 75%)'
-                  }}
-                ></div>
-                <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-3xl font-bold text-white">12.350</span>
-                  <span className="text-sm text-gray-400">Devices</span>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="h-3 w-3 rounded-full bg-violet-500"></div>
-                  <span className="text-sm text-gray-300">Mobile</span>
-                  <span className="text-sm font-medium text-white ml-2">65%</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="h-3 w-3 rounded-full bg-gray-300"></div>
-                  <span className="text-sm text-gray-300">Desktop</span>
-                  <span className="text-sm font-medium text-white ml-2">25%</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <div className="h-3 w-3 rounded-full bg-gray-600"></div>
-                  <span className="text-sm text-gray-300">Tablet</span>
-                  <span className="text-sm font-medium text-white ml-2">10%</span>
-                </div>
-              </div>
+              {(() => {
+                // Filtrer les transactions du mois en cours
+                const now = new Date();
+                const month = now.getMonth();
+                const year = now.getFullYear();
+                
+                const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                
+                // Sélectionner les 3 principales catégories avec budget
+                const topCategories = categories
+                  .filter(c => c.type === 'EXPENSE')
+                  .map(c => {
+                    const budget = budgets.find(b => b.categoryId === c.id);
+                    if (!budget) return null;
+                    
+                    // Calculer le montant dépensé ce mois-ci
+                    const spent = transactions
+                      .filter(t => t.categoryId === c.id)
+                      .filter(t => {
+                        const dt = new Date(t.date);
+                        return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                      })
+                      .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0);
+                    
+                    // Calculer le budget mensuel équivalent
+                    let monthlyBudget = budget.amount;
+                    switch (budget.period) {
+                      case 'WEEKLY':
+                        monthlyBudget *= 4.345; // ~52.14/12
+                        break;
+                      case 'QUARTERLY':
+                        monthlyBudget /= 3;
+                        break;
+                      case 'YEARLY':
+                        monthlyBudget /= 12;
+                        break;
+                    }
+                    
+                    return {
+                      id: c.id,
+                      name: c.name,
+                      color: c.color,
+                      spent,
+                      budget: monthlyBudget,
+                      progress: monthlyBudget > 0 ? Math.min(spent / monthlyBudget, 1) : 0
+                    };
+                  })
+                  .filter(Boolean)
+                  .sort((a, b) => (b?.budget || 0) - (a?.budget || 0))
+                  .slice(0, 3);
+                
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 w-full">
+                    {topCategories.map((cat, idx) => (
+                      <div key={idx} className="flex flex-col items-center">
+                        <div className="relative h-36 w-36 mb-3">
+                          {/* Cercle de fond */}
+                          <div className="absolute inset-0 rounded-full border-8 border-gray-700"></div>
+                          {/* Cercle de progression */}
+                          <div 
+                            className="absolute inset-0 rounded-full border-8" 
+                            style={{ 
+                              borderColor: cat?.color || '#6226fa',
+                              clipPath: `polygon(50% 50%, 50% 0%, ${cat && cat.progress >= 0.125 ? '100%' : '50%'} 0%, ${cat && cat.progress >= 0.375 ? '100%' : '50%'} ${cat && cat.progress >= 0.25 ? '100%' : '50%'}, ${cat && cat.progress >= 0.625 ? '100%' : '50%'} ${cat && cat.progress >= 0.5 ? '100%' : '50%'}, ${cat && cat.progress >= 0.875 ? '100%' : '50%'} ${cat && cat.progress >= 0.75 ? '100%' : '50%'}, 50% ${cat && cat.progress >= 1 ? '100%' : '50%'})`
+                            }}
+                          ></div>
+                          <div className="absolute inset-0 flex items-center justify-center flex-col">
+                            <span className="text-2xl font-bold text-white">{cat ? Math.round(cat.progress * 100) : 0}%</span>
+                            <span className="text-xs text-gray-400 mt-1 text-center px-2 truncate max-w-full">{cat?.name || 'N/A'}</span>
+                          </div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-sm font-medium text-white">{cat ? formatCurrency(cat.spent) : '0 €'}</div>
+                          <div className="text-xs text-gray-400">sur {cat ? formatCurrency(cat.budget) : '0 €'}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -244,7 +346,7 @@ export default function Dashboard() {
         {/* Left Column: Projections and Goals + Revenue by Period */}
         <div className="space-y-6">
           {/* Chart 1: Projections and Goals */}
-          <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+          <div className="shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
             <div className="px-4 py-5 sm:p-6">
               <h3 className="text-sm font-medium text-gray-300 mb-4">
                 Projections and goals
@@ -267,118 +369,249 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Revenue by Period - Circle Charts */}
-          <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+          {/* Objectifs - Circle Charts */}
+          <div className="shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
             <div className="px-4 py-5 sm:p-6">
               <h3 className="text-sm font-medium text-gray-300 mb-4">
-                Revenue by period
+                Évolution des objectifs
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Today */}
-                <div className="flex flex-col items-center">
-                  <div className="relative h-32 w-32 mb-2">
-                    <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
-                    <div 
-                      className="absolute inset-0 rounded-full border-4 border-violet-500" 
-                      style={{ 
-                        clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 50%)'
-                      }}
-                    ></div>
-                    <div className="absolute inset-0 flex items-center justify-center flex-col">
-                      <span className="text-xl font-bold text-white">$1.2k</span>
-                      <span className="text-xs text-gray-400">Today</span>
+                {objectives.slice(0, 3).map((objective) => {
+                  const percentage = objectiveProgress[objective.id] || 0;
+                  const clipPath = getClipPathForPercentage(percentage);
+                  
+                  return (
+                    <div key={objective.id} className="flex flex-col items-center">
+                      <div className="relative h-32 w-32 mb-2">
+                        {/* Cercle de fond */}
+                        <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
+                        {/* Cercle de progression */}
+                        <div 
+                          className="absolute inset-0 rounded-full border-4" 
+                          style={{ 
+                            borderColor: '#6226fa',
+                            clipPath: clipPath
+                          }}
+                        ></div>
+                        <div className="absolute inset-0 flex items-center justify-center flex-col">
+                          <span className="text-xl font-bold text-white">{Math.round(percentage)}%</span>
+                          <span className="text-xs text-gray-400 truncate max-w-full px-2 text-center">{objective.title}</span>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-sm font-medium text-white">{formatCurrency(objective.targetAmount * percentage / 100)}</div>
+                        <div className="text-xs text-gray-400">sur {formatCurrency(objective.targetAmount)}</div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })}
                 
-                {/* This week */}
-                <div className="flex flex-col items-center">
-                  <div className="relative h-32 w-32 mb-2">
-                    <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
-                    <div 
-                      className="absolute inset-0 rounded-full border-4 border-violet-500" 
-                      style={{ 
-                        clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 75%, 75% 100%, 50% 100%)'
-                      }}
-                    ></div>
-                    <div className="absolute inset-0 flex items-center justify-center flex-col">
-                      <span className="text-xl font-bold text-white">$7.2k</span>
-                      <span className="text-xs text-gray-400">This week</span>
-                    </div>
+                {objectives.length === 0 && (
+                  <div className="col-span-3 flex flex-col items-center justify-center py-8">
+                    <TrophyIcon className="h-12 w-12 text-gray-500 mb-2" />
+                    <p className="text-gray-400 text-center">Aucun objectif trouvé</p>
                   </div>
-                </div>
+                )}
                 
-                {/* This month */}
-                <div className="flex flex-col items-center">
-                  <div className="relative h-32 w-32 mb-2">
-                    <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
-                    <div 
-                      className="absolute inset-0 rounded-full border-4 border-violet-500" 
-                      style={{ 
-                        clipPath: 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 50% 100%)'
-                      }}
-                    ></div>
-                    <div className="absolute inset-0 flex items-center justify-center flex-col">
-                      <span className="text-xl font-bold text-white">$28.5k</span>
-                      <span className="text-xs text-gray-400">This month</span>
+                {objectives.length > 0 && objectives.length < 3 && Array.from({ length: 3 - objectives.length }).map((_, i) => (
+                  <div key={`empty-${i}`} className="flex flex-col items-center">
+                    <div className="relative h-32 w-32 mb-2">
+                      <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
+                      <div className="absolute inset-0 flex items-center justify-center flex-col">
+                        <TrophyIcon className="h-8 w-8 text-gray-600" />
+                        <span className="text-xs text-gray-500 mt-1">Nouvel objectif</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ))}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Chart 2: Revenue by Location */}
-        <div className="shadow rounded-lg border border-gray-700" style={{ backgroundColor: '#272a2f' }}>
+        {/* Chart 2: Catégories du mois */}
+        <div className="shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
           <div className="px-4 py-5 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-sm font-medium text-gray-300">
-                Revenue by location
+                Catégories du mois
               </h3>
-              <div className="bg-blue-500 p-1 rounded">
-                <MapIcon className="h-3 w-3 text-white" />
+              <div className="bg-violet-500 p-1 rounded">
+                <ChartBarIcon className="h-3 w-3 text-white" />
               </div>
             </div>
-            <div className="h-64 flex items-center justify-center text-gray-500">
-              <div className="relative w-full h-full">
-                {/* Simplified world map visualization */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <p className="text-gray-500 text-sm">World Map Visualization</p>
-                </div>
-                {/* Dots representing locations */}
-                <div className="absolute top-1/4 left-1/4 h-3 w-3 rounded-full bg-violet-500"></div>
-                <div className="absolute top-1/3 right-1/3 h-3 w-3 rounded-full bg-violet-500"></div>
-                <div className="absolute bottom-1/4 right-1/4 h-3 w-3 rounded-full bg-violet-500"></div>
-              </div>
+            <div className="h-80 flex items-center justify-center pt-4">
+              {(() => {
+                // Filtrer les transactions du mois en cours
+                const now = new Date();
+                const month = now.getMonth();
+                const year = now.getFullYear();
+                
+                const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                
+                // Fonction utilitaire: budget mensuel équivalent selon la période
+                const getMonthlyBudget = (categoryId: string) => {
+                  const b = budgets.find(bu => bu.categoryId === categoryId);
+                  if (!b) return null;
+                  switch (b.period) {
+                    case 'MONTHLY':
+                      return b.amount;
+                    case 'WEEKLY':
+                      return b.amount * 4.345; // ~52.14/12
+                    case 'QUARTERLY':
+                      return b.amount / 3;
+                    case 'YEARLY':
+                      return b.amount / 12;
+                    default:
+                      return b.amount;
+                  }
+                };
+                
+                // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
+                const data = categories
+                  .filter(c => c.type === 'EXPENSE')
+                  .map(c => {
+                    const monthlySpending = transactions
+                      .filter(t => t.categoryId === c.id)
+                      .filter(t => {
+                        const dt = new Date(t.date);
+                        return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                      })
+                      .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
+                    
+                    const monthlyBudget = getMonthlyBudget(c.id);
+                    return { label: c.name, color: c.color, spending: monthlySpending, budget: monthlyBudget ?? 0 };
+                  })
+                  .filter(d => (d.budget ?? 0) > 0);
+                
+                const totalBudget = data.reduce((sum: number, d) => sum + d.budget, 0);
+                
+                if (totalBudget <= 0) {
+                  return (
+                    <div className="text-sm text-gray-300 text-center">Aucune donnée disponible.</div>
+                  );
+                }
+                
+                const size = 340;
+                const radius = 140;
+                let angleOffset = 0; // in radians
+                
+                // Ordonner par budget décroissant pour lisibilité
+                const sorted = [...data].sort((a, b) => b.budget - a.budget);
+                
+                // Helpers to draw sector paths
+                const polar = (r: number, a: number) => ({ x: r * Math.cos(a), y: r * Math.sin(a) });
+                const sectorPath = (rOuter: number, rInner: number, a0: number, a1: number) => {
+                  const largeArc = a1 - a0 > Math.PI ? 1 : 0;
+                  const p0 = polar(rOuter, a0);
+                  const p1 = polar(rOuter, a1);
+                  if (rInner <= 0) {
+                    // Wedge from center
+                    return `M 0 0 L ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`;
+                  }
+                  const q0 = polar(rInner, a0);
+                  const q1 = polar(rInner, a1);
+                  return `M ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} L ${q1.x} ${q1.y} A ${rInner} ${rInner} 0 ${largeArc} 0 ${q0.x} ${q0.y} Z`;
+                };
+                
+                return (
+                  <svg width={size} height={size}>
+                    <g transform={`translate(${size / 2}, ${size / 2}) rotate(-90)`}>
+                      {sorted.map((d, idx) => {
+                        const sliceAngle = (d.budget / totalBudget) * 2 * Math.PI;
+                        const start = angleOffset;
+                        const end = angleOffset + sliceAngle;
+                        angleOffset = end;
+                        
+                        const ratio = d.budget > 0 ? Math.min(d.spending / d.budget, 1) : 0;
+                        const fillOuter = radius * ratio;
+                        
+                        return (
+                          <g key={idx}>
+                            {/* Fond (budget total) */}
+                            <path d={sectorPath(radius, 0, start, end)} fill={d.color} fillOpacity={0.25} />
+                            {/* Remplissage radial (dépenses) */}
+                            {ratio > 0 && (
+                              <path d={sectorPath(fillOuter, 0, start, end)} fill={d.color} />
+                            )}
+                          </g>
+                        );
+                      })}
+                    </g>
+                  </svg>
+                );
+              })()}
             </div>
-            {/* Country stats */}
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs text-gray-400">USA</span>
-                  <span className="text-xs text-gray-400">100k</span>
-                </div>
-                <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-violet-500" style={{ width: '75%' }}></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs text-gray-400">Brazil</span>
-                  <span className="text-xs text-gray-400">100k</span>
-                </div>
-                <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
-                  <div className="h-full bg-violet-500" style={{ width: '60%' }}></div>
-                </div>
-              </div>
+            {/* Légende des catégories */}
+            <div className="mt-10 grid grid-cols-2 gap-2 max-w-xs mx-auto">
+              {(() => {
+                // Filtrer les transactions du mois en cours
+                const now = new Date();
+                const month = now.getMonth();
+                const year = now.getFullYear();
+                
+                const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
+                
+                // Fonction utilitaire: budget mensuel équivalent selon la période
+                const getMonthlyBudget = (categoryId: string) => {
+                  const b = budgets.find(bu => bu.categoryId === categoryId);
+                  if (!b) return null;
+                  switch (b.period) {
+                    case 'MONTHLY':
+                      return b.amount;
+                    case 'WEEKLY':
+                      return b.amount * 4.345; // ~52.14/12
+                    case 'QUARTERLY':
+                      return b.amount / 3;
+                    case 'YEARLY':
+                      return b.amount / 12;
+                    default:
+                      return b.amount;
+                  }
+                };
+                
+                // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
+                const data = categories
+                  .filter(c => c.type === 'EXPENSE')
+                  .map(c => {
+                    const monthlySpending = transactions
+                      .filter(t => t.categoryId === c.id)
+                      .filter(t => {
+                        const dt = new Date(t.date);
+                        return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
+                      })
+                      .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
+                    
+                    const monthlyBudget = getMonthlyBudget(c.id);
+                    return { label: c.name, color: c.color, spending: monthlySpending, budget: monthlyBudget ?? 0 };
+                  })
+                  .filter(d => (d.budget ?? 0) > 0);
+                
+                // Ordonner par budget décroissant pour lisibilité
+                const sorted = [...data].sort((a, b) => b.budget - a.budget);
+                
+                return sorted.slice(0, 4).map((d, idx) => (
+                  <div key={idx} className="flex items-center justify-between">
+                    <div className="flex items-center min-w-0">
+                      <span className="inline-block w-2 h-2 rounded-sm mr-1 flex-shrink-0" style={{ backgroundColor: d.color }} />
+                      <span className="text-xs text-gray-200 truncate">{d.label}</span>
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {formatCurrency(d.spending)}
+                      <span className="text-xs text-gray-500 ml-1">
+                        ({((d.budget ? d.spending / d.budget : 0) * 100).toFixed(0)}%)
+                      </span>
+                    </div>
+                  </div>
+                ));
+              })()}
             </div>
           </div>
         </div>
       </div>
       
       {/* Recent Transactions - Moved to bottom */}
-      <div className="shadow rounded-lg border border-gray-700 mt-6" style={{ backgroundColor: '#272a2f' }}>
+      <div className="shadow rounded-2xl mt-6" style={{ backgroundColor: '#272a2f' }}>
         <div className="px-4 py-5 sm:p-6">
           <h3 className="text-lg leading-6 font-medium text-white mb-4">
             Transactions récentes

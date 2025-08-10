@@ -13,6 +13,7 @@ import transactionRoutes from './routes/transactions';
 import budgetRoutes from './routes/budgets';
 import recurrenceRoutes from './routes/recurrences';
 import dashboardRoutes from './routes/dashboard';
+import objectiveRoutes from './routes/objectives';
 
 dotenv.config();
 
@@ -38,6 +39,7 @@ app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
 app.use('/api/recurrences', recurrenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/objectives', objectiveRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
