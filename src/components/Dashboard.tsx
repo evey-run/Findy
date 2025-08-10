@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useAppStore } from '../store';
+import { useAppStore } from '../store/index';
 import {
   ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
   ChartBarIcon,
   ShoppingCartIcon,
   UsersIcon,
@@ -100,12 +101,12 @@ export default function Dashboard() {
     dashboardData,
     loadDashboardOverview,
     selectedUser,
-    transactions,
     allTransactions,
     loadAllTransactions,
     categories,
     budgets,
     isLoading,
+    setDateRange,
   } = useAppStore();
   
   const [objectives, setObjectives] = useState<Objective[]>([]);
@@ -114,9 +115,22 @@ export default function Dashboard() {
   // État pour la navigation par mois
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   
-  // Fonction pour obtenir le nom du mois en français
+  // État pour stocker les données du mois précédent
+  const [previousMonthData, setPreviousMonthData] = useState<{
+    currentMonthIncome: number;
+    currentMonthExpense: number;
+    savingsTotal: number;
+    investmentMonthTotal: number;
+  }>({ 
+    currentMonthIncome: 0, 
+    currentMonthExpense: 0, 
+    savingsTotal: 0, 
+    investmentMonthTotal: 0 
+  });
+  
+  // Fonction pour obtenir le nom du mois et l'année en français
   const getMonthName = (date: Date): string => {
-    return date.toLocaleString('fr-FR', { month: 'long' });
+    return date.toLocaleString('fr-FR', { month: 'long' }) + ' ' + date.getFullYear();
   };
   
   // Fonctions pour naviguer entre les mois
@@ -132,16 +146,68 @@ export default function Dashboard() {
     setSelectedMonth(prevMonth => {
       const newMonth = new Date(prevMonth);
       newMonth.setMonth(newMonth.getMonth() + 1);
+      
+      // Vérifier si le nouveau mois est dans le futur
+      const currentDate = new Date();
+      if (newMonth > currentDate) {
+        // Si c'est dans le futur, rester au mois actuel
+        return prevMonth;
+      }
+      
       return newMonth;
     });
   };
 
   useEffect(() => {
+    // Mettre à jour la plage de dates dans le store en fonction du mois sélectionné
+    const startDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
+    const endDate = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth() + 1, 0);
+    
+    // Mettre à jour la plage de dates dans le store
+    setDateRange({
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    });
+    
     // Charger toutes les allTransactions pour les analyses et graphiques
     loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
     loadDashboardOverview();
     loadObjectives();
-  }, [loadDashboardOverview, loadAllTransactions, selectedUser, selectedMonth]);
+    
+    // Charger les données du mois précédent pour comparaison
+    const fetchPreviousMonthData = async () => {
+      try {
+        // Créer une date pour le mois précédent
+        const prevMonth = new Date(selectedMonth);
+        prevMonth.setMonth(prevMonth.getMonth() - 1);
+        
+        // Construire les paramètres de requête
+        const params = new URLSearchParams();
+        if (selectedUser) params.append('userId', selectedUser.id);
+        
+        // Définir la plage de dates pour le mois précédent
+        const prevStartDate = new Date(prevMonth.getFullYear(), prevMonth.getMonth(), 1);
+        const prevEndDate = new Date(prevMonth.getFullYear(), prevMonth.getMonth() + 1, 0);
+        params.append('startDate', prevStartDate.toISOString());
+        params.append('endDate', prevEndDate.toISOString());
+        
+        const response = await fetch(`/api/dashboard/overview?${params.toString()}`);
+        if (response.ok) {
+          const data = await response.json();
+          setPreviousMonthData({
+            currentMonthIncome: data.summary.currentMonthIncome || 0,
+            currentMonthExpense: data.summary.currentMonthExpense || 0,
+            savingsTotal: data.summary.savingsTotal || 0,
+            investmentMonthTotal: data.summary.investmentMonthTotal || 0
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching previous month data:', error);
+      }
+    };
+    
+    fetchPreviousMonthData();
+  }, [loadDashboardOverview, loadAllTransactions, selectedUser, selectedMonth, setDateRange]);
   
   // Charger les objectifs depuis l'API
   const loadObjectives = async () => {
@@ -197,6 +263,20 @@ export default function Dashboard() {
     );
   }
 
+  // Fonction pour calculer la tendance par rapport au mois précédent
+  const calculateTrend = (current: number, previous: number) => {
+    if (previous === 0) return { isUp: true, percentage: 100 };
+    if (current === previous) return { isUp: true, percentage: 0 };
+    
+    const diff = current - previous;
+    const percentage = Math.abs(Math.round((diff / previous) * 100));
+    
+    return {
+      isUp: diff > 0,
+      percentage
+    };
+  };
+
   // Statistiques pour les cartes du haut
   const topStats = [
     {
@@ -206,7 +286,11 @@ export default function Dashboard() {
       color: 'text-green-400',
       bgColor: 'bg-green-900 bg-opacity-50',
       description: 'Comptes courants',
-      action: <ArrowTrendingUpIcon className="h-4 w-4 text-green-400" />
+      action: <ArrowTrendingUpIcon className="h-4 w-4 text-green-400" />,
+      trend: calculateTrend(
+        dashboardData.summary.currentMonthIncome || 0,
+        previousMonthData.currentMonthIncome
+      )
     },
     {
       name: 'Dépenses du mois',
@@ -215,7 +299,11 @@ export default function Dashboard() {
       color: 'text-red-400',
       bgColor: 'bg-red-900 bg-opacity-50',
       description: 'Comptes courants',
-      action: <ShoppingCartIcon className="h-4 w-4 text-red-400" />
+      action: <ShoppingCartIcon className="h-4 w-4 text-red-400" />,
+      trend: calculateTrend(
+        dashboardData.summary.currentMonthExpense || 0,
+        previousMonthData.currentMonthExpense
+      )
     },
     {
       name: 'Économies',
@@ -224,7 +312,11 @@ export default function Dashboard() {
       color: 'text-violet-400',
       bgColor: 'bg-violet-900 bg-opacity-50',
       description: 'Livrets d\'épargne',
-      action: <UsersIcon className="h-4 w-4 text-violet-400" />
+      action: <UsersIcon className="h-4 w-4 text-violet-400" />,
+      trend: calculateTrend(
+        dashboardData.summary.savingsTotal || 0,
+        previousMonthData.savingsTotal
+      )
     },
     {
       name: 'Investissements',
@@ -233,7 +325,11 @@ export default function Dashboard() {
       color: 'text-blue-400',
       bgColor: 'bg-blue-900 bg-opacity-50',
       description: 'Dépenses du mois',
-      action: <ChartBarIcon className="h-4 w-4 text-blue-400" />
+      action: <ChartBarIcon className="h-4 w-4 text-blue-400" />,
+      trend: calculateTrend(
+        dashboardData.summary.investmentMonthTotal || 0,
+        previousMonthData.investmentMonthTotal
+      )
     },
   ];
 
@@ -281,20 +377,33 @@ export default function Dashboard() {
           {topStats.map((stat) => (
             <div
               key={stat.name}
-              className="relative p-3 shadow rounded-2xl overflow-hidden flex flex-col"
+              className="relative p-4 shadow rounded-2xl overflow-hidden flex flex-col"
               style={{ backgroundColor: '#272a2f' }}
             >
-              <div className="flex justify-between items-start">
-                <div>
-                  <p className="text-xs font-medium text-gray-400 mb-1">
-                    {stat.name}
-                  </p>
-                  <p className="text-xl font-bold text-white">
-                    {stat.value}
-                  </p>
-                </div>
-                <div className="flex items-center justify-center h-5 w-5">
-                  {stat.action}
+              <div className="flex flex-col items-center">
+                <p className="text-sm font-medium text-gray-400 mb-2 text-center">
+                  {stat.name}
+                </p>
+                <p className="text-2xl font-bold text-white text-center mb-2">
+                  {stat.value}
+                </p>
+                <div className="flex items-center justify-center mt-1">
+                  {stat.trend.percentage > 0 ? (
+                    <div className={`flex items-center ${stat.name === 'Dépenses du mois' 
+                      ? (stat.trend.isUp ? 'text-red-400' : 'text-green-400') 
+                      : (stat.trend.isUp ? 'text-green-400' : 'text-red-400')}`}>
+                      {stat.trend.isUp ? (
+                        <ArrowTrendingUpIcon className="h-4 w-4 mr-1" />
+                      ) : (
+                        <ArrowTrendingDownIcon className="h-4 w-4 mr-1" />
+                      )}
+                      <span className="text-xs">
+                        {stat.trend.percentage}% {stat.trend.isUp ? 'hausse' : 'baisse'}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">Stable</span>
+                  )}
                 </div>
               </div>
             </div>

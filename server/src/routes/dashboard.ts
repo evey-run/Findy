@@ -41,6 +41,21 @@ router.get('/overview', async (req, res) => {
       })
     ]);
     
+    // Déterminer la période à utiliser (soit celle fournie dans les paramètres, soit le mois actuel)
+    let periodStart, periodEnd;
+    
+    if (Object.keys(dateFilter).length > 0) {
+      // Utiliser la période fournie dans les paramètres
+      periodStart = dateFilter.gte || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      periodEnd = dateFilter.lte || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+    } else {
+      // Utiliser le mois actuel par défaut
+      periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      periodEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+    }
+    
+    console.log(`Using period: ${periodStart.toISOString()} to ${periodEnd.toISOString()}`);
+    
     // Revenus vs Dépenses par type de compte
     const [incomeSum, expenseSum, currentAccountIncome, currentAccountExpense, savingsAccountIncome, investmentAccountExpense] = await Promise.all([
       // Total income
@@ -53,54 +68,54 @@ router.get('/overview', async (req, res) => {
         where: { ...transactionWhere, amount: { lt: 0 } },
         _sum: { amount: true }
       }),
-      // Current account income (for the current month)
+      // Current account income (for the selected period)
       prisma.transaction.aggregate({
         where: { 
-          ...transactionWhere, 
           amount: { gt: 0 },
           bank: { accountType: 'CURRENT' },
+          ...userFilter,
           date: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+            gte: periodStart,
+            lte: periodEnd
           }
         },
         _sum: { amount: true }
       }),
-      // Current account expense (for the current month)
+      // Current account expense (for the selected period)
       prisma.transaction.aggregate({
         where: { 
-          ...transactionWhere, 
           amount: { lt: 0 },
           bank: { accountType: 'CURRENT' },
+          ...userFilter,
           date: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+            gte: periodStart,
+            lte: periodEnd
           }
         },
         _sum: { amount: true }
       }),
-      // Savings account income (for the current month)
+      // Savings account income (for the selected period)
       prisma.transaction.aggregate({
         where: { 
-          ...transactionWhere, 
           amount: { gt: 0 },
           bank: { accountType: 'SAVINGS' },
+          ...userFilter,
           date: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+            gte: periodStart,
+            lte: periodEnd
           }
         },
         _sum: { amount: true }
       }),
-      // Investment account expense (for the current month)
+      // Investment account expense (for the selected period)
       prisma.transaction.aggregate({
         where: { 
-          ...transactionWhere, 
           amount: { lt: 0 },
           bank: { accountType: 'INVESTMENT' },
+          ...userFilter,
           date: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-            lte: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)
+            gte: periodStart,
+            lte: periodEnd
           }
         },
         _sum: { amount: true }

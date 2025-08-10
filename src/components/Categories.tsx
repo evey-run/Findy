@@ -161,7 +161,7 @@ export default function Categories() {
         await loadCategories();
         // Charger tous les budgets, indépendamment de la banque sélectionnée
         await loadBudgets(true);
-        // Charger toutes les transactions (toute l'historique), en ignorant la banque sélectionnée et la plage de dates
+        // Charger toutes les allTransactions (toute l'historique), en ignorant la banque sélectionnée et la plage de dates
         await loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
         await loadUsers();
       } catch (error) {
@@ -206,7 +206,7 @@ export default function Categories() {
       
       console.log(`📊 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
       
-      // Filtrer les transactions (toute l'historique) pour ce budget
+      // Filtrer les allTransactions (toute l'historique) pour ce budget
       const relevantTransactions = allTransactions.filter(t => {
         const transactionDate = new Date(t.date);
         const isInCategory = t.categoryId === budget.categoryId;
@@ -217,7 +217,7 @@ export default function Categories() {
         return isInCategory && isExpense && isInDateRange && isInBank;
       });
       
-      console.log(`📊 Found ${relevantTransactions.length} relevant transactions`);
+      console.log(`📊 Found ${relevantTransactions.length} relevant allTransactions`);
       
       const totalSpent = Math.abs(relevantTransactions.reduce((sum, t) => sum + t.amount, 0));
       const remaining = Math.max(0, budget.amount - totalSpent);
@@ -258,7 +258,7 @@ export default function Categories() {
     }, 5000); // Recalcule toutes les 5 secondes
 
     return () => clearInterval(interval);
-  }, [budgets, transactions]);
+  }, [budgets, allTransactions]);
 
   // Fonction pour obtenir le budget d'une catégorie
   const getCategoryBudget = (categoryId: string) => {
@@ -279,7 +279,7 @@ export default function Categories() {
     }).format(amount);
   };
 
-  // Auto-assign uncategorized transactions based on category keywords
+  // Auto-assign uncategorized allTransactions based on category keywords
   const autoAssignCategories = async () => {
     try {
       const rules = categories
@@ -293,13 +293,13 @@ export default function Categories() {
 
       if (rules.length === 0) return;
 
-      const txToUpdate = transactions.filter(t => !t.categoryId && t.description);
+      const txToUpdate = allTransactions.filter(t => !t.categoryId && t.description);
       for (const t of txToUpdate) {
         const desc = (t.description || '').toLowerCase();
         const match = rules.find(r => r.keywords.some(k => desc.includes(k)));
         if (match) {
           try {
-            const response = await fetch(`/api/transactions/${t.id}`, {
+            const response = await fetch(`/api/allTransactions/${t.id}`, {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ categoryId: match.categoryId })
@@ -328,7 +328,7 @@ export default function Categories() {
       if (resp.ok) {
         const data = await resp.json();
         toast.success(`Mots-clés appliqués: ${data.updatedCount} transaction(s) mise(s) à jour`);
-        // Recharger les transactions pour refléter les changements
+        // Recharger les allTransactions pour refléter les changements
         await loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
       } else {
         const err = await resp.json();
@@ -452,11 +452,11 @@ export default function Categories() {
         setKeywordInput('');
         toast.success('Catégorie et budget sauvegardés avec succès');
 
-        // Proposer d'appliquer les nouveaux mots-clés aux transactions existantes
+        // Proposer d'appliquer les nouveaux mots-clés aux allTransactions existantes
         const newKeywords = (updatedCategory.keywords || []).map((k: string) => k.toLowerCase().trim());
         const added = newKeywords.filter((k: string) => !prevKeywords.includes(k));
         if (added.length > 0) {
-          const confirmApply = window.confirm(`Appliquer ${added.length} nouveau(x) mot(s)-clé(s) aux transactions existantes ?`);
+          const confirmApply = window.confirm(`Appliquer ${added.length} nouveau(x) mot(s)-clé(s) aux allTransactions existantes ?`);
           if (confirmApply) {
             await applyKeywordsToExisting(updatedCategory.id, false);
           }
@@ -567,7 +567,7 @@ export default function Categories() {
 
         // Proposer d'appliquer immédiatement les mots-clés de la nouvelle catégorie
         if ((newCategory.keywords || []).length > 0) {
-          const confirmApply = window.confirm('Appliquer ces mots-clés aux transactions existantes non catégorisées ?');
+          const confirmApply = window.confirm('Appliquer ces mots-clés aux allTransactions existantes non catégorisées ?');
           if (confirmApply) {
             await applyKeywordsToExisting(newCategory.id, false);
           }
@@ -604,7 +604,7 @@ export default function Categories() {
             Catégories & Budgets
           </h2>
           <p className="text-sm text-gray-300 mt-1">
-            Gérez vos catégories de transactions et leurs budgets associés
+            Gérez vos catégories de allTransactions et leurs budgets associés
           </p>
         </div>
         <div className="mt-4 md:mt-0 md:ml-4 flex items-center">
@@ -653,7 +653,7 @@ export default function Categories() {
               </div>
             </div>
             {(() => {
-              // Filtrer les transactions selon le mois sélectionné
+              // Filtrer les allTransactions selon le mois sélectionné
               const base = new Date(chartMonth.getFullYear(), chartMonth.getMonth(), 1);
               const month = base.getMonth();
               const year = base.getFullYear();
@@ -682,7 +682,7 @@ export default function Categories() {
               const data = categories
                 .filter(c => c.type === 'EXPENSE')
                 .map(c => {
-                  const monthlySpending = transactions
+                  const monthlySpending = allTransactions
                     .filter(t => t.categoryId === c.id)
                     .filter(t => {
                       const dt = new Date(t.date);
@@ -1119,18 +1119,18 @@ export default function Categories() {
                   </div>
                   <div className="px-6 py-4" style={{ backgroundColor: '#1f2226' }}>
                     {/* Section des transactions - identique à Banks */}
-                    {transactions.filter(t => t.categoryId === category.id).length > 0 ? (
+                    {allTransactions.filter(t => t.categoryId === category.id).length > 0 ? (
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-sm font-medium text-gray-300">
-                            Dernières transactions
+                            Dernières allTransactions
                           </p>
                           <span className="text-gray-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
                             &gt;
                           </span>
                         </div>
                         <div className="space-y-2 mb-4">
-                          {transactions
+                          {allTransactions
                             .filter(t => t.categoryId === category.id)
                             .slice(0, 3)
                             .map((transaction) => (
