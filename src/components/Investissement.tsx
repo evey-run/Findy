@@ -269,10 +269,7 @@ export default function Investissement() {
     // Pas besoin de nettoyer l'état global car nous utilisons uniquement localSelectedBank
   }, []);
   
-  // Log transactions changes
-  useEffect(() => {
-    console.log('Transactions updated:', transactions.length, 'transactions');
-  }, [transactions]);
+  // Removed transaction logging effect to reduce unnecessary updates
 
   const handleSave = async () => {
     if (!editingTransaction) return;

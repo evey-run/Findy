@@ -3,6 +3,9 @@ import { devtools } from 'zustand/middleware';
 import type { User, Bank, Transaction, Category, Budget, DashboardOverview } from '../types';
 
 interface AppState {
+  // Internal state tracking
+  _lastTransactionRequestKey?: string;
+  
   // Users
   users: User[];
   selectedUser: User | null;
@@ -39,7 +42,7 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string }) => Promise<void>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number }) => Promise<void>;
   loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   loadAllTransactions: (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; pageName?: string }) => Promise<void>;
   appendTransactions: (newTransactions: Transaction[]) => void;
@@ -287,9 +290,31 @@ export const useAppStore = create<AppState>()(
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
       
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number }) => {
+        // Create a unique key for this request based on the options
+        const requestKey = JSON.stringify({
+          categoryId: options?.categoryId || null,
+          bankId: options?.forceIgnoreSelectedBank ? null : get().selectedBank?.id,
+          accountType: options?.accountType || null,
+          searchText: options?.searchText || null,
+          pageName: options?.pageName || null,
+          limit: options?.limit || null
+        });
+        
+        // Store the last request key to prevent duplicate requests
+        const state = get();
+        const lastRequestKey = state._lastTransactionRequestKey;
+        
+        // Skip loading if not explicitly requested via forceRefresh and we have data
+        // Also skip if this is the same request we just made (prevents loops)
+        if (!options?.forceRefresh && 
+            state.transactions.length > 0 && 
+            requestKey === lastRequestKey) {
+          console.log('Skipping duplicate transaction load - using cached data');
+          return;
+        }
+
         try {
-          const state = get();
           const params = new URLSearchParams();
           
           // Filtre par catégorie s'il est fourni
@@ -311,6 +336,16 @@ export const useAppStore = create<AppState>()(
           if (options?.accountType) {
             params.append('accountType', options.accountType);
           }
+          
+          // Add pagination limit to reduce initial data load
+          // Default to 50 items if not specified
+          const limit = options?.limit || 50;
+          params.append('limit', limit.toString());
+          
+          // Save this request key before making the request
+          set({ _lastTransactionRequestKey: requestKey });
+          
+          console.log(`Loading transactions with limit: ${limit}`);
           const response = await fetch(`/api/transactions?${params}`);
           const data = await response.json();
           if (data.transactions) {

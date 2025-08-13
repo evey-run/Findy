@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import Papa from 'papaparse';
@@ -188,7 +188,7 @@ export default function Transactions({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const ITEMS_PER_PAGE = 50;
+  const ITEMS_PER_PAGE = 25; // Reduced for better initial performance
   
   // États pour la sélection multiple
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
@@ -272,6 +272,12 @@ export default function Transactions({
         const searchParams = new URLSearchParams(location.search);
         const searchFromURL = searchParams.get('search');
         
+        // Load categories and banks first for better UX
+        await Promise.all([
+          loadCategories(),
+          loadBanks()
+        ]);
+        
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
           setSearchInput(searchFromURL);
@@ -280,19 +286,19 @@ export default function Transactions({
           setFilters(newFilters);
           // Sauvegarder les filtres dans le store pour cette page
           setPageFilter(pageName, newFilters);
-          // Charger les transactions avec le filtre de recherche
-          await Promise.all([
-            loadTransactions({ searchText: searchFromURL, pageName }),
-            loadCategories(),
-            loadBanks()
-          ]);
+          // Charger les transactions avec le filtre de recherche et pagination
+          await loadTransactions({ 
+            searchText: searchFromURL, 
+            pageName,
+            limit: ITEMS_PER_PAGE // Use pagination to improve performance
+          });
         } else {
           // Chargement normal sans filtre ou avec les filtres spécifiques à la page
-          await Promise.all([
-            loadTransactions({ pageName }),
-            loadCategories(),
-            loadBanks()
-          ]);
+          // avec pagination pour améliorer les performances
+          await loadTransactions({ 
+            pageName,
+            limit: ITEMS_PER_PAGE // Use pagination to improve performance
+          });
         }
         // Initialiser le formulaire d'ajout
         setEditingTransaction({
@@ -314,10 +320,7 @@ export default function Transactions({
     initializeData();
   }, []);
   
-  // Log transactions changes
-  useEffect(() => {
-    console.log('Transactions updated:', transactions.length, 'transactions');
-  }, [transactions]);
+  // Removed transaction logging effect to reduce unnecessary updates
 
   const handleSave = async () => {
     if (!editingTransaction) return;
@@ -1140,6 +1143,21 @@ export default function Transactions({
   };
 
   // Réinitialiser la pagination et recharger quand les filtres ou la banque changent
+  // useEffect pour charger les transactions quand les filtres changent
+  // Mais avec une référence stable pour éviter les boucles infinies
+  const filtersRef = useRef(filters);
+  const selectedBankRef = useRef(selectedBank);
+  const pageNameRef = useRef(pageName);
+  
+  useEffect(() => {
+    // Mettre à jour les refs quand les valeurs changent
+    filtersRef.current = filters;
+    selectedBankRef.current = selectedBank;
+    pageNameRef.current = pageName;
+  }, [filters, selectedBank, pageName]);
+  
+  // Effet séparé pour le chargement des données
+  // Ne dépend que de refs stables pour éviter les boucles infinies
   useEffect(() => {
     const fetchWithFilters = async () => {
       setLoading(true);
@@ -1147,12 +1165,13 @@ export default function Transactions({
         setPage(1);
         setHasMore(true);
         // Mettre à jour les filtres dans le store pour cette page
-        setPageFilter(pageName, filters);
+        setPageFilter(pageNameRef.current, filtersRef.current);
         // Charger les transactions avec les filtres et le nom de la page
         await loadTransactions({
-          searchText: filters.searchText,
-          categoryId: filters.categoryId,
-          pageName
+          searchText: filtersRef.current.searchText,
+          categoryId: filtersRef.current.categoryId,
+          pageName: pageNameRef.current,
+          limit: ITEMS_PER_PAGE // Ajouter la limite pour la pagination
         });
         
         // Note: startDate, endDate et checked sont gérés dans le store mais pas directement
@@ -1165,8 +1184,9 @@ export default function Transactions({
     };
 
     fetchWithFilters();
+    // Pas de dépendances ici pour n'exécuter qu'une seule fois
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters, selectedBank, pageName]);
+  }, []);
   
   const handleSearch = () => {
     const newFilters = { ...filters, searchText: searchInput };

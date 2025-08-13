@@ -60,7 +60,8 @@ router.get('/', async (req, res) => {
       console.log('🔍 Recherche description (normalisée sans accents):', normalizedSearch);
       console.log('🔍 Recherche description (avec accents possibles):', searchWithAccents);
     }
-    console.log('🔍 Filtre where:', JSON.stringify(where));
+    // Removed excessive logging
+    // console.log('🔍 Filtre where:', JSON.stringify(where));
     
     // Forcer le rechargement - incluant image pour les banques
     const transactions = await prisma.transaction.findMany({
@@ -93,10 +94,7 @@ router.get('/', async (req, res) => {
       skip: offset ? parseInt(offset as string) : undefined
     });
     
-    // Debug: log the first transaction bank to see what fields are returned
-    if (transactions.length > 0) {
-      console.log('🔍 DEBUG - Premier bank d\'une transaction:', JSON.stringify(transactions[0].bank, null, 2));
-    }
+    // Removed debug logging of first transaction bank to reduce log spam
     
     res.json(transactions);
   } catch (error) {
@@ -219,32 +217,11 @@ router.post('/', async (req, res) => {
       }
     }
     
-    // Auto-assign category based on keywords if not provided
+    // Auto-assign category based on keywords if not provided - DISABLED (schema doesn't support keywords)
+    // Keywords functionality is currently disabled as the schema doesn't include the categoryKeyword table
     let assignedCategoryId: string | null = categoryId || null;
-    if (!assignedCategoryId && description) {
-      try {
-        const allKeywords = await prisma.categoryKeyword.findMany({
-          select: { value: true, categoryId: true }
-        });
-        const rulesByCategory: Record<string, string[]> = {};
-        for (const k of allKeywords) {
-          const v = (k.value || '').toLowerCase().trim();
-          if (!v) continue;
-          if (!rulesByCategory[k.categoryId]) rulesByCategory[k.categoryId] = [];
-          rulesByCategory[k.categoryId].push(v);
-        }
-        const desc = (description || '').toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        outer: for (const [cid, kws] of Object.entries(rulesByCategory)) {
-          for (const kw of kws) {
-            const kwNorm = kw.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            if (desc.includes(kwNorm)) { assignedCategoryId = cid; break outer; }
-          }
-        }
-      } catch (e) {
-        console.error('Auto-assign on create failed:', e);
-      }
-    }
+    // The auto-assignment based on keywords is disabled
+    // If needed in the future, implement category assignment logic here
 
     // Préparer les données à envoyer à Prisma
     const transactionData = {

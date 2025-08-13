@@ -26,6 +26,8 @@ function App() {
       try {
         await loadUsers();
         await loadCategories();
+        // Only load transactions when the app initializes
+        // We'll use the modified loadTransactions function which has caching
         await loadTransactions();
         await loadBudgets();
         await loadDashboardOverview();
@@ -35,7 +37,7 @@ function App() {
     };
 
     initializeApp();
-  }, [loadUsers, loadCategories, loadTransactions, loadBudgets, loadDashboardOverview]);
+  }, [loadUsers, loadCategories, loadBudgets, loadDashboardOverview]); // Removed loadTransactions from dependencies
 
   return (
     <Router>
