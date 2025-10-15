@@ -217,9 +217,9 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* Main content */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
-          <div className="py-6">
-            <div className="max-w-full mx-auto px-4 sm:px-6 md:px-8">
+        <main className="flex-1 relative z-0 flex flex-col focus:outline-none">
+          <div className="flex-1 flex flex-col pt-[40px]">
+            <div className="flex-1 w-full px-[40px] flex flex-col">
               {children}
             </div>
           </div>

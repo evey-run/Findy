@@ -54,7 +54,6 @@ router.get('/overview', async (req, res) => {
       periodEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
     }
     
-    console.log(`Using period: ${periodStart.toISOString()} to ${periodEnd.toISOString()}`);
     
     // Revenus vs Dépenses par type de compte
     const [incomeSum, expenseSum, currentAccountIncome, currentAccountExpense, savingsAccountIncome, investmentAccountExpense] = await Promise.all([

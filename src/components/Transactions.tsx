@@ -1213,7 +1213,7 @@ export default function Transactions({
   };
 
   return (
-    <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
+    <div className="flex flex-col h-full space-y-6" style={{ backgroundColor: '#202427' }}>
       <style>{`
         /* Forcer le style du selecteur de banque dans la section filtre */
         select[name="bank-filter-select"] {
@@ -1229,7 +1229,7 @@ export default function Transactions({
         }
       `}</style>
       {/* Header */}
-      <div className="md:flex md:items-center md:justify-between">
+      <div className="md:flex md:items-center md:justify-between mt-0">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             Transactions
@@ -1238,7 +1238,7 @@ export default function Transactions({
             Gérez toutes vos transactions et opérations bancaires
           </p>
         </div>
-        <div className="mt-4 flex gap-3 md:mt-0 md:ml-4">
+        <div className="flex gap-3 md:mt-0">
           <button
             onClick={() => setShowBulkEditModal(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"

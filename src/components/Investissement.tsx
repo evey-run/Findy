@@ -1531,12 +1531,14 @@ export default function Investissement() {
   
   // Rendu du composant
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full pb-6">
       <div className="flex flex-col space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
-          <h1 className="text-2xl font-bold text-white">Investissements</h1>
-          
-          <div className="flex space-x-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">Investissements</h2>
+            <p className="text-sm text-gray-300 mt-1">Suivez et gérez vos investissements et leurs opérations associées</p>
+          </div>
+          <div className="flex space-x-2 md:mt-0">
             <button
               onClick={handleOpenImportModal}
               className="px-3 py-2 text-sm font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"

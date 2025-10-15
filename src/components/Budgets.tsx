@@ -295,7 +295,7 @@ export default function Budgets() {
 
   return (
     <div className="min-h-screen custom-scrollbar" style={{ backgroundColor: '#202427' }}>
-      <div className="space-y-6 p-6">
+      <div className="space-y-6 pb-6">
         {/* Header */}
         <div className="md:flex md:items-center md:justify-between">
           <div className="flex-1 min-w-0">

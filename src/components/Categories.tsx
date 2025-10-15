@@ -456,7 +456,7 @@ export default function Categories() {
         const newKeywords = (updatedCategory.keywords || []).map((k: string) => k.toLowerCase().trim());
         const added = newKeywords.filter((k: string) => !prevKeywords.includes(k));
         if (added.length > 0) {
-          const confirmApply = window.confirm(`Appliquer ${added.length} nouveau(x) mot(s)-clé(s) aux allTransactions existantes ?`);
+          const confirmApply = window.confirm(`Appliquer ${added.length} nouveau(x) mot(s)-clé(s) aux transactions existantes ?`);
           if (confirmApply) {
             await applyKeywordsToExisting(updatedCategory.id, false);
           }
@@ -567,7 +567,7 @@ export default function Categories() {
 
         // Proposer d'appliquer immédiatement les mots-clés de la nouvelle catégorie
         if ((newCategory.keywords || []).length > 0) {
-          const confirmApply = window.confirm('Appliquer ces mots-clés aux allTransactions existantes non catégorisées ?');
+          const confirmApply = window.confirm('Appliquer ces mots-clés aux transactions existantes non catégorisées ?');
           if (confirmApply) {
             await applyKeywordsToExisting(newCategory.id, false);
           }
@@ -596,7 +596,7 @@ export default function Categories() {
   }
 
   return (
-    <div className="space-y-6 min-h-screen p-6" style={{ backgroundColor: '#202427' }}>
+    <div className="space-y-6 min-h-screen pb-6" style={{ backgroundColor: '#202427' }}>
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
@@ -604,7 +604,7 @@ export default function Categories() {
             Catégories & Budgets
           </h2>
           <p className="text-sm text-gray-300 mt-1">
-            Gérez vos catégories de allTransactions et leurs budgets associés
+            Gérez vos catégories de transactions et leurs budgets associés
           </p>
         </div>
         <div className="mt-4 md:mt-0 md:ml-4 flex items-center">
@@ -1123,7 +1123,7 @@ export default function Categories() {
                       <div>
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-sm font-medium text-gray-300">
-                            Dernières allTransactions
+                            Dernières transactions
                           </p>
                           <span className="text-gray-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
                             &gt;
