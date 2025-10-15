@@ -420,9 +420,17 @@ export const useAppStore = create<AppState>()(
       },
       
       appendTransactions: (newTransactions: Transaction[]) =>
-        set((state) => ({
-          transactions: [...state.transactions, ...newTransactions]
-        })),
+        set((state) => {
+          // Filtrer les transactions qui n'existent pas déjà pour éviter les doublons
+          const existingIds = new Set(state.transactions.map(t => t.id));
+          const uniqueNewTransactions = newTransactions.filter(t => !existingIds.has(t.id));
+          
+          console.log('📝 appendTransactions - existing:', state.transactions.length, 'new:', newTransactions.length, 'unique new:', uniqueNewTransactions.length);
+          
+          return {
+            transactions: [...state.transactions, ...uniqueNewTransactions]
+          };
+        }),
       
       // Budgets
       budgets: [],

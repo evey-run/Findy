@@ -164,6 +164,7 @@ export default function Transactions({
     addTransaction,
     loadMoreTransactions,
     appendTransactions,
+    setTransactions,
     pageFilters,
     setPageFilter
   } = useAppStore();
@@ -268,6 +269,10 @@ export default function Transactions({
     const initializeData = async () => {
       setLoading(true);
       try {
+        // Initialiser les états de pagination pour le scroll infini
+        setPage(1);
+        setHasMore(true);
+        
         // Récupérer le paramètre de recherche depuis l'URL
         const searchParams = new URLSearchParams(location.search);
         const searchFromURL = searchParams.get('search');
@@ -278,6 +283,9 @@ export default function Transactions({
           loadBanks()
         ]);
         
+        // Load initial transactions with proper pagination info
+        console.log('🚀 Initial data load with pagination');
+        
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
           setSearchInput(searchFromURL);
@@ -286,20 +294,27 @@ export default function Transactions({
           setFilters(newFilters);
           // Sauvegarder les filtres dans le store pour cette page
           setPageFilter(pageName, newFilters);
-          // Charger les transactions avec le filtre de recherche et pagination
-          await loadTransactions({ 
-            searchText: searchFromURL, 
-            pageName,
-            limit: ITEMS_PER_PAGE // Use pagination to improve performance
-          });
-        } else {
-          // Chargement normal sans filtre ou avec les filtres spécifiques à la page
-          // avec pagination pour améliorer les performances
-          await loadTransactions({ 
-            pageName,
-            limit: ITEMS_PER_PAGE // Use pagination to improve performance
-          });
         }
+        
+        // Use loadTransactions for initial load but with limit for pagination
+        await loadTransactions({ 
+          searchText: searchFromURL || undefined,
+          pageName,
+          limit: ITEMS_PER_PAGE
+        });
+        
+        // Get the current state after loading to check transaction count
+        const currentState = useAppStore.getState();
+        const loadedCount = currentState.transactions.length;
+        console.log('📦 Initial load result:', { transactionsCount: loadedCount, expectedLimit: ITEMS_PER_PAGE });
+        
+        // Set hasMore based on whether we got a full page of results
+        const hasMoreData = loadedCount >= ITEMS_PER_PAGE;
+        setHasMore(hasMoreData);
+        
+        // Force a check for infinite scroll after initial load
+        console.log('🔄 Initial scroll check - hasMore:', hasMoreData, 'loadedCount:', loadedCount, 'ITEMS_PER_PAGE:', ITEMS_PER_PAGE);
+        
         // Initialiser le formulaire d'ajout
         setEditingTransaction({
           id: '',
@@ -1010,20 +1025,28 @@ export default function Transactions({
 
   // Fonction pour charger plus de transactions
   const loadMoreData = async () => {
-    if (loadingMore || !hasMore) return;
+    console.log('🔄 loadMoreData called - loadingMore:', loadingMore, 'hasMore:', hasMore, 'page:', page);
+    if (loadingMore || !hasMore) {
+      console.log('🚫 loadMoreData blocked - loadingMore:', loadingMore, 'hasMore:', hasMore);
+      return;
+    }
     
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
+      console.log('📡 Loading page:', nextPage, 'with filters:', { searchText: filters.searchText, categoryId: filters.categoryId, pageName });
       const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE, {
         searchText: filters.searchText,
         categoryId: filters.categoryId,
         pageName
       });
       
+      console.log('📦 Received result:', { newTransactionsCount: result.newTransactions.length, hasMore: result.hasMore });
+      
       if (result.newTransactions.length > 0) {
         appendTransactions(result.newTransactions);
         setPage(nextPage);
+        console.log('✅ Page updated to:', nextPage);
       }
       
       setHasMore(result.hasMore);
@@ -1037,9 +1060,14 @@ export default function Transactions({
   // Fonction de détection du scroll
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
     
-    // Si on est proche du bas (100px), charger plus de données
-    if (scrollHeight - scrollTop <= clientHeight + 100) {
+    console.log('📜 Scroll detected:', { scrollTop, scrollHeight, clientHeight, distanceFromBottom, distanceType: typeof distanceFromBottom });
+    
+    // Si on est proche du bas (4500px), charger plus de données
+    console.log('🔍 Checking condition: distanceFromBottom <=', 4500, ':', distanceFromBottom <= 4500, '- distanceFromBottom:', distanceFromBottom);
+    if (distanceFromBottom <= 4500) {
+      console.log('🎯 Near bottom, triggering loadMoreData - hasMore:', hasMore, 'loadingMore:', loadingMore, 'page:', page);
       loadMoreData();
     }
   };
@@ -1156,37 +1184,8 @@ export default function Transactions({
     pageNameRef.current = pageName;
   }, [filters, selectedBank, pageName]);
   
-  // Effet séparé pour le chargement des données
-  // Ne dépend que de refs stables pour éviter les boucles infinies
-  useEffect(() => {
-    const fetchWithFilters = async () => {
-      setLoading(true);
-      try {
-        setPage(1);
-        setHasMore(true);
-        // Mettre à jour les filtres dans le store pour cette page
-        setPageFilter(pageNameRef.current, filtersRef.current);
-        // Charger les transactions avec les filtres et le nom de la page
-        await loadTransactions({
-          searchText: filtersRef.current.searchText,
-          categoryId: filtersRef.current.categoryId,
-          pageName: pageNameRef.current,
-          limit: ITEMS_PER_PAGE // Ajouter la limite pour la pagination
-        });
-        
-        // Note: startDate, endDate et checked sont gérés dans le store mais pas directement
-        // passés à loadTransactions car son interface ne les supporte pas encore
-      } catch (error) {
-        console.error('Error loading transactions with filters:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWithFilters();
-    // Pas de dépendances ici pour n'exécuter qu'une seule fois
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Note: fetchWithFilters useEffect removed to avoid conflicts with initializeData
+  // All initialization is now handled by the initializeData useEffect
   
   const handleSearch = () => {
     const newFilters = { ...filters, searchText: searchInput };

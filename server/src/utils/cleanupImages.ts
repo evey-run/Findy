@@ -12,12 +12,8 @@ export async function cleanupUnusedImages() {
   const uploadsDir = path.join(process.cwd(), 'public/uploads');
   
   try {
-    console.log('🧹 Nettoyage des images non utilisées...');
-    console.log(`Dossier uploads: ${uploadsDir}`);
-    
     // Vérifier si le dossier uploads existe
     if (!fs.existsSync(uploadsDir)) {
-      console.log('Le dossier uploads n\'existe pas. Création du dossier...');
       fs.mkdirSync(uploadsDir, { recursive: true });
       return;
     }
@@ -53,7 +49,6 @@ export async function cleanupUnusedImages() {
       if (user.avatar) {
         const filename = extractFilename(user.avatar);
         usedImages.add(filename);
-        console.log(`Image utilisée (avatar): ${filename}`);
       }
     });
     
@@ -61,12 +56,8 @@ export async function cleanupUnusedImages() {
       if (bank.image) {
         const filename = extractFilename(bank.image);
         usedImages.add(filename);
-        console.log(`Image utilisée (bank): ${filename}`);
       }
     });
-    
-    // Afficher toutes les images utilisées pour le débogage
-    console.log(`Images utilisées: ${Array.from(usedImages).join(', ')}`);
     
     // Fonction récursive pour traiter les fichiers et dossiers
     function processDirectory(directory: string): number {
@@ -91,12 +82,10 @@ export async function cleanupUnusedImages() {
         // Vérifier si le fichier est utilisé
         // On doit comparer le chemin relatif au dossier uploads
         const relativePath = path.relative(uploadsDir, itemPath);
-        console.log(`Vérification de ${relativePath}`);
         
         if (!usedImages.has(relativePath)) {
           // Supprimer le fichier
           fs.unlinkSync(itemPath);
-          console.log(`Suppression de ${itemPath}`);
           deletedCount++;
         }
       }
