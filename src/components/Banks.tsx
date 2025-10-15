@@ -506,7 +506,7 @@ export default function Banks() {
   const bankStats = calculateBankStats();
   
   return (
-    <div className="space-y-6 min-h-screen pb-6" style={{ backgroundColor: '#202427' }}>
+    <div className="space-y-6 min-h-screen pb-[40px]" style={{ backgroundColor: '#202427' }}>
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">

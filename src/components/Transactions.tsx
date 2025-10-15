@@ -1213,7 +1213,7 @@ export default function Transactions({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-6" style={{ backgroundColor: '#202427' }}>
+    <div className="flex flex-col h-full space-y-6 pb-[40px]" style={{ backgroundColor: '#202427' }}>
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between mt-0">
         <div className="flex-1 min-w-0">

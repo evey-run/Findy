@@ -596,7 +596,7 @@ export default function Categories() {
   }
 
   return (
-    <div className="space-y-6 min-h-screen pb-6" style={{ backgroundColor: '#202427' }}>
+    <div className="space-y-6 min-h-screen pb-[40px]" style={{ backgroundColor: '#202427' }}>
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">

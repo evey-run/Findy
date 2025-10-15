@@ -35,6 +35,8 @@ function classNames(...classes: string[]) {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
+  const pathname = (location?.pathname || '').toLowerCase();
+  const lockScroll = pathname.startsWith('/dashboard') || pathname.startsWith('/transactions') || pathname.startsWith('/investissement') || pathname.startsWith('/investissements');
   const { users, selectedUser, setSelectedUser } = useAppStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -216,7 +218,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className={lockScroll ? "flex flex-col flex-1 overflow-hidden" : "flex flex-col flex-1 overflow-auto"}>
         <main className="flex-1 relative z-0 flex flex-col focus:outline-none">
           <div className="flex-1 flex flex-col pt-[40px]">
             <div className="flex-1 w-full px-[40px] flex flex-col">

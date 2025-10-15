@@ -1531,7 +1531,7 @@ export default function Investissement() {
   
   // Rendu du composant
   return (
-    <div className="w-full pb-6">
+    <div className="w-full pb-[40px]">
       <div className="flex flex-col space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
           <div className="flex-1 min-w-0">
