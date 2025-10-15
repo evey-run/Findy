@@ -1214,20 +1214,6 @@ export default function Transactions({
 
   return (
     <div className="flex flex-col h-full space-y-6" style={{ backgroundColor: '#202427' }}>
-      <style>{`
-        /* Forcer le style du selecteur de banque dans la section filtre */
-        select[name="bank-filter-select"] {
-          background-color: #1f2226 !important;
-          color: #fff !important;
-          min-height: 2.5rem !important;
-          border: none !important;
-          padding: 0.5rem 0.75rem !important;
-          font-weight: 500 !important;
-          appearance: none !important;
-          -webkit-appearance: none !important;
-          -moz-appearance: none !important;
-        }
-      `}</style>
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between mt-0">
         <div className="flex-1 min-w-0">
@@ -1272,6 +1258,21 @@ export default function Transactions({
           </button>
         </div>
       </div>
+
+      <style>{`
+        /* Forcer le style du selecteur de banque dans la section filtre */
+        select[name="bank-filter-select"] {
+          background-color: #1f2226 !important;
+          color: #fff !important;
+          min-height: 2.5rem !important;
+          border: none !important;
+          padding: 0.5rem 0.75rem !important;
+          font-weight: 500 !important;
+          appearance: none !important;
+          -webkit-appearance: none !important;
+          -moz-appearance: none !important;
+        }
+      `}</style>
 
       {/* Filters */}
       <div className="shadow rounded-lg p-6" style={{ backgroundColor: '#272a2f' }}>

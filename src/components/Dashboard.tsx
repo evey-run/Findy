@@ -443,6 +443,9 @@ export default function Dashboard() {
           <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             Tableau de bord
           </h2>
+          <p className="text-sm text-gray-300 mt-1">
+            Suivez vos soldes, dépenses, revenus et tendances en un coup d'œil
+          </p>
           {selectedUser && (
             <p className="mt-1 text-sm text-gray-400">
               Vue de {selectedUser.name}
