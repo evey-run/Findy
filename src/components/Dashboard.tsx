@@ -446,11 +446,6 @@ export default function Dashboard() {
           <p className="text-sm text-gray-300 mt-1">
             Suivez vos soldes, dépenses, revenus et tendances en un coup d'œil
           </p>
-          {selectedUser && (
-            <p className="mt-1 text-sm text-gray-400">
-              Vue de {selectedUser.name}
-            </p>
-          )}
         </div>
         
         {/* Navigation et sélecteur de période */}
@@ -631,7 +626,7 @@ export default function Dashboard() {
         <div className="lg:col-span-4 shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
           <div className="px-6 py-6 sm:p-8">
             <h3 className="text-sm font-medium text-gray-300 mb-4">
-              Tricount
+              Impayés
             </h3>
             <div className="flow-root">
               {/* Données fictives pour Tricount */}
