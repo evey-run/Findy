@@ -1176,6 +1176,11 @@ export default function Transactions({
   const filtersRef = useRef(filters);
   const selectedBankRef = useRef(selectedBank);
   const pageNameRef = useRef(pageName);
+
+  // Ne pas sélectionner de banque par défaut sur la page Transactions
+  useEffect(() => {
+    setSelectedBank(null);
+  }, []);
   
   useEffect(() => {
     // Mettre à jour les refs quand les valeurs changent
