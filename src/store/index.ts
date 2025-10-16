@@ -42,8 +42,8 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number }) => Promise<void>;
-  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   loadAllTransactions: (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; pageName?: string }) => Promise<void>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
@@ -290,13 +290,16 @@ export const useAppStore = create<AppState>()(
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
       
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => {
         // Create a unique key for this request based on the options
         const requestKey = JSON.stringify({
           categoryId: options?.categoryId || null,
           bankId: options?.forceIgnoreSelectedBank ? null : get().selectedBank?.id,
           accountType: options?.accountType || null,
           searchText: options?.searchText || null,
+          startDate: options?.startDate || null,
+          endDate: options?.endDate || null,
+          checked: options?.checked || null,
           pageName: options?.pageName || null,
           limit: options?.limit || null
         });
@@ -342,6 +345,19 @@ export const useAppStore = create<AppState>()(
             params.append('search', options.searchText);
           }
           
+          // Ajouter les filtres de dates si fournis
+          if (options?.startDate && options.startDate !== '') {
+            params.append('startDate', options.startDate);
+          }
+          if (options?.endDate && options.endDate !== '') {
+            params.append('endDate', options.endDate);
+          }
+          
+          // Ajouter le filtre checked (pointé) si fourni
+          if (options?.checked && options.checked !== '') {
+            params.append('checked', options.checked);
+          }
+          
           // Add pagination limit to reduce initial data load
           // Default to 50 items if not specified
           const limit = options?.limit || 50;
@@ -363,7 +379,7 @@ export const useAppStore = create<AppState>()(
         }
       },
        
-      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string }) => {
+      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -373,12 +389,18 @@ export const useAppStore = create<AppState>()(
           const offset = Math.max(0, (page - 1) * itemsPerPage);
           params.append('offset', offset.toString());
           
-          // Ajouter les filtres de dates
-          if (state.dateRange.startDate && state.dateRange.startDate !== '') {
-            params.append('startDate', state.dateRange.startDate);
+          // Ajouter les filtres de dates depuis les options (priorité) ou depuis l'état global
+          const startDate = options?.startDate || state.dateRange.startDate;
+          const endDate = options?.endDate || state.dateRange.endDate;
+          if (startDate && startDate !== '') {
+            params.append('startDate', startDate);
           }
-          if (state.dateRange.endDate && state.dateRange.endDate !== '') {
-            params.append('endDate', state.dateRange.endDate);
+          if (endDate && endDate !== '') {
+            params.append('endDate', endDate);
+          }
+          // Ajouter le filtre checked si fourni
+          if (options?.checked && options.checked !== '') {
+            params.append('checked', options.checked);
           }
           // Ajouter le filtre de banque si une banque est sélectionnée
           // et si on ne force pas l'ignorance de ce filtre
@@ -432,8 +454,16 @@ export const useAppStore = create<AppState>()(
           
           console.log('📝 appendTransactions - existing:', state.transactions.length, 'new:', newTransactions.length, 'unique new:', uniqueNewTransactions.length);
           
+          // Fusionner et trier par date décroissante pour maintenir l'ordre cohérent
+          const allTransactions = [...state.transactions, ...uniqueNewTransactions];
+          allTransactions.sort((a, b) => {
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return dateB - dateA; // Tri décroissant (les plus récentes en premier)
+          });
+          
           return {
-            transactions: [...state.transactions, ...uniqueNewTransactions]
+            transactions: allTransactions
           };
         }),
       

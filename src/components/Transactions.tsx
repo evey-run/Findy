@@ -286,19 +286,39 @@ export default function Transactions({
         // Load initial transactions with proper pagination info
         console.log('🚀 Initial data load with pagination');
         
+        // Récupérer les filtres sauvegardés pour cette page
+        const pageSpecificFilters = pageFilters?.[pageName];
+        let activeFilters = { ...filters };
+        
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
           setSearchInput(searchFromURL);
-          // Mettre à jour les filtres affichés
-          const newFilters = { ...filters, searchText: searchFromURL };
-          setFilters(newFilters);
-          // Sauvegarder les filtres dans le store pour cette page
-          setPageFilter(pageName, newFilters);
+          activeFilters = { ...activeFilters, searchText: searchFromURL };
+        } else if (pageSpecificFilters) {
+          // Utiliser les filtres sauvegardés s'il n'y a pas de recherche dans l'URL
+          // Note: Les dates et checked ne sont pas restaurés pour qu'ils se réinitialisent à chaque visite
+          activeFilters = {
+            categoryId: pageSpecificFilters.categoryId || '',
+            checked: '', // Réinitialisé à chaque visite
+            startDate: '', // Réinitialisé à chaque visite
+            endDate: '', // Réinitialisé à chaque visite
+            searchText: pageSpecificFilters.searchText || ''
+          };
+          if (pageSpecificFilters.searchText) {
+            setSearchInput(pageSpecificFilters.searchText);
+          }
         }
+        
+        // Mettre à jour les filtres dans l'état local
+        setFilters(activeFilters);
         
         // Use loadTransactions for initial load but with limit for pagination
         await loadTransactions({ 
-          searchText: searchFromURL || undefined,
+          searchText: activeFilters.searchText || undefined,
+          categoryId: activeFilters.categoryId || undefined,
+          startDate: activeFilters.startDate || undefined,
+          endDate: activeFilters.endDate || undefined,
+          checked: activeFilters.checked || undefined,
           pageName,
           limit: ITEMS_PER_PAGE
         });
@@ -562,27 +582,9 @@ export default function Transactions({
       }
     }
     
-    // Filtre par statut pointé
-    if (filters.checked !== '') {
-      // Conversion explicite en booléen pour la comparaison
-      const isChecked = filters.checked === 'true';
-      if (transaction.checked !== isChecked) {
-        return false;
-      }
-    }
-    
-    // Filtre par date de début
-    if (filters.startDate && transaction.date < filters.startDate) {
-      return false;
-    }
-    
-    // Filtre par date de fin
-    if (filters.endDate && transaction.date > filters.endDate) {
-      return false;
-    }
-    
-    // Le filtrage par recherche de texte est géré côté serveur via loadTransactions
-    // Ne pas re-filtrer ici pour permettre la recherche sur toute la base de données
+    // Les filtres par dates, statut pointé et recherche de texte sont gérés côté serveur
+    // via loadTransactions. Ne pas re-filtrer ici pour permettre la recherche sur toute
+    // la base de données et éviter un double filtrage qui donnerait zéro résultat.
     
     return true;
   });
@@ -1023,6 +1025,9 @@ export default function Transactions({
       const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE, {
         searchText: filters.searchText,
         categoryId: filters.categoryId,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        checked: filters.checked,
         pageName
       });
       
@@ -1186,6 +1191,9 @@ export default function Transactions({
       await loadTransactions({
         searchText: newFilters.searchText || undefined,
         categoryId: newFilters.categoryId || undefined,
+        startDate: newFilters.startDate || undefined,
+        endDate: newFilters.endDate || undefined,
+        checked: newFilters.checked || undefined,
         pageName,
         limit: ITEMS_PER_PAGE
       });
