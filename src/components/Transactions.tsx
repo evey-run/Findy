@@ -1412,11 +1412,8 @@ export default function Transactions({
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
                 Catégorie
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-56">
                 Banque
-              </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
-                Propriétaires
               </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
                 Montant
@@ -1484,18 +1481,6 @@ export default function Transactions({
                     );
                   })}
                 </select>
-              </td>
-              <td className="px-4 py-2">
-                <span className="text-sm text-gray-300">
-                  {editingTransaction?.bankId ? 
-                    (() => {
-                      const selectedBankObj = banks.find(b => b.id === editingTransaction.bankId);
-                      const users = selectedBankObj?.users?.map(u => u.name).filter(Boolean) || [];
-                      return users.length > 0 ? users.join(', ') : '-';
-                    })()
-                    : '-'
-                  }
-                </span>
               </td>
               <td className="px-4 py-2">
                 <input
@@ -1715,15 +1700,17 @@ export default function Transactions({
                         </div>
                       )}
                       <div className="ml-2">
-                        <div className="font-medium text-white">{transaction.bank.name}</div>
+                        <div className="font-medium text-white">
+                          {transaction.bank.name}
+                          {transaction.bank.userBanks && transaction.bank.userBanks.length > 0 && (
+                            <span className="text-xs text-gray-400 ml-2">
+                              ({transaction.bank.userBanks.map((ub: any) => ub.user?.name).filter(Boolean).join(', ')})
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300 text-center">
-                  <div className="flex justify-center">
-                    {renderUserAvatars(transaction.bank.users || [], { border: '2px solid #1f2226' })}
-                  </div>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (

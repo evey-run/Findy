@@ -71,13 +71,17 @@ router.get('/', async (req, res) => {
       where,
       include: {
         bank: {
-          select: {
-            id: true,
-            name: true,
-            shortName: true,
-            color: true,
-            image: true,
-            balance: true
+          include: {
+            userBanks: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            }
           }
         },
         category: {
