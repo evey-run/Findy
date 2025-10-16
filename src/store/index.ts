@@ -337,6 +337,11 @@ export const useAppStore = create<AppState>()(
             params.append('accountType', options.accountType);
           }
           
+          // Ajouter le filtre de recherche si fourni
+          if (options?.searchText && options.searchText.trim() !== '') {
+            params.append('search', options.searchText);
+          }
+          
           // Add pagination limit to reduce initial data load
           // Default to 50 items if not specified
           const limit = options?.limit || 50;

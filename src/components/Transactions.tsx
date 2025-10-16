@@ -581,23 +581,8 @@ export default function Transactions({
       return false;
     }
     
-    // Filtre par recherche de texte ou montant
-    if (filters.searchText) {
-      const searchLower = filters.searchText.toLowerCase();
-      const descriptionMatch = transaction.description.toLowerCase().includes(searchLower);
-      
-      // Recherche dans le montant (convertir le montant en string pour la recherche)
-      const amountStr = transaction.amount.toString();
-      const amountMatch = amountStr.includes(searchLower);
-      
-      // Recherche dans le montant formaté (ex: "123,45 €")
-      const formattedAmount = formatAmount(transaction.amount).toLowerCase();
-      const formattedAmountMatch = formattedAmount.includes(searchLower);
-      
-      if (!descriptionMatch && !amountMatch && !formattedAmountMatch) {
-        return false;
-      }
-    }
+    // Le filtrage par recherche de texte est géré côté serveur via loadTransactions
+    // Ne pas re-filtrer ici pour permettre la recherche sur toute la base de données
     
     return true;
   });
