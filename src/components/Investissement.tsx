@@ -1555,7 +1555,7 @@ export default function Investissement() {
         </div>
         
         {/* Filtres */}
-        <div className="p-4 rounded-lg" style={{ backgroundColor: '#272a2f' }}>
+        <div className="p-6 rounded-lg" style={{ backgroundColor: '#272a2f' }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300">Banque</label>
