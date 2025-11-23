@@ -217,9 +217,8 @@ export default function Investissement() {
         
         // Nous utilisons uniquement localSelectedBank pour la page Investissements
         
-        // Initialiser la banque locale avec la première banque d'investissement
-        const firstInvestmentBank = banks.find(bank => bank.accountType === 'INVESTMENT');
-        setLocalSelectedBank(firstInvestmentBank || null);
+        // Ne pas sélectionner de banque par défaut sur la page Investissements
+        setLocalSelectedBank(null);
         
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
@@ -237,13 +236,10 @@ export default function Investissement() {
         } else {
           // Chargement normal avec filtre par type de compte
           if (investmentBankIds.length > 0) {
-            // Forcer le rechargement complet des transactions d'investissement
-            // en ignorant le filtre global de banque sélectionnée
+            // Chargement initial: uniquement par type INVESTMENT, sans banque présélectionnée
             await loadTransactions({ 
               accountType: 'INVESTMENT',
-              forceIgnoreSelectedBank: true,
-              // Si une banque locale est déjà sélectionnée, l'utiliser comme filtre
-              ...(firstInvestmentBank ? { bankId: firstInvestmentBank.id } : {})
+              forceIgnoreSelectedBank: true
             } as any);
           }
         }
@@ -255,7 +251,7 @@ export default function Investissement() {
           description: '',
           date: new Date().toISOString().split('T')[0],
           checked: false,
-          bankId: firstInvestmentBank?.id || ''
+          bankId: ''
         });
       } catch (error) {
         console.error('Error initializing data:', error);
@@ -1555,7 +1551,7 @@ export default function Investissement() {
         </div>
         
         {/* Filtres */}
-        <div className="p-4 rounded-lg" style={{ backgroundColor: '#272a2f' }}>
+        <div className="p-6 rounded-lg" style={{ backgroundColor: '#272a2f' }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300">Banque</label>

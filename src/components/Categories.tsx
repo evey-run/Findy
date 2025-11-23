@@ -141,10 +141,16 @@ export default function Categories() {
   
   // Couleurs prédéfinies
   const predefinedColors = [
-    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
-    '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
-    '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-    '#ec4899', '#f43f5e', '#64748b', '#6b7280', '#374151'
+    '#54478c', // ultra-violet
+    '#2c699a', // lapis-lazuli
+    '#048ba8', // blue-munsell
+    '#0db39e', // keppel
+    '#16db93', // emerald
+    '#83e377', // light-green
+    '#b9e769', // mindaro
+    '#efea5a', // maize
+    '#f1c453', // saffron
+    '#f29e4c'  // sandy-brown
   ];
   
   // Types de catégories

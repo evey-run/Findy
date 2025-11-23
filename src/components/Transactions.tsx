@@ -286,19 +286,39 @@ export default function Transactions({
         // Load initial transactions with proper pagination info
         console.log('🚀 Initial data load with pagination');
         
+        // Récupérer les filtres sauvegardés pour cette page
+        const pageSpecificFilters = pageFilters?.[pageName];
+        let activeFilters = { ...filters };
+        
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
           setSearchInput(searchFromURL);
-          // Mettre à jour les filtres affichés
-          const newFilters = { ...filters, searchText: searchFromURL };
-          setFilters(newFilters);
-          // Sauvegarder les filtres dans le store pour cette page
-          setPageFilter(pageName, newFilters);
+          activeFilters = { ...activeFilters, searchText: searchFromURL };
+        } else if (pageSpecificFilters) {
+          // Utiliser les filtres sauvegardés s'il n'y a pas de recherche dans l'URL
+          // Note: Les dates et checked ne sont pas restaurés pour qu'ils se réinitialisent à chaque visite
+          activeFilters = {
+            categoryId: pageSpecificFilters.categoryId || '',
+            checked: '', // Réinitialisé à chaque visite
+            startDate: '', // Réinitialisé à chaque visite
+            endDate: '', // Réinitialisé à chaque visite
+            searchText: pageSpecificFilters.searchText || ''
+          };
+          if (pageSpecificFilters.searchText) {
+            setSearchInput(pageSpecificFilters.searchText);
+          }
         }
+        
+        // Mettre à jour les filtres dans l'état local
+        setFilters(activeFilters);
         
         // Use loadTransactions for initial load but with limit for pagination
         await loadTransactions({ 
-          searchText: searchFromURL || undefined,
+          searchText: activeFilters.searchText || undefined,
+          categoryId: activeFilters.categoryId || undefined,
+          startDate: activeFilters.startDate || undefined,
+          endDate: activeFilters.endDate || undefined,
+          checked: activeFilters.checked || undefined,
           pageName,
           limit: ITEMS_PER_PAGE
         });
@@ -562,42 +582,9 @@ export default function Transactions({
       }
     }
     
-    // Filtre par statut pointé
-    if (filters.checked !== '') {
-      // Conversion explicite en booléen pour la comparaison
-      const isChecked = filters.checked === 'true';
-      if (transaction.checked !== isChecked) {
-        return false;
-      }
-    }
-    
-    // Filtre par date de début
-    if (filters.startDate && transaction.date < filters.startDate) {
-      return false;
-    }
-    
-    // Filtre par date de fin
-    if (filters.endDate && transaction.date > filters.endDate) {
-      return false;
-    }
-    
-    // Filtre par recherche de texte ou montant
-    if (filters.searchText) {
-      const searchLower = filters.searchText.toLowerCase();
-      const descriptionMatch = transaction.description.toLowerCase().includes(searchLower);
-      
-      // Recherche dans le montant (convertir le montant en string pour la recherche)
-      const amountStr = transaction.amount.toString();
-      const amountMatch = amountStr.includes(searchLower);
-      
-      // Recherche dans le montant formaté (ex: "123,45 €")
-      const formattedAmount = formatAmount(transaction.amount).toLowerCase();
-      const formattedAmountMatch = formattedAmount.includes(searchLower);
-      
-      if (!descriptionMatch && !amountMatch && !formattedAmountMatch) {
-        return false;
-      }
-    }
+    // Les filtres par dates, statut pointé et recherche de texte sont gérés côté serveur
+    // via loadTransactions. Ne pas re-filtrer ici pour permettre la recherche sur toute
+    // la base de données et éviter un double filtrage qui donnerait zéro résultat.
     
     return true;
   });
@@ -1038,6 +1025,9 @@ export default function Transactions({
       const result = await loadMoreTransactions(nextPage, ITEMS_PER_PAGE, {
         searchText: filters.searchText,
         categoryId: filters.categoryId,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        checked: filters.checked,
         pageName
       });
       
@@ -1176,6 +1166,11 @@ export default function Transactions({
   const filtersRef = useRef(filters);
   const selectedBankRef = useRef(selectedBank);
   const pageNameRef = useRef(pageName);
+
+  // Ne pas sélectionner de banque par défaut sur la page Transactions
+  useEffect(() => {
+    setSelectedBank(null);
+  }, []);
   
   useEffect(() => {
     // Mettre à jour les refs quand les valeurs changent
@@ -1183,33 +1178,40 @@ export default function Transactions({
     selectedBankRef.current = selectedBank;
     pageNameRef.current = pageName;
   }, [filters, selectedBank, pageName]);
-  
-  // Note: fetchWithFilters useEffect removed to avoid conflicts with initializeData
-  // All initialization is now handled by the initializeData useEffect
-  
-  const handleSearch = () => {
-    const newFilters = { ...filters, searchText: searchInput };
+
+  // Applique les filtres côté serveur (réinitialise la pagination et recharge page 1)
+  const applyFilters = async (newFilters: typeof filters) => {
     setFilters(newFilters);
     setPageFilter(pageName, newFilters);
+
+    setPage(1);
+    setHasMore(true);
+    setLoading(true);
+    try {
+      await loadTransactions({
+        searchText: newFilters.searchText || undefined,
+        categoryId: newFilters.categoryId || undefined,
+        startDate: newFilters.startDate || undefined,
+        endDate: newFilters.endDate || undefined,
+        checked: newFilters.checked || undefined,
+        pageName,
+        limit: ITEMS_PER_PAGE
+      });
+      // Après loadTransactions, récupérer l'état courant
+      const currentState = useAppStore.getState();
+      setTransactions(currentState.transactions);
+      setHasMore((currentState.transactions?.length || 0) >= ITEMS_PER_PAGE);
+    } catch (err) {
+      console.error('Erreur lors du chargement des transactions filtrées:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Fonction pour rechercher des transactions dans le formulaire de modification en lot
-  const handleBulkSearch = async () => {
-    setBulkEditProgress(p => ({ ...p, isProcessing: true }));
-    try {
-      // Appel à l'API backend pour récupérer toutes les transactions correspondant aux filtres
-      const res = await fetch('/api/transactions/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bulkEditFilters)
-      });
-      const data = await res.json();
-      setBulkEditTransactions(data.transactions || []);
-      setBulkEditProgress(p => ({ ...p, isProcessing: false, errors: [] }));
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erreur lors de la recherche';
-      setBulkEditProgress(p => ({ ...p, isProcessing: false, errors: [msg] }));
-    }
+  // Déclenche la recherche côté serveur à partir du champ texte
+  const handleSearch = () => {
+    const newFilters = { ...filters, searchText: searchInput };
+    applyFilters(newFilters);
   };
 
   return (
@@ -1285,6 +1287,8 @@ export default function Transactions({
               onChange={(e) => {
                 const bank = banks.find(b => b.id === e.target.value);
                 setSelectedBank(bank || null);
+                // Recharger avec la nouvelle banque sélectionnée
+                applyFilters({ ...filters });
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
             >
@@ -1323,9 +1327,8 @@ export default function Transactions({
             <select
               value={filters.categoryId}
               onChange={(e) => {
-                const newFilters = {...filters, categoryId: e.target.value};
-                setFilters(newFilters);
-                setPageFilter(pageName, newFilters);
+                const newFilters = { ...filters, categoryId: e.target.value };
+                applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
@@ -1343,9 +1346,8 @@ export default function Transactions({
               type="date"
               value={filters.startDate}
               onChange={(e) => {
-                const newFilters = {...filters, startDate: e.target.value};
-                setFilters(newFilters);
-                setPageFilter(pageName, newFilters);
+                const newFilters = { ...filters, startDate: e.target.value };
+                applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
@@ -1357,9 +1359,8 @@ export default function Transactions({
               type="date"
               value={filters.endDate}
               onChange={(e) => {
-                const newFilters = {...filters, endDate: e.target.value};
-                setFilters(newFilters);
-                setPageFilter(pageName, newFilters);
+                const newFilters = { ...filters, endDate: e.target.value };
+                applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
@@ -1370,9 +1371,8 @@ export default function Transactions({
             <select
               value={filters.checked}
               onChange={(e) => {
-                const newFilters = {...filters, checked: e.target.value};
-                setFilters(newFilters);
-                setPageFilter(pageName, newFilters);
+                const newFilters = { ...filters, checked: e.target.value };
+                applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
               style={{ backgroundColor: '#1f2226' }}
@@ -1412,11 +1412,8 @@ export default function Transactions({
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
                 Catégorie
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
+              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-56">
                 Banque
-              </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
-                Propriétaires
               </th>
               <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
                 Montant
@@ -1484,18 +1481,6 @@ export default function Transactions({
                     );
                   })}
                 </select>
-              </td>
-              <td className="px-4 py-2">
-                <span className="text-sm text-gray-300">
-                  {editingTransaction?.bankId ? 
-                    (() => {
-                      const selectedBankObj = banks.find(b => b.id === editingTransaction.bankId);
-                      const users = selectedBankObj?.users?.map(u => u.name).filter(Boolean) || [];
-                      return users.length > 0 ? users.join(', ') : '-';
-                    })()
-                    : '-'
-                  }
-                </span>
               </td>
               <td className="px-4 py-2">
                 <input
@@ -1715,15 +1700,17 @@ export default function Transactions({
                         </div>
                       )}
                       <div className="ml-2">
-                        <div className="font-medium text-white">{transaction.bank.name}</div>
+                        <div className="font-medium text-white">
+                          {transaction.bank.name}
+                          {transaction.bank.userBanks && transaction.bank.userBanks.length > 0 && (
+                            <span className="text-xs text-gray-400 ml-2">
+                              ({transaction.bank.userBanks.map((ub: any) => ub.user?.name).filter(Boolean).join(', ')})
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
-                </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300 text-center">
-                  <div className="flex justify-center">
-                    {renderUserAvatars(transaction.bank.users || [], { border: '2px solid #1f2226' })}
-                  </div>
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
