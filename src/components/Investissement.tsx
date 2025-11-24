@@ -158,7 +158,7 @@ export default function Investissement() {
   const ITEMS_PER_PAGE = 50;
   
   
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
   
@@ -174,19 +174,19 @@ export default function Investissement() {
   });
 
   // États pour la modification en masse
-  const [bulkEditFilters, setBulkEditFilters] = useState({
+  const [_bulkEditFilters, _setBulkEditFilters] = useState({
     searchText: '',
     bankId: '',
     checked: '',
     startDate: '',
     endDate: ''
   });
-  const [bulkEditActions, setBulkEditActions] = useState({
+  const [_bulkEditActions, _setBulkEditActions] = useState({
     replaceText: { enabled: false, from: '', to: '', replaceAll: false },
     changeChecked: { enabled: false, checked: false },
     changeBank: { enabled: false, bankId: '' }
   });
-  const [bulkEditTransactions, setBulkEditTransactions] = useState([]);
+  const [_bulkEditTransactions, _setBulkEditTransactions] = useState([]);
 
 
   // État local pour la saisie du texte de recherche

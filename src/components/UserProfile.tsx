@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import type { User, Bank } from '../types/index.js';
+import type { Bank } from '../types/index.js';
 
 export default function UserProfile() {
-  const { selectedUser, users, banks, loadUsers, loadBanks } = useAppStore();
+  const { selectedUser, users, banks: _banks, loadUsers, loadBanks } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [userBanks, setUserBanks] = useState<Bank[]>([]);

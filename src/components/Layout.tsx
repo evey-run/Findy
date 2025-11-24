@@ -13,7 +13,7 @@ import {
   ChevronUpIcon,
   FlagIcon,
 } from '@heroicons/react/24/outline';
-import { colors, borderRadius, textSizes, spacing, commonClasses } from '../styles/commonStyles';
+import { colors, borderRadius } from '../styles/commonStyles';
 
 interface LayoutProps {
   children: ReactNode;

@@ -5,8 +5,8 @@ import type { User, Bank } from '../types/index.js';
 export default function Users() {
   const { users, loadUsers, loadBanks } = useAppStore();
   const [loading, setLoading] = useState(true);
-  const [selectedUserBanks, setSelectedUserBanks] = useState<Bank[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [_selectedUserBanks, _setSelectedUserBanks] = useState<Bank[]>([]);
+  const [selectedUserId, _setSelectedUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: ''
   });
@@ -31,36 +31,6 @@ export default function Users() {
     
     initUsers();
   }, [loadUsers, loadBanks]);
-
-  const loadUserBanks = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/users/${userId}`);
-      if (response.ok) {
-        const userData = await response.json();
-        // Transformer les données pour obtenir les banques
-        const banks = userData.userBanks.map((userBank: any) => userBank.bank);
-        setSelectedUserBanks(banks);
-      }
-    } catch (error) {
-      console.error('Error loading user banks:', error);
-    }
-  };
-
-  const handleSelectUser = (userId: string) => {
-    setSelectedUserId(userId);
-    loadUserBanks(userId);
-    // Initialiser les données du formulaire avec les données de l'utilisateur sélectionné
-    const selectedUser = users.find(u => u.id === userId);
-    if (selectedUser) {
-      setFormData({
-        name: selectedUser.name
-      });
-      setAvatarPreview(selectedUser.avatar ? `http://localhost:3001${selectedUser.avatar}` : null);
-      setAvatarFile(null);
-    }
-    setEditingId(null);
-    setEditingUser(null);
-  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -132,33 +102,6 @@ export default function Users() {
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleRemoveBankAccess = async (bankId: string, userId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir retirer l\'accès à cette banque ?')) {
-      return;
-    }
-    
-    try {
-      const response = await fetch(`/api/banks/${bankId}/share/${userId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await loadUserBanks(userId);
-        alert('Accès retiré avec succès');
-      }
-    } catch (error) {
-      console.error('Error removing bank access:', error);
-      alert('Erreur lors du retrait d\'accès');
-    }
-  };
-
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
   };
 
   if (loading) {

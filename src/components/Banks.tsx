@@ -116,10 +116,11 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
 };
 
 // Définition de l'interface User pour éviter les erreurs de typage
-interface User {
-  id: string;
-  name: string;
-}
+// Note: Currently unused but kept for future use
+// interface User {
+//   id: string;
+//   name: string;
+// }
 
 export default function Banks() {
   const { banks, transactions, loadBanks, loadTransactions, selectedUser, users, loadUsers } = useAppStore();

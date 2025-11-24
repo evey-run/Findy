@@ -113,11 +113,11 @@ export default function Categories() {
   const { 
     categories, 
     budgets,
-    transactions,
+    transactions: _transactions,
     allTransactions,
     loadCategories, 
     loadBudgets,
-    loadTransactions,
+    loadTransactions: _loadTransactions,
     loadAllTransactions,
     loadUsers,
     addCategory, 
@@ -125,8 +125,7 @@ export default function Categories() {
     removeCategory,
     addBudget,
     updateBudget,
-    removeBudget,
-    updateTransaction 
+    removeBudget
   } = useAppStore();
   
   const [loading, setLoading] = useState(true);
@@ -283,44 +282,6 @@ export default function Categories() {
       style: 'currency',
       currency: 'EUR'
     }).format(amount);
-  };
-
-  // Auto-assign uncategorized allTransactions based on category keywords
-  const autoAssignCategories = async () => {
-    try {
-      const rules = categories
-        .filter(c => c.keywords && c.keywords.length > 0)
-        .map(c => ({
-          categoryId: c.id,
-          keywords: (c.keywords || [])
-            .map(k => k.toLowerCase().trim())
-            .filter(Boolean)
-        }));
-
-      if (rules.length === 0) return;
-
-      const txToUpdate = allTransactions.filter(t => !t.categoryId && t.description);
-      for (const t of txToUpdate) {
-        const desc = (t.description || '').toLowerCase();
-        const match = rules.find(r => r.keywords.some(k => desc.includes(k)));
-        if (match) {
-          try {
-            const response = await fetch(`/api/allTransactions/${t.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ categoryId: match.categoryId })
-            });
-            if (response.ok) {
-              updateTransaction(t.id, { categoryId: match.categoryId });
-            }
-          } catch (e) {
-            console.error('Failed to auto-assign transaction', t.id, e);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Auto-assign categories failed:', e);
-    }
   };
 
   // Appeler l'API backend pour appliquer les mots-clés d'une catégorie
@@ -711,8 +672,6 @@ export default function Categories() {
 
               const size = 520;
               const radius = 200;
-              const strokeW = 48;
-              const circumference = 2 * Math.PI * radius;
               let angleOffset = 0; // in radians
 
               // Ordonner par budget décroissant pour lisibilité

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
-import { Bank, User } from '../types';
+import type { Bank } from '../types';
 
 type FormData = {
   name: string;
@@ -27,7 +27,7 @@ type BankWithUsers = Bank & {
 export default function Banks() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBank, setEditingBank] = useState<BankWithUsers | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [_imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [archivedBanks, setArchivedBanks] = useState<BankWithUsers[]>([]);
   const [showArchivedBanks, setShowArchivedBanks] = useState(false);
@@ -119,16 +119,6 @@ export default function Banks() {
   };
 
   // Form handlers
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       name: '',
@@ -187,7 +177,7 @@ export default function Banks() {
     setEditingBank(bank);
     setFormData({
       name: bank.name,
-      shortName: bank.shortName,
+      shortName: bank.shortName || '',
       iban: bank.iban || '',
       balance: bank.balance,
       accountType: bank.accountType as 'CURRENT' | 'SAVINGS' | 'INVESTMENT',
@@ -385,7 +375,6 @@ export default function Banks() {
           // Cartes des banques avec design moderne
           activeBanks.map((bank) => {
             const accountInfo = getAccountTypeInfo(bank.accountType);
-            const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
             
             return (
               <div key={bank.id}>

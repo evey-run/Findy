@@ -4,17 +4,6 @@ import type { Bank } from '../types';
 import Papa from 'papaparse';
 import { useLocation } from 'react-router-dom';
 
-// CSS pour les cellules éditables
-const editableCellStyle = `
-  .editable-cell {
-    position: relative;
-    transition: background-color 0.15s;
-  }
-  .editable-cell:hover {
-    background-color: #23272b;
-  }
-`;
-
 // Styles pour la barre de scroll personnalisée
 const scrollbarStyles = `
   /* Webkit browsers (Chrome, Safari, Edge) */
@@ -142,13 +131,13 @@ interface TransactionsProps {
 
 export default function Transactions({ 
   pageName = 'transactions', 
-  showHeader = true, 
-  showFilters = true, 
-  showPagination = true, 
-  showActions = true, 
-  limit = 0, 
-  height = 'auto', 
-  className = '' 
+  showHeader: _showHeader = true, 
+  showFilters: _showFilters = true, 
+  showPagination: _showPagination = true, 
+  showActions: _showActions = true, 
+  limit: _limit = 0, 
+  height: _height = 'auto', 
+  className: _className = '' 
 }: TransactionsProps) {
   const { 
     transactions, 
@@ -198,7 +187,7 @@ export default function Transactions({
   // Vérifie si tous les utilisateurs sont sélectionnés (selectedUser est null)
   // const allUsersSelected = selectedUser === null;
   
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
   
@@ -230,7 +219,7 @@ export default function Transactions({
     changeChecked: { enabled: false, checked: false },
     changeBank: { enabled: false, bankId: '' }
   });
-  const [bulkEditTransactions, setBulkEditTransactions] = useState([]);
+  const [_bulkEditTransactions, _setBulkEditTransactions] = useState([]);
   const [bulkEditProgress, setBulkEditProgress] = useState({
     isProcessing: false,
     processed: 0,
@@ -589,77 +578,6 @@ export default function Transactions({
     return true;
   });
 
-  // Fonction pour afficher les avatars des utilisateurs
-  const renderUserAvatars = (users: any[], style?: React.CSSProperties) => {
-    if (!users || users.length === 0) return <span className="text-gray-400">-</span>;
-    return (
-      <div className="flex -space-x-2">
-        {users.map((user, index) => (
-          <div key={user.id || index} className="relative group">
-            {user.avatar ? (
-              <img
-                src={user.avatar}
-                alt={user.name}
-                className="inline-block h-8 w-8 rounded-full object-cover"
-                title={user.name}
-                style={{ border: '2px solid #1f2226', ...style }}
-              />
-            ) : (
-              <div
-                className="inline-block h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-medium"
-                title={user.name}
-                style={{ border: '2px solid #1f2226', ...style }}
-              >
-                {user.name?.charAt(0)?.toUpperCase() || '?'}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  // Fonction pour obtenir les transactions concernées par la modification en lot
-  const getBulkEditTargetTransactions = () => {
-    return transactions.filter(transaction => {
-      // Filtre par recherche de texte
-      if (bulkEditFilters.searchText && !transaction.description.toLowerCase().includes(bulkEditFilters.searchText.toLowerCase())) {
-        return false;
-      }
-      
-      // Filtre par catégorie
-      if (bulkEditFilters.categoryId) {
-        if (bulkEditFilters.categoryId === 'undefined') {
-          if (transaction.categoryId) return false;
-        } else {
-          if (transaction.categoryId !== bulkEditFilters.categoryId) return false;
-        }
-      }
-      
-      // Filtre par banque
-      if (bulkEditFilters.bankId && transaction.bankId !== bulkEditFilters.bankId) {
-        return false;
-      }
-      
-      // Filtre par statut pointé
-      if (bulkEditFilters.checked !== '' && transaction.checked.toString() !== bulkEditFilters.checked) {
-        return false;
-      }
-      
-      // Filtre par date de début
-      if (bulkEditFilters.startDate && transaction.date < bulkEditFilters.startDate) {
-        return false;
-      }
-      
-      // Filtre par date de fin
-      if (bulkEditFilters.endDate && transaction.date > bulkEditFilters.endDate) {
-        return false;
-      }
-      
-      return true;
-    });
-  };
-
   // Fonction pour appliquer les modifications en lot
   const handleBulkEdit = async () => {
     // Vérifier qu'au moins une action est activée
@@ -761,9 +679,6 @@ export default function Transactions({
       return;
     }
     
-    // Récupérer la banque sélectionnée pour l'import
-    const selectedImportBank = banks.find(bank => bank.id === importBankId);
-
     setImportProgress({
       isImporting: true,
       imported: 0,
@@ -1702,9 +1617,9 @@ export default function Transactions({
                       <div className="ml-2">
                         <div className="font-medium text-white">
                           {transaction.bank.name}
-                          {transaction.bank.userBanks && transaction.bank.userBanks.length > 0 && (
+                          {transaction.bank.users && transaction.bank.users.length > 0 && (
                             <span className="text-xs text-gray-400 ml-2">
-                              ({transaction.bank.userBanks.map((ub: any) => ub.user?.name).filter(Boolean).join(', ')})
+                              ({transaction.bank.users.map((u) => u.name).filter(Boolean).join(', ')})
                             </span>
                           )}
                         </div>
