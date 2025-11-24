@@ -15,14 +15,14 @@
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
     "@prisma/client": "^6.11.1",
     "@tailwindcss/forms": "^0.5.10",
     "@tauri-apps/api": "^2.9.0",
-    "@tauri-apps/cli": "^2.9.4",
     "@types/multer": "^2.0.0",
     "@types/papaparse": "^5.3.16",
     "@types/uuid": "^10.0.0",
@@ -46,6 +46,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
+    "@tauri-apps/cli": "^2.9.4",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.13",
