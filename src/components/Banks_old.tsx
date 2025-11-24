@@ -470,7 +470,7 @@ export default function Banks() {
                       <p className="text-green-100 text-sm font-medium">Solde Total</p>
                       <p className="text-3xl font-bold">
                         {new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(
-                          visibleBanks.reduce((sum: number, bank) => sum + bank.balance, 0)
+                          visibleBanks.reduce((sum, bank) => sum + bank.balance, 0)
                         )}
                       </p>
                     </div>
