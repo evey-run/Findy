@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Bars3Icon, ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-const NAV_ITEMS = ['Home', 'Services', 'Reviews', 'Contact us'];
+const NAV_ITEMS = [
+  { label: 'Home', href: '#home' },
+  { label: 'Services', href: '#services', withChevron: true },
+  { label: 'Reviews', href: '#reviews' },
+  { label: 'Contact us', href: '#contact' },
+];
 
 export default function HeroLanding() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -27,15 +32,16 @@ export default function HeroLanding() {
 
           <div className="hidden items-center gap-8 md:flex">
             {NAV_ITEMS.map((item) => (
-              <button
-                key={item}
+              <a
+                key={item.label}
+                href={item.href}
                 className="font-['Manrope'] text-[14px] font-medium text-white transition-opacity hover:opacity-80"
               >
                 <span className="inline-flex items-center gap-1">
-                  {item}
-                  {item === 'Services' && <ChevronDownIcon className="h-4 w-4" />}
+                  {item.label}
+                  {item.withChevron && <ChevronDownIcon className="h-4 w-4" />}
                 </span>
-              </button>
+              </a>
             ))}
           </div>
 
@@ -71,13 +77,14 @@ export default function HeroLanding() {
 
           <div className="mt-12 flex flex-1 flex-col gap-7">
             {NAV_ITEMS.map((item) => (
-              <button
-                key={item}
+              <a
+                key={item.label}
+                href={item.href}
                 className="text-left font-['Manrope'] text-[24px] font-medium text-white"
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                {item}
-              </button>
+                {item.label}
+              </a>
             ))}
           </div>
 

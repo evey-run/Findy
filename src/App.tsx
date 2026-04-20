@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { useAppStore } from './store';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -11,6 +11,16 @@ import Banks from './components/Banks';
 import Users from './components/Users';
 import { Toaster } from 'react-hot-toast';
 import HeroLanding from './components/HeroLanding';
+
+function AppLayout() {
+  return (
+    <div className="min-h-screen bg-gray-900">
+      <Layout>
+        <Outlet />
+      </Layout>
+    </div>
+  );
+}
 
 function App() {
   const { 
@@ -44,25 +54,16 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<HeroLanding />} />
-        <Route
-          path="*"
-          element={
-            <div className="min-h-screen bg-gray-900">
-              <Layout>
-                <Routes>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/transactions" element={<Transactions />} />
-                  <Route path="/investissement" element={<Investissement />} />
-                  <Route path="/categories" element={<Categories />} />
-                  <Route path="/budgets" element={<Budgets />} />
-                  <Route path="/banks" element={<Banks />} />
-                  <Route path="/users" element={<Users />} />
-                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
-                </Routes>
-              </Layout>
-            </div>
-          }
-        />
+        <Route element={<AppLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/transactions" element={<Transactions />} />
+          <Route path="/investissement" element={<Investissement />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/budgets" element={<Budgets />} />
+          <Route path="/banks" element={<Banks />} />
+          <Route path="/users" element={<Users />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster 
         position="top-right"
