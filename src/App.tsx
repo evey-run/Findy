@@ -10,6 +10,7 @@ import Budgets from './components/Budgets';
 import Banks from './components/Banks';
 import Users from './components/Users';
 import { Toaster } from 'react-hot-toast';
+import HeroLanding from './components/HeroLanding';
 
 function App() {
   const { 
@@ -41,30 +42,38 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-900">
-        <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/investissement" element={<Investissement />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/budgets" element={<Budgets />} />
-            <Route path="/banks" element={<Banks />} />
-            <Route path="/users" element={<Users />} />
-          </Routes>
-        </Layout>
-        <Toaster 
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-          }}
+      <Routes>
+        <Route path="/" element={<HeroLanding />} />
+        <Route
+          path="*"
+          element={
+            <div className="min-h-screen bg-gray-900">
+              <Layout>
+                <Routes>
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/transactions" element={<Transactions />} />
+                  <Route path="/investissement" element={<Investissement />} />
+                  <Route path="/categories" element={<Categories />} />
+                  <Route path="/budgets" element={<Budgets />} />
+                  <Route path="/banks" element={<Banks />} />
+                  <Route path="/users" element={<Users />} />
+                  <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                </Routes>
+              </Layout>
+            </div>
+          }
         />
-      </div>
+      </Routes>
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+        }}
+      />
     </Router>
   );
 }
