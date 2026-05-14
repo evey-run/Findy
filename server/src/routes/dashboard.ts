@@ -1,21 +1,23 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
+import { validate } from '../middlewares/validate';
+import { OverviewQuery, MonthlyTrendsQuery, BudgetStatusQuery } from '../schemas/dashboard';
+import type { z } from 'zod';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET /api/dashboard/overview - Vue d'ensemble pour le tableau de bord
-router.get('/overview', async (req, res) => {
+router.get('/overview', validate({ query: OverviewQuery }), async (req, res) => {
   try {
-    const { userId, startDate, endDate } = req.query;
-    
-    const dateFilter: any = {};
-    if (startDate || endDate) {
-      if (startDate) dateFilter.gte = new Date(startDate as string);
-      if (endDate) dateFilter.lte = new Date(endDate as string);
-    }
-    
-    const userFilter = userId ? { userId: userId as string } : {};
+    const { userId, startDate, endDate } = req.query as unknown as z.infer<typeof OverviewQuery>;
+
+    const dateFilter: Prisma.DateTimeFilter = {};
+    if (startDate) dateFilter.gte = startDate;
+    if (endDate) dateFilter.lte = endDate;
+
+    const userFilter = userId ? { userId } : {};
     const transactionWhere = {
       ...userFilter,
       ...(Object.keys(dateFilter).length > 0 && { date: dateFilter })
@@ -189,49 +191,53 @@ router.get('/overview', async (req, res) => {
       upcomingRecurrences
     });
   } catch (error) {
-    console.error('Error fetching dashboard overview:', error);
+    logger.error({ err: error }, 'Error fetching dashboard overview');
     res.status(500).json({ error: 'Failed to fetch dashboard overview' });
   }
 });
 
 // GET /api/dashboard/monthly-trends - Tendances mensuelles
-router.get('/monthly-trends', async (req, res) => {
+router.get('/monthly-trends', validate({ query: MonthlyTrendsQuery }), async (req, res) => {
   try {
-    const { userId, months = 6 } = req.query;
-    
-    const monthsBack = parseInt(months as string);
+    const { userId, months } = req.query as unknown as z.infer<typeof MonthlyTrendsQuery>;
+    const monthsBack = months ?? 6;
+
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - monthsBack);
     startDate.setDate(1);
     startDate.setHours(0, 0, 0, 0);
-    
-    const userFilter = userId ? { userId: userId as string } : {};
-    
+
+    // Filtrage par utilisateur via la table de jointure user_banks (paramétré)
+    const userClause = userId
+      ? Prisma.sql`AND t.bankId IN (SELECT bankId FROM user_banks WHERE userId = ${userId})`
+      : Prisma.empty;
+
     const monthlyData = await prisma.$queryRaw`
-      SELECT 
-        strftime('%Y-%m', date) as month,
-        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as income,
-        SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) as expenses,
+      SELECT
+        strftime('%Y-%m', t.date) as month,
+        SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END) as income,
+        SUM(CASE WHEN t.amount < 0 THEN ABS(t.amount) ELSE 0 END) as expenses,
         COUNT(*) as transactionCount
-      FROM transactions 
-      WHERE date >= ${startDate}
-        ${userId ? `AND userId = '${userId}'` : ''}
-      GROUP BY strftime('%Y-%m', date)
+      FROM transactions t
+      WHERE t.date >= ${startDate}
+        ${userClause}
+      GROUP BY strftime('%Y-%m', t.date)
       ORDER BY month ASC
     `;
-    
+
     res.json(monthlyData);
   } catch (error) {
-    console.error('Error fetching monthly trends:', error);
+    logger.error({ err: error }, 'Error fetching monthly trends');
     res.status(500).json({ error: 'Failed to fetch monthly trends' });
   }
 });
 
 // GET /api/dashboard/budget-status - Statut des budgets
-router.get('/budget-status', async (req, res) => {
+router.get('/budget-status', validate({ query: BudgetStatusQuery }), async (req, res) => {
   try {
-    const { userId } = req.query;
-    
+    const { userId } = req.query as unknown as z.infer<typeof BudgetStatusQuery>;
+
+
     const currentDate = new Date();
     const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
@@ -280,7 +286,7 @@ router.get('/budget-status', async (req, res) => {
     
     res.json(budgetStatus);
   } catch (error) {
-    console.error('Error fetching budget status:', error);
+    logger.error({ err: error }, 'Error fetching budget status');
     res.status(500).json({ error: 'Failed to fetch budget status' });
   }
 });

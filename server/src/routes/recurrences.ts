@@ -1,18 +1,26 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
+import { validate } from '../middlewares/validate';
+import { IdParam } from '../schemas/common';
+import {
+  ListRecurrencesQuery,
+  CreateRecurrenceBody,
+  UpdateRecurrenceBody,
+} from '../schemas/recurrences';
+import type { z } from 'zod';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
-// GET /api/recurrences - Récupérer toutes les récurrences
-router.get('/', async (req, res) => {
+// GET /api/recurrences
+router.get('/', validate({ query: ListRecurrencesQuery }), async (req, res) => {
   try {
-    const { bankId, categoryId, active } = req.query;
-    
-    const where: any = {};
+    const { bankId, categoryId, active } = req.query as unknown as z.infer<typeof ListRecurrencesQuery>;
+    const where: Prisma.RecurrenceWhereInput = {};
     if (bankId) where.bankId = bankId;
     if (categoryId) where.categoryId = categoryId;
-    if (active !== undefined) where.active = active === 'true';
+    if (active !== undefined) where.active = active;
     
     const recurrences = await prisma.recurrence.findMany({
       where,
@@ -43,31 +51,25 @@ router.get('/', async (req, res) => {
     
     res.json(recurrences);
   } catch (error) {
-    console.error('Error fetching recurrences:', error);
+    logger.error({ err: error }, 'Error fetching recurrences');
     res.status(500).json({ error: 'Failed to fetch recurrences' });
   }
 });
 
-// POST /api/recurrences - Créer une nouvelle récurrence
-router.post('/', async (req, res) => {
+// POST /api/recurrences
+router.post('/', validate({ body: CreateRecurrenceBody }), async (req, res) => {
   try {
-    const { amount, frequency, nextDue, description, bankId, categoryId, active } = req.body;
-    
-    if (!amount || !nextDue || !description || !categoryId) {
-      return res.status(400).json({ 
-        error: 'Amount, nextDue, description, and categoryId are required' 
-      });
-    }
-    
+    const body = req.body as z.infer<typeof CreateRecurrenceBody>;
+
     const recurrence = await prisma.recurrence.create({
       data: {
-        amount: parseFloat(amount),
-        frequency: frequency || 'MONTHLY',
-        nextDue: new Date(nextDue),
-        description,
-        active: active !== false,
-        bankId: bankId || null,
-        categoryId
+        amount: body.amount,
+        frequency: body.frequency ?? 'MONTHLY',
+        nextDue: new Date(body.nextDue),
+        description: body.description,
+        active: body.active !== false,
+        bankId: body.bankId ?? null,
+        categoryId: body.categoryId,
       },
       include: {
         bank: {
@@ -93,25 +95,27 @@ router.post('/', async (req, res) => {
     
     res.status(201).json(recurrence);
   } catch (error) {
-    console.error('Error creating recurrence:', error);
+    logger.error({ err: error }, 'Error creating recurrence');
     res.status(500).json({ error: 'Failed to create recurrence' });
   }
 });
 
-// PUT /api/recurrences/:id - Mettre à jour une récurrence
-router.put('/:id', async (req, res) => {
+// PUT /api/recurrences/:id
+router.put('/:id', validate({ params: IdParam, body: UpdateRecurrenceBody }), async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, frequency, nextDue, description, active } = req.body;
-    
+    const body = req.body as z.infer<typeof UpdateRecurrenceBody>;
+
     const recurrence = await prisma.recurrence.update({
       where: { id },
       data: {
-        ...(amount && { amount: parseFloat(amount) }),
-        ...(frequency && { frequency }),
-        ...(nextDue && { nextDue: new Date(nextDue) }),
-        ...(description && { description }),
-        ...(active !== undefined && { active })
+        ...(body.amount !== undefined ? { amount: body.amount } : {}),
+        ...(body.frequency !== undefined ? { frequency: body.frequency } : {}),
+        ...(body.nextDue !== undefined ? { nextDue: new Date(body.nextDue) } : {}),
+        ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.active !== undefined ? { active: body.active } : {}),
+        ...(body.bankId !== undefined ? { bankId: body.bankId } : {}),
+        ...(body.categoryId !== undefined ? { categoryId: body.categoryId } : {}),
       },
       include: {
         bank: {
@@ -136,36 +140,31 @@ router.put('/:id', async (req, res) => {
     });
     
     res.json(recurrence);
-  } catch (error: any) {
-    console.error('Error updating recurrence:', error);
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return res.status(404).json({ error: 'Recurrence not found' });
     }
+    logger.error({ err: error }, 'Error updating recurrence');
     res.status(500).json({ error: 'Failed to update recurrence' });
   }
 });
 
-// DELETE /api/recurrences/:id - Supprimer une récurrence
-router.delete('/:id', async (req, res) => {
+// DELETE /api/recurrences/:id
+router.delete('/:id', validate({ params: IdParam }), async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    await prisma.recurrence.delete({
-      where: { id }
-    });
-    
+    await prisma.recurrence.delete({ where: { id: req.params.id } });
     res.status(204).send();
-  } catch (error: any) {
-    console.error('Error deleting recurrence:', error);
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return res.status(404).json({ error: 'Recurrence not found' });
     }
+    logger.error({ err: error }, 'Error deleting recurrence');
     res.status(500).json({ error: 'Failed to delete recurrence' });
   }
 });
 
-// POST /api/recurrences/:id/execute - Exécuter une récurrence (créer la transaction)
-router.post('/:id/execute', async (req, res) => {
+// POST /api/recurrences/:id/execute
+router.post('/:id/execute', validate({ params: IdParam }), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -244,7 +243,7 @@ router.post('/:id/execute', async (req, res) => {
       transaction
     });
   } catch (error) {
-    console.error('Error executing recurrence:', error);
+    logger.error({ err: error }, 'Error executing recurrence');
     res.status(500).json({ error: 'Failed to execute recurrence' });
   }
 });
@@ -281,13 +280,13 @@ router.post('/process', async (req, res) => {
       }
     });
     
-    const results: any[] = [];
+    const results: Array<{ recurrence: unknown; transaction: unknown; success: boolean; error?: string }> = [];
     
     for (const recurrence of dueRecurrences) {
       try {
         // Vérifier que la récurrence a une banque associée
         if (!recurrence.bankId) {
-          console.warn(`Skipping recurrence ${recurrence.id} - no bank associated`);
+          logger.warn(`Skipping recurrence ${recurrence.id} - no bank associated`);
           continue;
         }
         
@@ -352,7 +351,7 @@ router.post('/process', async (req, res) => {
           success: true
         });
       } catch (error) {
-        console.error(`Error processing recurrence ${recurrence.id}:`, error);
+        logger.error({ err: error }, `Error processing recurrence ${recurrence.id}:`);
         results.push({
           recurrence,
           transaction: null,
@@ -369,7 +368,7 @@ router.post('/process', async (req, res) => {
       results
     });
   } catch (error) {
-    console.error('Error processing recurrences:', error);
+    logger.error({ err: error }, 'Error processing recurrences');
     res.status(500).json({ error: 'Failed to process recurrences' });
   }
 });

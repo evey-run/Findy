@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
 
 /**
  * Nettoie les images non utilisées du dossier uploads
@@ -8,9 +9,8 @@ import { PrismaClient } from '@prisma/client';
  * dans la base de données (User.avatar et Bank.image)
  */
 export async function cleanupUnusedImages() {
-  const prisma = new PrismaClient();
   const uploadsDir = path.join(process.cwd(), 'public/uploads');
-  
+
   try {
     // Vérifier si le dossier uploads existe
     if (!fs.existsSync(uploadsDir)) {
@@ -96,10 +96,10 @@ export async function cleanupUnusedImages() {
     // Lancer le traitement récursif
     const deletedCount = processDirectory(uploadsDir);
     
-    console.log(`🗑️ ${deletedCount} images non utilisées supprimées.`);
+    if (deletedCount > 0) {
+      logger.info({ deletedCount }, 'Unused images cleaned up');
+    }
   } catch (error) {
-    console.error('Erreur lors du nettoyage des images:', error);
-  } finally {
-    await prisma.$disconnect();
+    logger.error({ err: error }, 'Error cleaning up unused images');
   }
 }

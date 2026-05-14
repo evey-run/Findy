@@ -1,8 +1,11 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
+import { validate } from '../middlewares/validate';
+import { IdParam } from '../schemas/common';
+import { CreateObjectiveBody, UpdateObjectiveBody } from '../schemas/objectives';
+import type { z } from 'zod';
 
 const router = express.Router();
 
@@ -14,13 +17,13 @@ router.get('/', async (req, res) => {
     });
     res.json(objectives);
   } catch (error) {
-    console.error('Error fetching objectives:', error);
+    logger.error({ err: error }, 'Error fetching objectives');
     res.status(500).json({ error: 'Failed to fetch objectives' });
   }
 });
 
 // Récupérer un objectif spécifique
-router.get('/:id', async (req, res) => {
+router.get('/:id', validate({ params: IdParam }), async (req, res) => {
   try {
     const objective = await prisma.objective.findUnique({
       where: { id: req.params.id }
@@ -30,13 +33,13 @@ router.get('/:id', async (req, res) => {
     }
     res.json(objective);
   } catch (error) {
-    console.error('Error fetching objective:', error);
+    logger.error({ err: error }, 'Error fetching objective');
     res.status(500).json({ error: 'Failed to fetch objective' });
   }
 });
 
 // Récupérer la progression d'un objectif
-router.get('/:id/progress', async (req, res) => {
+router.get('/:id/progress', validate({ params: IdParam }), async (req, res) => {
   try {
     const objective = await prisma.objective.findUnique({
       where: { id: req.params.id }
@@ -94,80 +97,66 @@ router.get('/:id/progress', async (req, res) => {
       recentTransactions
     });
   } catch (error) {
-    console.error('Error fetching objective progress:', error);
+    logger.error({ err: error }, 'Error fetching objective progress');
     res.status(500).json({ error: 'Failed to fetch objective progress' });
   }
 });
 
 // Créer un nouvel objectif
-router.post('/', async (req, res) => {
+router.post('/', validate({ body: CreateObjectiveBody }), async (req, res) => {
   try {
-    const { title, description, targetAmount, deadline, icon } = req.body;
-    
-    if (!title || !targetAmount) {
-      return res.status(400).json({ error: 'Title and target amount are required' });
-    }
-
-    const id = uuidv4();
-    const now = new Date().toISOString();
+    const body = req.body as z.infer<typeof CreateObjectiveBody>;
+    const now = new Date();
 
     const newObjective = await prisma.objective.create({
       data: {
-        id,
-        title,
-        description: description || '',
-        targetAmount: parseFloat(targetAmount),
-        deadline: deadline ? new Date(deadline) : null,
-        isCompleted: false,
-        createdAt: new Date(now),
-        updatedAt: new Date(now)
-      }
+        id: uuidv4(),
+        title: body.title,
+        description: body.description ?? '',
+        targetAmount: body.targetAmount,
+        deadline: body.deadline ? new Date(body.deadline) : null,
+        isCompleted: body.isCompleted ?? false,
+        createdAt: now,
+        updatedAt: now,
+      },
     });
     res.status(201).json(newObjective);
   } catch (error) {
-    console.error('Error creating objective:', error);
+    logger.error({ err: error }, 'Error creating objective');
     res.status(500).json({ error: 'Failed to create objective' });
   }
 });
 
 // Mettre à jour un objectif
-router.put('/:id', async (req, res) => {
+router.put('/:id', validate({ params: IdParam, body: UpdateObjectiveBody }), async (req, res) => {
   try {
-    const { title, description, targetAmount, deadline, icon } = req.body;
+    const body = req.body as z.infer<typeof UpdateObjectiveBody>;
     const { id } = req.params;
-    
-    if (!title || !targetAmount) {
-      return res.status(400).json({ error: 'Title and target amount are required' });
-    }
 
-    const objective = await prisma.objective.findUnique({
-      where: { id }
-    });
-    if (!objective) {
-      return res.status(404).json({ error: 'Objective not found' });
-    }
-
-    const now = new Date().toISOString();
+    const objective = await prisma.objective.findUnique({ where: { id } });
+    if (!objective) return res.status(404).json({ error: 'Objective not found' });
 
     const updatedObjective = await prisma.objective.update({
       where: { id },
       data: {
-        title,
-        description: description || '',
-        targetAmount: parseFloat(targetAmount),
-        deadline: deadline ? new Date(deadline) : null,
-        updatedAt: new Date(now)
-      }
+        ...(body.title !== undefined ? { title: body.title } : {}),
+        ...(body.description !== undefined ? { description: body.description ?? '' } : {}),
+        ...(body.targetAmount !== undefined ? { targetAmount: body.targetAmount } : {}),
+        ...(body.deadline !== undefined
+          ? { deadline: body.deadline ? new Date(body.deadline) : null }
+          : {}),
+        ...(body.isCompleted !== undefined ? { isCompleted: body.isCompleted } : {}),
+      },
     });
     res.json(updatedObjective);
   } catch (error) {
-    console.error('Error updating objective:', error);
+    logger.error({ err: error }, 'Error updating objective');
     res.status(500).json({ error: 'Failed to update objective' });
   }
 });
 
 // Supprimer un objectif
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validate({ params: IdParam }), async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -183,7 +172,7 @@ router.delete('/:id', async (req, res) => {
     });
     res.json({ message: 'Objective deleted successfully' });
   } catch (error) {
-    console.error('Error deleting objective:', error);
+    logger.error({ err: error }, 'Error deleting objective');
     res.status(500).json({ error: 'Failed to delete objective' });
   }
 });

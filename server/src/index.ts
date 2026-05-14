@@ -1,11 +1,17 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import multer from 'multer';
+import { prisma } from './lib/prisma';
+import { logger } from './lib/logger';
 import { cleanupUnusedImages } from './utils/cleanupImages';
+import { purgeExpiredSessions } from './lib/auth';
+import { requireUser } from './middlewares/requireUser';
 
 // Routes
+import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import bankRoutes from './routes/banks';
 import categoryRoutes from './routes/categories';
@@ -18,7 +24,6 @@ import objectiveRoutes from './routes/objectives';
 dotenv.config();
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -27,28 +32,52 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+app.use(cookieParser());
 
-// Serve static files (images)
-app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+// Serve static files (images) — durcissement des headers pour bloquer l'inline d'éventuel HTML/SVG.
+app.use(
+  '/uploads',
+  express.static(path.join(process.cwd(), 'public/uploads'), {
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'");
+      res.setHeader('Cross-Origin-Resource-Policy', 'same-site');
+    },
+  }),
+);
 
-// Routes
-app.use('/api/users', userRoutes);
-app.use('/api/banks', bankRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/budgets', budgetRoutes);
-app.use('/api/recurrences', recurrenceRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/objectives', objectiveRoutes);
-
-// Health check
+// Health check (public)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Finance Tracker API is running!' });
 });
 
+// Auth routes (public)
+app.use('/api/auth', authRoutes);
+
+// Routes protégées — toutes nécessitent une session valide
+app.use('/api/users', requireUser, userRoutes);
+app.use('/api/banks', requireUser, bankRoutes);
+app.use('/api/categories', requireUser, categoryRoutes);
+app.use('/api/transactions', requireUser, transactionRoutes);
+app.use('/api/budgets', requireUser, budgetRoutes);
+app.use('/api/recurrences', requireUser, recurrenceRoutes);
+app.use('/api/dashboard', requireUser, dashboardRoutes);
+app.use('/api/objectives', requireUser, objectiveRoutes);
+
+// Multer error handler (file too large, etc.) — placé avant le 500 générique
+app.use((err: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'File too large (max 5 MB)' });
+    }
+    return res.status(400).json({ error: `Upload error: ${err.code}` });
+  }
+  next(err);
+});
+
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error(err.stack);
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ err }, 'Unhandled error');
   res.status(500).json({ error: 'Something went wrong!' });
 });
 
@@ -59,17 +88,18 @@ app.use((req, res) => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  logger.info('SIGTERM received, shutting down gracefully');
   await prisma.$disconnect();
   process.exit(0);
 });
 
 app.listen(PORT, async () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Finance Tracker API ready!`);
-  
+  logger.info({ port: PORT }, 'Finance Tracker API ready');
+
   // Nettoyer les images non utilisées au démarrage
   await cleanupUnusedImages();
+  // Purger les sessions expirées
+  await purgeExpiredSessions();
 });
 
 export { prisma };

@@ -1,134 +1,100 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { prisma } from '../lib/prisma';
+import { logger } from '../lib/logger';
+import { validate } from '../middlewares/validate';
+import { IdParam } from '../schemas/common';
+import { ListBudgetsQuery, CreateBudgetBody, UpdateBudgetBody } from '../schemas/budgets';
+import type { z } from 'zod';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
-// GET /api/budgets - Récupérer tous les budgets
-router.get('/', async (req, res) => {
+const CATEGORY_SELECT = { id: true, name: true, type: true, color: true, icon: true } as const;
+
+// GET /api/budgets
+router.get('/', validate({ query: ListBudgetsQuery }), async (req, res) => {
   try {
-    const { categoryId, shared } = req.query;
-    
-    const where: any = {};
+    const { categoryId, shared } = req.query as unknown as z.infer<typeof ListBudgetsQuery>;
+    const where: Prisma.BudgetWhereInput = {};
     if (categoryId) where.categoryId = categoryId;
-    if (shared !== undefined) where.shared = shared === 'true';
-    
+    if (shared !== undefined) where.shared = shared;
+
     const budgets = await prisma.budget.findMany({
       where,
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            color: true,
-            icon: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
+      include: { category: { select: CATEGORY_SELECT } },
+      orderBy: { createdAt: 'desc' },
     });
-    
+
     res.json(budgets);
   } catch (error) {
-    console.error('Error fetching budgets:', error);
+    logger.error({ err: error }, 'Error fetching budgets');
     res.status(500).json({ error: 'Failed to fetch budgets' });
   }
 });
 
-// POST /api/budgets - Créer un nouveau budget
-router.post('/', async (req, res) => {
+// POST /api/budgets
+router.post('/', validate({ body: CreateBudgetBody }), async (req, res) => {
   try {
-    const { amount, period, startDate, shared, categoryId } = req.body;
-    
-    if (!amount || !categoryId) {
-      return res.status(400).json({ 
-        error: 'Amount and categoryId are required' 
-      });
-    }
-    
+    const body = req.body as z.infer<typeof CreateBudgetBody>;
+
     const budget = await prisma.budget.create({
       data: {
-        amount: parseFloat(amount),
-        period: period || 'MONTHLY',
-        startDate: startDate ? new Date(startDate) : new Date(),
-        shared: shared || false,
-        categoryId
+        amount: body.amount,
+        period: body.period ?? 'MONTHLY',
+        startDate: body.startDate ? new Date(body.startDate) : new Date(),
+        shared: body.shared ?? false,
+        categoryId: body.categoryId,
+        bankId: body.bankId ?? null,
       },
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            color: true,
-            icon: true
-          }
-        }
-      }
+      include: { category: { select: CATEGORY_SELECT } },
     });
-    
+
     res.status(201).json(budget);
   } catch (error) {
-    console.error('Error creating budget:', error);
+    logger.error({ err: error }, 'Error creating budget');
     res.status(500).json({ error: 'Failed to create budget' });
   }
 });
 
-// PUT /api/budgets/:id - Mettre à jour un budget
-router.put('/:id', async (req, res) => {
+// PUT /api/budgets/:id
+router.put('/:id', validate({ params: IdParam, body: UpdateBudgetBody }), async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, period, startDate, shared } = req.body;
-    
+    const body = req.body as z.infer<typeof UpdateBudgetBody>;
+
     const budget = await prisma.budget.update({
       where: { id },
       data: {
-        ...(amount && { amount: parseFloat(amount) }),
-        ...(period && { period }),
-        ...(startDate && { startDate: new Date(startDate) }),
-        ...(shared !== undefined && { shared })
+        ...(body.amount !== undefined ? { amount: body.amount } : {}),
+        ...(body.period !== undefined ? { period: body.period } : {}),
+        ...(body.startDate !== undefined ? { startDate: new Date(body.startDate) } : {}),
+        ...(body.shared !== undefined ? { shared: body.shared } : {}),
+        ...(body.bankId !== undefined ? { bankId: body.bankId } : {}),
+        ...(body.categoryId !== undefined ? { categoryId: body.categoryId } : {}),
       },
-      include: {
-        category: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            color: true,
-            icon: true
-          }
-        }
-      }
+      include: { category: { select: CATEGORY_SELECT } },
     });
-    
+
     res.json(budget);
-  } catch (error: any) {
-    console.error('Error updating budget:', error);
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return res.status(404).json({ error: 'Budget not found' });
     }
+    logger.error({ err: error }, 'Error updating budget');
     res.status(500).json({ error: 'Failed to update budget' });
   }
 });
 
-// DELETE /api/budgets/:id - Supprimer un budget
-router.delete('/:id', async (req, res) => {
+// DELETE /api/budgets/:id
+router.delete('/:id', validate({ params: IdParam }), async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    await prisma.budget.delete({
-      where: { id }
-    });
-    
+    await prisma.budget.delete({ where: { id: req.params.id } });
     res.status(204).send();
-  } catch (error: any) {
-    console.error('Error deleting budget:', error);
-    if (error.code === 'P2025') {
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
       return res.status(404).json({ error: 'Budget not found' });
     }
+    logger.error({ err: error }, 'Error deleting budget');
     res.status(500).json({ error: 'Failed to delete budget' });
   }
 });

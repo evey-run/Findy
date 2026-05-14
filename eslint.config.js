@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { globalIgnores } from 'eslint/config'
 
 export default tseslint.config([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'server/dist', 'node_modules']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -18,6 +18,19 @@ export default tseslint.config([
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
+    },
+    rules: {
+      // Bannir console.log et console.debug, autoriser warn/error pour les vrais cas
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+  // Côté serveur: tolère node globals
+  {
+    files: ['server/**/*.ts', 'prisma/**/*.ts'],
+    languageOptions: { globals: { ...globals.node } },
+    rules: {
+      // Côté serveur on a un logger pino - aucun console.* ne devrait passer
+      'no-console': 'error',
     },
   },
 ])
