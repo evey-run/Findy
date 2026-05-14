@@ -757,8 +757,6 @@ export default function Investissement() {
                   }
                 }
                 
-                console.log(`🔍 Ligne ${i + 1} - Date: "${dateValue}", Description: "${descriptionValue}", Montant: "${amountValue}"`);
-                
                 // Si description absente, essayer de la construire à partir de type/title/project/comment
                 if (!descriptionValue) {
                   const typeVal = normalizedRow['type'] || normalizedRow['operation'] || normalizedRow['category'];
@@ -887,14 +885,9 @@ export default function Investissement() {
                 continue;
               }
               
-              console.log(`📝 Creating transaction ${i + 1}:`, transactionData);
-              console.log(`🔍 DEBUG - unitPrice: ${transactionData.unitPrice}, type: ${typeof transactionData.unitPrice}`);
-              console.log(`🔍 DEBUG - quantity: ${transactionData.quantity}, type: ${typeof transactionData.quantity}`);
-              
               // Sérialiser les données pour l'API
               const jsonData = JSON.stringify(transactionData);
-              console.log(`🔍 DEBUG - JSON envoyé à l'API:`, jsonData);
-              
+
               // Appel API pour créer la transaction
               const response = await fetch('/api/transactions', {
                 method: 'POST',
@@ -1208,7 +1201,6 @@ export default function Investissement() {
             const price = parseFloat(String(priceValue).replace(/[^0-9.-]/g, '').replace(',', '.'));
             const qty = parseFloat(String(quantityValue).replace(/[^0-9.-]/g, '').replace(',', '.'));
             amountValue = price * qty;
-            console.log(`Calculated amount from price (${price}) * quantity (${qty}) = ${amountValue}`);
           } catch (e) {
             console.warn('Failed to calculate amount from price and quantity:', e);
           }
@@ -1469,8 +1461,6 @@ export default function Investissement() {
       
       // Créer la description avec uniquement le nom et l'ISIN (sans quantité ni prix)
       const description = `${name} (${isin})`;
-      
-      console.log(`CSV import: Création transaction pour ${name}, unitPrice=${lastPrice}, quantity=${quantity}`);
       
       // Créer la transaction
       return {

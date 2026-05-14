@@ -892,7 +892,6 @@ export default function Transactions({
                 }
               }
               
-              console.log(`🔍 Ligne ${i + 1} - Date: "${dateValue}", Description: "${descriptionValue}", Montant: "${amountValue}"`);
               
               if (!dateValue || !descriptionValue || amountValue === undefined) {
                 const missingFields = [];

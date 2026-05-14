@@ -165,8 +165,6 @@ export default function Budgets() {
         deadline: formData.deadline || null
       };
 
-      console.log('Sending objective data:', objectiveData); // Debug log
-
       const response = await fetch(`/api/objectives/${editingObjective.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -213,8 +211,6 @@ export default function Budgets() {
         targetAmount: parseFloat(formData.targetAmount),
         deadline: formData.deadline || null
       };
-
-      console.log('Creating objective with data:', objectiveData); // Debug log
 
       const response = await fetch('/api/objectives', {
         method: 'POST',

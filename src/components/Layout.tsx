@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
+import { useAuthStore } from '../store/auth';
 import { useState, useEffect, useRef } from 'react';
 import {
   HomeIcon,
@@ -31,6 +32,22 @@ const navigation = [
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(' ');
+}
+
+function LogoutButton() {
+  const { user, logout } = useAuthStore();
+  if (!user) return null;
+  return (
+    <div className="px-4 pb-4">
+      <button
+        onClick={() => logout()}
+        className="w-full text-left text-sm text-gray-400 hover:text-white transition-colors px-2 py-2 rounded hover:bg-white/5"
+        title={`Connecté en tant que ${user.email ?? user.name}`}
+      >
+        Se déconnecter
+      </button>
+    </div>
+  );
 }
 
 export default function Layout({ children }: LayoutProps) {
@@ -209,6 +226,9 @@ export default function Layout({ children }: LayoutProps) {
               );
             })}
           </nav>
+
+          {/* Bouton de déconnexion */}
+          <LogoutButton />
         </div>
       </div>
 
