@@ -140,6 +140,10 @@ npm run dev:server
 ## 🗄️ Scripts Disponibles
 
 ```bash
+# Tauri
+
+npm run tauri dev
+
 # Développement
 npm run dev              # Lance frontend + backend
 npm run dev:frontend     # Lance uniquement Vite
