@@ -4,91 +4,6 @@ import type { Bank } from '../types';
 import Papa from 'papaparse';
 import { useLocation } from 'react-router-dom';
 
-// Styles pour la barre de scroll personnalisée
-const scrollbarStyles = `
-  /* Webkit browsers (Chrome, Safari, Edge) */
-  ::-webkit-scrollbar {
-    width: 12px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #272a2f;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #6227f5;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:active {
-    background: #6227f5;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Firefox */
-  html {
-    scrollbar-width: auto;
-    scrollbar-color: #272a2f #1f2226;
-  }
-  
-  /* Styles spécifiques pour les conteneurs avec scroll */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 12px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #272a2f !important;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #6227f5 !important;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:active {
-    background: #6227f5 !important;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Force pour tous les scrollbars */
-  * {
-    scrollbar-width: auto;
-    scrollbar-color: #272a2f #1f2226;
-  }
-  
-  /* Couleur des séparateurs de lignes */
-  .divide-y > * + * {
-    border-top-color: #1f2226 !important;
-  }
-  
-  .divide-gray-600 > * + * {
-    border-top-color: #1f2226 !important;
-  }
-`;
-
-// Injecter les styles dans le document
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = scrollbarStyles;
-  if (!document.head.querySelector('style[data-scrollbar-custom]')) {
-    styleElement.setAttribute('data-scrollbar-custom', 'true');
-    document.head.appendChild(styleElement);
-  }
-}
 
 interface EditingTransaction {
   id: string;
@@ -1130,14 +1045,14 @@ export default function Transactions({
   };
 
   return (
-    <div className="flex flex-col h-full space-y-6 pb-[40px]" style={{ backgroundColor: '#202427' }}>
+    <div className="flex flex-col h-full min-h-0 gap-4">
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between mt-0">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             Transactions
           </h2>
-          <p className="text-sm text-gray-300 mt-1">
+          <p className="text-sm text-zinc-300 mt-1">
             Gérez toutes vos transactions et opérations bancaires
           </p>
         </div>
@@ -1145,7 +1060,7 @@ export default function Transactions({
           <button
             onClick={() => setShowBulkEditModal(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
-            style={{ backgroundColor: '#6227f5' }}
+            style={{ backgroundColor: '#7c3aed' }}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1155,7 +1070,7 @@ export default function Transactions({
           <button
             onClick={handleOpenImportModal}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
-            style={{ backgroundColor: '#6227f5' }}
+            style={{ backgroundColor: '#7c3aed' }}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
@@ -1179,7 +1094,7 @@ export default function Transactions({
       <style>{`
         /* Forcer le style du selecteur de banque dans la section filtre */
         select[name="bank-filter-select"] {
-          background-color: #1f2226 !important;
+          background-color: #18191c !important;
           color: #fff !important;
           min-height: 2.5rem !important;
           border: none !important;
@@ -1192,10 +1107,10 @@ export default function Transactions({
       `}</style>
 
       {/* Filters */}
-      <div className="shadow rounded-lg p-6" style={{ backgroundColor: '#272a2f' }}>
+      <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300">Banque</label>
+            <label className="block text-sm font-medium text-zinc-300">Banque</label>
             <select
               name="bank-filter-select"
               value={selectedBank?.id || ''}
@@ -1207,14 +1122,14 @@ export default function Transactions({
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
             >
-              <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes les banques</option>
+              <option value="" style={{ backgroundColor: '#18191c' }}>Toutes les banques</option>
               {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
                 // Récupérer les utilisateurs associés à cette banque
                 const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                 const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                 
                 return (
-                  <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1f2226' }}>
+                  <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
                     {bank.name}{bankUsersText}
                   </option>
                 );
@@ -1222,7 +1137,7 @@ export default function Transactions({
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300">Recherche</label>
+            <label className="block text-sm font-medium text-zinc-300">Recherche</label>
             <input
               type="text"
               placeholder="Rechercher..."
@@ -1234,11 +1149,11 @@ export default function Transactions({
                 }
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+              style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300">Catégorie</label>
+            <label className="block text-sm font-medium text-zinc-300">Catégorie</label>
             <select
               value={filters.categoryId}
               onChange={(e) => {
@@ -1246,17 +1161,17 @@ export default function Transactions({
                 applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+              style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
             >
-              <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes</option>
-              <option value="undefined" style={{ backgroundColor: '#1f2226' }}>Non défini</option>
+              <option value="" style={{ backgroundColor: '#18191c' }}>Toutes</option>
+              <option value="undefined" style={{ backgroundColor: '#18191c' }}>Non défini</option>
               {categories.map(category => (
-                <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
+                <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300">Date début</label>
+            <label className="block text-sm font-medium text-zinc-300">Date début</label>
             <input
               type="date"
               value={filters.startDate}
@@ -1265,11 +1180,11 @@ export default function Transactions({
                 applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+              style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300">Date fin</label>
+            <label className="block text-sm font-medium text-zinc-300">Date fin</label>
             <input
               type="date"
               value={filters.endDate}
@@ -1278,11 +1193,11 @@ export default function Transactions({
                 applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226' }}
+              style={{ backgroundColor: '#18191c' }}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300">Pointé</label>
+            <label className="block text-sm font-medium text-zinc-300">Pointé</label>
             <select
               value={filters.checked}
               onChange={(e) => {
@@ -1290,60 +1205,59 @@ export default function Transactions({
                 applyFilters(newFilters);
               }}
               className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#1f2226' }}
+              style={{ backgroundColor: '#18191c' }}
             >
-              <option value="" style={{ backgroundColor: '#1f2226' }}>Tous</option>
-              <option value="true" style={{ backgroundColor: '#1f2226' }}>Oui</option>
-              <option value="false" style={{ backgroundColor: '#1f2226' }}>Non</option>
+              <option value="" style={{ backgroundColor: '#18191c' }}>Tous</option>
+              <option value="true" style={{ backgroundColor: '#18191c' }}>Oui</option>
+              <option value="false" style={{ backgroundColor: '#18191c' }}>Non</option>
             </select>
           </div>
         </div>
       </div>
 
       {/* Transactions Table */}
-      <div className="shadow rounded-lg overflow-hidden" style={{ backgroundColor: '#272a2f' }}>
-        <div 
-          className="overflow-y-auto custom-scrollbar"
-          style={{ maxHeight: '70vh' }}
+      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10">
+        <div
+          className="overflow-y-auto custom-scrollbar h-full"
           onScroll={handleScroll}
         >
-          <table className="w-full divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
-          <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
+          <table className="w-full divide-y divide-zinc-800">
+          <thead className="sticky top-0 z-10 bg-zinc-900/60">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-8">
+              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-8">
                 <input
                   type="checkbox"
                   checked={selectAll}
                   onChange={handleToggleSelectAll}
-                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                  className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                 />
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
                 Date
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-64">
+              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-64">
                 Description
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
+              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-32">
                 Catégorie
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-56">
+              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-56">
                 Banque
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
                 Montant
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
+              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
                 Pointé
               </th>
-              <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
+              <th className="px-4 py-2 text-center text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
                 Actions
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
+          <tbody className="divide-y divide-zinc-800">
             {/* Add form row - always visible as first row */}
-            <tr className="border-l-4" style={{ backgroundColor: '#1f2226', borderLeftColor: '#6226fa' }}>
+            <tr className="border-l-4 bg-zinc-900/60" style={{ borderLeftColor: '#7c3aed' }}>
               {/* Cellule vide pour aligner avec la colonne de checkbox */}
               <td className="px-4 py-2"></td>
               <td className="px-4 py-2">
@@ -1351,7 +1265,7 @@ export default function Transactions({
                   type="date"
                   value={editingTransaction?.date || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                   required
                 />
               </td>
@@ -1360,7 +1274,7 @@ export default function Transactions({
                   type="text"
                   value={editingTransaction?.description || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                   placeholder="Description de la transaction"
                   required
                 />
@@ -1369,11 +1283,11 @@ export default function Transactions({
                 <select
                   value={editingTransaction?.categoryId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                 >
-                  <option value="" style={{ backgroundColor: '#272a2f' }}>Non défini</option>
+                  <option value="" style={{ backgroundColor: '#1e2024' }}>Non défini</option>
                   {categories.map(category => (
-                    <option key={category.id} value={category.id} style={{ backgroundColor: '#272a2f' }}>{category.name}</option>
+                    <option key={category.id} value={category.id} style={{ backgroundColor: '#1e2024' }}>{category.name}</option>
                   ))}
                 </select>
               </td>
@@ -1381,16 +1295,16 @@ export default function Transactions({
                 <select
                   value={editingTransaction?.bankId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                   required
                 >
-                  <option value="" style={{ backgroundColor: '#272a2f' }}>Sélectionnez une banque</option>
+                  <option value="" style={{ backgroundColor: '#1e2024' }}>Sélectionnez une banque</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
                     const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                     const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                     
                     return (
-                      <option key={bank.id} value={bank.id} style={{ backgroundColor: '#272a2f' }}>
+                      <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1e2024' }}>
                         {bank.name}{bankUsersText}
                       </option>
                     );
@@ -1404,21 +1318,21 @@ export default function Transactions({
                   value={editingTransaction?.amount || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
                   className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                  style={{ backgroundColor: '#272a2f' }}
+                  style={{ backgroundColor: '#1e2024' }}
                   placeholder="0.00"
                   required
                 />
               </td>
               <td className="px-4 py-2">
-                <label className="flex items-center text-xs text-gray-300">
+                <label className="flex items-center text-xs text-zinc-300">
                   <input
                     type="checkbox"
                     checked={editingTransaction?.checked || false}
                     onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
                     className="h-3 w-3 rounded"
-                    style={{ accentColor: '#6226fa' }}
+                    style={{ accentColor: '#7c3aed' }}
                   />
-                  <span className="ml-1 text-gray-300">Pointé</span>
+                  <span className="ml-1 text-zinc-300">Pointé</span>
                 </label>
               </td>
               <td className="px-4 py-2">
@@ -1430,7 +1344,7 @@ export default function Transactions({
                       handleAddTransaction(e);
                     }}
                     className="px-2 py-1 text-xs font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center gap-1"
-                    style={{ backgroundColor: '#6226fa', minWidth: '0' }}
+                    style={{ backgroundColor: '#7c3aed', minWidth: '0' }}
                     title="Ajouter"
                   >
                     <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
@@ -1444,9 +1358,9 @@ export default function Transactions({
             {filteredTransactions.map((transaction) => (
               <tr
                 key={transaction.id}
-                className="transition-colors cursor-pointer bg-[#272a2f] group"
+                className="transition-colors cursor-pointer group"
                 style={{ borderLeft: '4px solid transparent' }}
-                onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #6226fa'}
+                onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #7c3aed'}
                 onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
               >
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
@@ -1454,7 +1368,7 @@ export default function Transactions({
                     type="checkbox"
                     checked={selectedTransactions.includes(transaction.id)}
                     onChange={() => handleToggleSelect(transaction.id)}
-                    className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                     onClick={(e) => e.stopPropagation()}
                   />
                 </td>
@@ -1464,7 +1378,7 @@ export default function Transactions({
                       type="date"
                       value={editingTransaction?.date || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent py-2 px-3" style={{ backgroundColor: '#18191c' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'date' ? (
                     <input
@@ -1474,7 +1388,7 @@ export default function Transactions({
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     />
                   ) : (
@@ -1494,7 +1408,7 @@ export default function Transactions({
                       value={editingTransaction?.description || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      style={{ backgroundColor: '#18191c' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'description' ? (
                     <input
@@ -1504,7 +1418,7 @@ export default function Transactions({
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     />
                   ) : (
@@ -1522,10 +1436,10 @@ export default function Transactions({
                     <select
                       value={editingTransaction?.categoryId || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-              className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+              className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                     >
                       {categories.map(category => (
-                        <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
+                        <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
                       ))}
                     </select>
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'category' ? (
@@ -1535,12 +1449,12 @@ export default function Transactions({
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     >
                       <option value="">Non défini</option>
                       {categories.map(category => (
-                        <option key={category.id} value={category.id} style={{ backgroundColor: '#1f2226' }}>{category.name}</option>
+                        <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
                       ))}
                     </select>
                   ) : (
@@ -1579,7 +1493,7 @@ export default function Transactions({
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     >
                       {banks
@@ -1591,7 +1505,7 @@ export default function Transactions({
                           const displayText = userNames ? `${bank.name} (${userNames})` : bank.name;
                           
                           return (
-                            <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1f2226' }}>
+                            <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
                               {displayText}
                             </option>
                           );
@@ -1618,7 +1532,7 @@ export default function Transactions({
                         <div className="font-medium text-white">
                           {transaction.bank.name}
                           {transaction.bank.users && transaction.bank.users.length > 0 && (
-                            <span className="text-xs text-gray-400 ml-2">
+                            <span className="text-xs text-zinc-400 ml-2">
                               ({transaction.bank.users.map((u) => u.name).filter(Boolean).join(', ')})
                             </span>
                           )}
@@ -1635,7 +1549,7 @@ export default function Transactions({
                       value={editingTransaction?.amount || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      style={{ backgroundColor: '#18191c' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
                     <input
@@ -1646,7 +1560,7 @@ export default function Transactions({
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                      style={{ backgroundColor: '#1f2226' }}
+                      style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     />
                   ) : (
@@ -1661,26 +1575,26 @@ export default function Transactions({
                 </td>
                 <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
                   {editingId === transaction.id ? (
-                    <label className="flex items-center text-xs text-gray-300">
+                    <label className="flex items-center text-xs text-zinc-300">
                       <input
                         type="checkbox"
                         checked={editingTransaction?.checked || false}
                         onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
                         className="h-3 w-3 rounded"
-                        style={{ accentColor: '#6226fa' }}
+                        style={{ accentColor: '#7c3aed' }}
                       />
-                      <span className="ml-1 text-gray-300">Pointé</span>
+                      <span className="ml-1 text-zinc-300">Pointé</span>
                     </label>
                   ) : (
-                    <label className="flex items-center text-xs text-gray-300 cursor-pointer" onClick={() => handleInlineEdit(transaction.id, 'checked')}>
+                    <label className="flex items-center text-xs text-zinc-300 cursor-pointer" onClick={() => handleInlineEdit(transaction.id, 'checked')}>
                       <input
                         type="checkbox"
                         checked={transaction.checked}
                         readOnly
                         className="h-3 w-3 rounded"
-                        style={{ accentColor: '#6226fa' }}
+                        style={{ accentColor: '#7c3aed' }}
                       />
-                      <span className="ml-1 text-gray-300">Pointé</span>
+                      <span className="ml-1 text-zinc-300">Pointé</span>
                     </label>
                   )}
                 </td>
@@ -1691,7 +1605,7 @@ export default function Transactions({
                         onClick={handleSave}
                         className="transition-colors"
                         style={{ color: '#616875' }}
-                        onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#7c3aed'}
                         onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                       >
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1735,18 +1649,18 @@ export default function Transactions({
         {/* Indicateur de chargement pour le scroll infini */}
         {loadingMore && (
           <div className="flex justify-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
-            <span className="ml-2 text-sm text-gray-300">Chargement...</span>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderBottomColor: '#7c3aed' }}></div>
+            <span className="ml-2 text-sm text-zinc-300">Chargement...</span>
           </div>
         )}
         
         {filteredTransactions.length === 0 && (
           <div className="text-center py-12">
-            <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="mx-auto h-12 w-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <h3 className="mt-2 text-sm font-medium text-white">Aucune transaction</h3>
-            <p className="mt-1 text-sm text-gray-300">Commencez par ajouter une nouvelle transaction.</p>
+            <p className="mt-1 text-sm text-zinc-300">Commencez par ajouter une nouvelle transaction.</p>
           </div>
         )}
       </div>
@@ -1754,14 +1668,14 @@ export default function Transactions({
       {/* Modal d'import CSV */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-          <div className="p-0 w-80 md:w-[24rem] lg:w-[28rem] xl:w-[32rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
-            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
+          <div className="p-0 w-80 md:w-[24rem] lg:w-[28rem] xl:w-[32rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto bg-white/5 backdrop-blur-xl border border-white/10" style={{ maxHeight: '80vh' }}>
+            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between bg-zinc-900/60">
               <h3 className="text-lg font-bold text-white">
                 Importer des transactions depuis un fichier CSV
               </h3>
               <button
                 onClick={() => setShowImportModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-zinc-400 hover:text-white transition-colors"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1772,7 +1686,7 @@ export default function Transactions({
 
               {/* Sélection de la banque */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Banque de destination *
                 </label>
                 <select
@@ -1781,7 +1695,7 @@ export default function Transactions({
                     setImportBankId(e.target.value);
                   }}
                   className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                  style={{ backgroundColor: '#1f2226' }}
+                  style={{ backgroundColor: '#18191c' }}
                   required
                 >
                   <option value="">Sélectionnez une banque...</option>
@@ -1802,16 +1716,16 @@ export default function Transactions({
 
               {/* Zone de drop de fichier */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Fichier CSV *
                 </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-700 border-dashed rounded-md hover:border-gray-400 transition-colors" style={{ backgroundColor: '#23262b' }}>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-zinc-800 border-dashed rounded-lg hover:border-zinc-600 transition-colors bg-zinc-900/40">
                   <div className="space-y-1 text-center">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <svg className="mx-auto h-12 w-12 text-zinc-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                       <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <div className="flex text-sm text-gray-400">
-                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-[#1f2226] rounded-md font-medium hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 px-2 py-1" style={{ color: '#6226fa' }}>
+                    <div className="flex text-sm text-zinc-400">
+                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-zinc-900/60 rounded-md font-medium text-violet-400 hover:text-violet-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-violet-500 px-2 py-1">
                         <span>Choisir un fichier</span>
                         <input
                           id="csv-upload"
@@ -1824,7 +1738,7 @@ export default function Transactions({
                       </label>
                       <p className="pl-1">ou glisser-déposer</p>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-zinc-500">
                       CSV uniquement (max 10MB)
                     </p>
                   </div>
@@ -1841,7 +1755,7 @@ export default function Transactions({
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-300 bg-[#23262b] border border-gray-700 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   Annuler
                 </button>
@@ -1849,7 +1763,7 @@ export default function Transactions({
                   onClick={handleImportCSV}
                   disabled={!csvFile || !importBankId || importProgress.isImporting}
                   className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#6226fa' }}
+                  style={{ background: '#7c3aed' }}
                 >
                   {importProgress.isImporting ? 'Import en cours...' : 'Importer'}
                 </button>
@@ -1858,13 +1772,13 @@ export default function Transactions({
               {/* Barre de progression */}
               {importProgress.isImporting && (
                 <div className="mt-4">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <div className="flex justify-between text-sm text-zinc-600 mb-1">
                     <span>Import en cours...</span>
                     <span>{importProgress.imported}/{importProgress.total}</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-zinc-800 rounded-full h-2">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-violet-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${importProgress.total > 0 ? (importProgress.imported / importProgress.total) * 100 : 0}%` }}
                     ></div>
                   </div>
@@ -1890,15 +1804,15 @@ export default function Transactions({
       {/* Modal de modification en lot */}
       {showBulkEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-          <div className="relative p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
-            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
+          <div className="relative p-0 w-96 md:w-[32rem] lg:w-[36rem] xl:w-[40rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto bg-white/5 backdrop-blur-xl border border-white/10" style={{ maxHeight: '80vh' }}>
+            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between bg-zinc-900/60">
               {/* En-tête */}
               <h3 className="text-lg font-bold text-white">
                 Modification en lot des transactions
               </h3>
               <button
                 onClick={() => setShowBulkEditModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-zinc-400 hover:text-white transition-colors"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1910,29 +1824,29 @@ export default function Transactions({
               <div className="flex flex-col space-y-8">
                 {/* Section 1: Critères de sélection */}
                 <div className="space-y-4">
-                  <h4 className="text-md font-bold text-white border-b border-gray-700 pb-2">
+                  <h4 className="text-md font-bold text-white border-b border-zinc-800 pb-2">
                     1. Quelles transactions modifier ?
                   </h4>
                   
                   <div className="flex flex-wrap gap-4">
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Contient le texte</label>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Contient le texte</label>
                       <input
                         type="text"
                         placeholder="ex: abonnement"
                         value={bulkEditFilters.searchText}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, searchText: e.target.value})}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       />
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Catégorie</label>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Catégorie</label>
                       <select
                         value={bulkEditFilters.categoryId}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, categoryId: e.target.value})}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       >
                         <option value="">Toutes les catégories</option>
                         <option value="undefined">Non défini</option>
@@ -1942,12 +1856,12 @@ export default function Transactions({
                       </select>
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Banque</label>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Banque</label>
                       <select
                         value={bulkEditFilters.bankId}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, bankId: e.target.value})}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       >
                         <option value="">Toutes les banques</option>
                         {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => (
@@ -1956,32 +1870,32 @@ export default function Transactions({
                       </select>
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Date début</label>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Date début</label>
                       <input
                         type="date"
                         value={bulkEditFilters.startDate}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, startDate: e.target.value})}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       />
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Date fin</label>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Date fin</label>
                       <input
                         type="date"
                         value={bulkEditFilters.endDate}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, endDate: e.target.value})}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       />
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Statut pointé</label>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Statut pointé</label>
                       <select
                         value={bulkEditFilters.checked}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, checked: e.target.value})}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       >
                         <option value="">Tous</option>
                         <option value="true">Pointé</option>
@@ -1993,12 +1907,12 @@ export default function Transactions({
 
                 {/* Section 2: Actions à effectuer */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <h4 className="text-md font-bold text-white border-b border-gray-700 pb-2 col-span-1 md:col-span-2">
+                  <h4 className="text-md font-bold text-white border-b border-zinc-800 pb-2 col-span-1 md:col-span-2">
                     2. Quelles modifications appliquer ?
                   </h4>
 
                   {/* Remplacement de texte */}
-                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
+                  <div className="rounded-md p-4" style={{ background: '#18191c' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -2008,7 +1922,7 @@ export default function Transactions({
                           ...bulkEditActions,
                           replaceText: { ...bulkEditActions.replaceText, enabled: e.target.checked }
                         })}
-                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                       />
                       <label htmlFor="replaceText" className="ml-2 text-sm font-medium text-white">
                         Modifier la description
@@ -2027,7 +1941,7 @@ export default function Transactions({
                                 ...bulkEditActions,
                                 replaceText: { ...bulkEditActions.replaceText, replaceAll: false }
                               })}
-                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                              className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 bg-zinc-900"
                             />
                           <span className="ml-2 text-sm text-white">Remplacement partiel</span>
                           </label>
@@ -2040,7 +1954,7 @@ export default function Transactions({
                                 ...bulkEditActions,
                                 replaceText: { ...bulkEditActions.replaceText, replaceAll: true }
                               })}
-                              className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300"
+                              className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 bg-zinc-900"
                             />
                           <span className="ml-2 text-sm text-white">Remplacer toute la description</span>
                           </label>
@@ -2061,7 +1975,7 @@ export default function Transactions({
                                   replaceText: { ...bulkEditActions.replaceText, from: e.target.value }
                                 })}
                                 className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                                style={{ backgroundColor: '#1f2226' }}
+                                style={{ backgroundColor: '#18191c' }}
                               />
                             </div>
                             <div className="flex-1 min-w-[180px]">
@@ -2075,7 +1989,7 @@ export default function Transactions({
                                   replaceText: { ...bulkEditActions.replaceText, to: e.target.value }
                                 })}
                                 className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                                style={{ backgroundColor: '#1f2226' }}
+                                style={{ backgroundColor: '#18191c' }}
                               />
                             </div>
                           </div>
@@ -2092,9 +2006,9 @@ export default function Transactions({
                                 replaceText: { ...bulkEditActions.replaceText, to: e.target.value }
                               })}
                               className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white"
-                              style={{ backgroundColor: '#1f2226' }}
+                              style={{ backgroundColor: '#18191c' }}
                             />
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-zinc-500 mt-1">
                               Toutes les descriptions des transactions sélectionnées seront remplacées par ce texte
                             </p>
                           </div>
@@ -2104,7 +2018,7 @@ export default function Transactions({
                   </div>
 
                   {/* Changement de catégorie */}
-                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
+                  <div className="rounded-md p-4" style={{ background: '#18191c' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -2114,7 +2028,7 @@ export default function Transactions({
                           ...bulkEditActions,
                           changeCategory: { ...bulkEditActions.changeCategory, enabled: e.target.checked }
                         })}
-                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                       />
                       <label htmlFor="changeCategory" className="ml-2 text-sm font-medium text-white">
                         Changer la catégorie
@@ -2128,7 +2042,7 @@ export default function Transactions({
                           changeCategory: { ...bulkEditActions.changeCategory, categoryId: e.target.value }
                         })}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       >
                         <option value="">Non défini</option>
                         {categories.map(category => (
@@ -2139,7 +2053,7 @@ export default function Transactions({
                   </div>
 
                   {/* Changement de statut pointé */}
-                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
+                  <div className="rounded-md p-4" style={{ background: '#18191c' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -2149,7 +2063,7 @@ export default function Transactions({
                           ...bulkEditActions,
                           changeChecked: { ...bulkEditActions.changeChecked, enabled: e.target.checked }
                         })}
-                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                       />
                       <label htmlFor="changeChecked" className="ml-2 text-sm font-medium text-white">
                         Modifier le statut pointé
@@ -2163,7 +2077,7 @@ export default function Transactions({
                           changeChecked: { ...bulkEditActions.changeChecked, checked: e.target.value === 'true' }
                         })}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       >
                         <option value="true">Pointé</option>
                         <option value="false">Non pointé</option>
@@ -2172,7 +2086,7 @@ export default function Transactions({
                   </div>
 
                   {/* Changement de banque */}
-                  <div className="rounded-md p-4" style={{ background: '#23262b' }}>
+                  <div className="rounded-md p-4" style={{ background: '#18191c' }}>
                     <div className="flex items-center mb-3">
                       <input
                         type="checkbox"
@@ -2182,7 +2096,7 @@ export default function Transactions({
                           ...bulkEditActions,
                           changeBank: { ...bulkEditActions.changeBank, enabled: e.target.checked }
                         })}
-                        className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                       />
                       <label htmlFor="changeBank" className="ml-2 text-sm font-medium text-white">
                         Changer de banque
@@ -2196,7 +2110,7 @@ export default function Transactions({
                           changeBank: { ...bulkEditActions.changeBank, bankId: e.target.value }
                         })}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                        style={{ backgroundColor: '#1f2226' }}
+                        style={{ backgroundColor: '#18191c' }}
                       >
                         <option value="">Sélectionner une banque</option>
                         {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => (
@@ -2212,7 +2126,7 @@ export default function Transactions({
               <div className="flex justify-end space-x-3 mt-6 pt-4">
                 <button
                   onClick={() => setShowBulkEditModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   Annuler
                 </button>
@@ -2220,7 +2134,7 @@ export default function Transactions({
                   onClick={handleBulkEdit}
                   disabled={bulkEditProgress.isProcessing}
                   className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#6226fa' }}
+                  style={{ background: '#7c3aed' }}
                 >
                   {bulkEditProgress.isProcessing ? 'Modification en cours...' : 'Appliquer les modifications'}
                 </button>
@@ -2229,11 +2143,11 @@ export default function Transactions({
               {/* Barre de progression */}
               {bulkEditProgress.isProcessing && (
                 <div className="mt-4">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <div className="flex justify-between text-sm text-zinc-600 mb-1">
                     <span>Modification en cours...</span>
                     <span>{bulkEditProgress.processed}/{bulkEditProgress.total}</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-zinc-800 rounded-full h-2">
                     <div 
                       className="bg-purple-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${bulkEditProgress.total > 0 ? (bulkEditProgress.processed / bulkEditProgress.total) * 100 : 0}%` }}

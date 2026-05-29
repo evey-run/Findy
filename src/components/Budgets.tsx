@@ -43,29 +43,7 @@ export default function Budgets() {
   });
 
   // Inject custom scrollbar styles
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.textContent = `
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-track {
-        background: #1f2226;
-        border-radius: 3px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #6226fa;
-        border-radius: 3px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-        background: #7c3aed;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
+  // scrollbar styles handled globally in index.css
 
   useEffect(() => {
     loadObjectives();
@@ -288,21 +266,21 @@ export default function Budgets() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen custom-scrollbar" style={{ backgroundColor: '#202427' }}>
-      <div className="space-y-6 pb-[40px]">
+    <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
+      <div className="flex flex-col gap-4">
         {/* Header */}
         <div className="md:flex md:items-center md:justify-between">
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
+            <h2 className="text-2xl font-bold leading-7 text-zinc-50 sm:text-3xl sm:truncate">
               Objectifs d'Épargne
             </h2>
-            <p className="mt-1 text-sm text-gray-300">
+            <p className="mt-1 text-sm text-zinc-400">
               Créez et suivez vos objectifs d'épargne. Ajoutez des transactions "Économie [NomObjectif]" pour les alimenter automatiquement.
             </p>
           </div>
@@ -310,73 +288,57 @@ export default function Budgets() {
 
         {/* Statistiques */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-lg shadow p-6" style={{ backgroundColor: '#272a2f' }}>
+          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <ChartBarIcon className="h-8 w-8" style={{ color: '#6226fa' }} />
+                <ChartBarIcon className="h-7 w-7 text-violet-400" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-300 truncate">
-                    Objectifs Totaux
-                  </dt>
-                  <dd className="text-lg font-medium text-white">
-                    {totalObjectives}
-                  </dd>
+                  <dt className="text-sm font-medium text-zinc-400 truncate">Objectifs Totaux</dt>
+                  <dd className="text-lg font-semibold text-zinc-50">{totalObjectives}</dd>
                 </dl>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg shadow p-6" style={{ backgroundColor: '#272a2f' }}>
+          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <TrophyIcon className="h-8 w-8 text-yellow-500" />
+                <TrophyIcon className="h-7 w-7 text-amber-400" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-300 truncate">
-                    Objectifs Atteints
-                  </dt>
-                  <dd className="text-lg font-medium text-white">
-                    {completedObjectives}
-                  </dd>
+                  <dt className="text-sm font-medium text-zinc-400 truncate">Objectifs Atteints</dt>
+                  <dd className="text-lg font-semibold text-zinc-50">{completedObjectives}</dd>
                 </dl>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg shadow p-6" style={{ backgroundColor: '#272a2f' }}>
+          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <TrophyIcon className="h-8 w-8 text-green-500" />
+                <TrophyIcon className="h-7 w-7 text-green-400" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-300 truncate">
-                    Économisé
-                  </dt>
-                  <dd className="text-lg font-medium text-white">
-                    {totalSaved.toLocaleString('fr-FR')} €
-                  </dd>
+                  <dt className="text-sm font-medium text-zinc-400 truncate">Économisé</dt>
+                  <dd className="text-lg font-semibold text-zinc-50">{totalSaved.toLocaleString('fr-FR')} €</dd>
                 </dl>
               </div>
             </div>
           </div>
 
-          <div className="rounded-lg shadow p-6" style={{ backgroundColor: '#272a2f' }}>
+          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <TrophyIcon className="h-8 w-8" style={{ color: '#6226fa' }} />
+                <TrophyIcon className="h-7 w-7 text-violet-400" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
-                  <dt className="text-sm font-medium text-gray-300 truncate">
-                    Objectif Total
-                  </dt>
-                  <dd className="text-lg font-medium text-white">
-                    {totalTargetAmount.toLocaleString('fr-FR')} €
-                  </dd>
+                  <dt className="text-sm font-medium text-zinc-400 truncate">Objectif Total</dt>
+                  <dd className="text-lg font-semibold text-zinc-50">{totalTargetAmount.toLocaleString('fr-FR')} €</dd>
                 </dl>
               </div>
             </div>
@@ -393,7 +355,7 @@ export default function Budgets() {
             // Suppression du carré rouge autour des objectifs en retard
             
             return (
-              <div key={objective.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f' }}>
+              <div key={objective.id} className="rounded-2xl overflow-hidden flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10 transition-all duration-300 hover:border-violet-500/20">
               {editingId === objective.id ? (
                 <form onSubmit={handleSave} className="flex flex-col h-full">
                   <div className="p-6 flex-1">
@@ -401,18 +363,18 @@ export default function Budgets() {
                       <div className="flex items-center">
                         <div 
                           className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                          style={{ backgroundColor: '#6226fa', color: 'white' }}
+                          style={{ backgroundColor: '#7c3aed', color: 'white' }}
                           title="Icône de l'objectif"
                         >
                           <TrophyIcon className="h-6 w-6" />
                         </div>
-                        
+
                         <div className="ml-4 flex-1">
                           <input
                             type="text"
                             value={formData.title}
                             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
+                            className="text-lg font-medium text-zinc-50 border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
                             placeholder="Titre de l'objectif"
                             required
                           />
@@ -423,17 +385,17 @@ export default function Budgets() {
                               step="1"
                               value={formData.targetAmount}
                               onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent w-20"
+                              className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-20"
                               placeholder="1000"
                               required
                             />
-                            <span className="text-sm text-gray-300">€</span>
+                            <span className="text-sm text-zinc-300">€</span>
                             
                             <input
                               type="date"
                               value={formData.deadline}
                               onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                              className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent"
                             />
                           </div>
                         </div>
@@ -444,30 +406,29 @@ export default function Budgets() {
                       <textarea
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent resize-none"
+                        className="w-full text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent resize-none"
                         rows={3}
                         placeholder="Description de l'objectif..."
                       />
                     </div>
                   </div>
                   
-                  <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+                  <div className="px-6 py-3 rounded-b-lg bg-zinc-900/60">
                     <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-zinc-500">
                         Modifier l'objectif
                       </div>
                       <div className="flex space-x-2">
                         <button
                           type="button"
                           onClick={handleCancel}
-                          className="px-3 py-1 text-xs border border-gray-300 rounded text-white hover:text-gray-700 hover:bg-gray-100"
+                          className="px-3 py-1 text-xs border border-zinc-700 rounded-lg text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
                         >
                           Annuler
                         </button>
                         <button
                           type="submit"
-                          className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                          style={{ backgroundColor: '#6227f5' }}
+                          className="px-3 py-1 text-xs border border-transparent rounded-lg text-white bg-violet-600 hover:bg-violet-500 transition-colors"
                         >
                           Sauvegarder
                         </button>
@@ -482,14 +443,14 @@ export default function Budgets() {
                       <div className="flex items-center">
                         <div 
                           className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: '#6226fa', color: 'white' }}
+                          style={{ backgroundColor: '#7c3aed', color: 'white' }}
                         >
                           <TrophyIcon className="h-6 w-6" />
                         </div>
                         <div className="ml-4">
-                          <h3 className="text-lg font-medium text-white">{objective.title}</h3>
+                          <h3 className="text-lg font-medium text-zinc-50">{objective.title}</h3>
                           {objective.description && (
-                            <p className="text-sm text-gray-300">
+                            <p className="text-sm text-zinc-400">
                               {objective.description}
                             </p>
                           )}
@@ -499,9 +460,9 @@ export default function Budgets() {
                         <button
                           onClick={() => handleEdit(objective)}
                           className="transition-colors"
-                          style={{ color: '#616875' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
+                          style={{ color: '#52525b' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#a78bfa'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#52525b'}
                           title="Modifier"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -511,9 +472,9 @@ export default function Budgets() {
                         <button
                           onClick={() => handleDelete(objective.id)}
                           className="transition-colors"
-                          style={{ color: '#616875' }}
+                          style={{ color: '#52525b' }}
                           onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = '#52525b'}
                           title="Supprimer"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -525,30 +486,30 @@ export default function Budgets() {
 
                     <div className="mt-4">
                       <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-medium text-gray-300">
+                        <span className="text-sm font-medium text-zinc-400">
                           Objectif {objective.targetAmount.toLocaleString('fr-FR')} €
                         </span>
-                        <span 
+                        <span
                           className="text-xl font-bold"
-                          style={{ color: isCompleted ? '#10b981' : '#6226fa' }}
+                          style={{ color: isCompleted ? '#22c55e' : '#7c3aed' }}
                         >
                           {Math.round(percentage)}%
                         </span>
                       </div>
                       
-                      <div className="w-full rounded-full h-3" style={{ backgroundColor: '#1f2226' }}>
+                      <div className="w-full rounded-full h-2.5 bg-zinc-800">
                         <div
-                          className="h-3 rounded-full transition-all duration-300"
-                          style={{ 
+                          className="h-2.5 rounded-full transition-all duration-500"
+                          style={{
                             width: `${Math.min(percentage, 100)}%`,
-                            backgroundColor: isCompleted ? '#10b981' : '#6226fa'
+                            backgroundColor: isCompleted ? '#22c55e' : '#7c3aed'
                           }}
                         />
                       </div>
                       
-                      <div className="flex justify-between text-sm text-gray-400 mt-2">
-                        <span className={deadline && isOverdue(deadline) && !isCompleted ? 'text-red-500 font-medium' : ''}>{deadline ? `Échéance: ${new Date(deadline).toLocaleDateString('fr-FR')}` : 'Pas d\'échéance'}</span>
-                        <span className={isCompleted ? 'text-green-400' : 'text-gray-400'}>
+                      <div className="flex justify-between text-sm text-zinc-500 mt-2">
+                        <span className={deadline && isOverdue(deadline) && !isCompleted ? 'text-red-400 font-medium' : ''}>{deadline ? `Échéance: ${new Date(deadline).toLocaleDateString('fr-FR')}` : 'Pas d\'échéance'}</span>
+                        <span className={isCompleted ? 'text-green-400' : 'text-zinc-400'}>
                           {progress ? 
                             (progress.remaining > 0 ? 
                               `${progress.remaining.toLocaleString('fr-FR')} € restant` : 
@@ -560,18 +521,18 @@ export default function Budgets() {
                       </div>
                     </div>
                   </div>
-                  <div className="px-6 py-4" style={{ backgroundColor: '#1f2226' }}>
+                  <div className="px-6 py-4 bg-zinc-900/60">
                     {(() => {
                       const objectiveTransactions = getObjectiveTransactions(objective.title);
                       return objectiveTransactions.length > 0 ? (
                         <div>
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-medium text-gray-300">
+                            <p className="text-sm font-medium text-zinc-400">
                               Dernières transactions ({objectiveTransactions.length})
                             </p>
                             {objectiveTransactions.length > 0 && (
                               <button 
-                                className="text-purple-400 hover:text-purple-300 transition-colors flex items-center"
+                                className="text-violet-400 hover:text-violet-300 transition-colors flex items-center"
                                 onClick={() => {
                                   // Créer le pattern de recherche pour la page transactions
                                   const searchPattern = `Économie ${objective.title}`;
@@ -588,10 +549,10 @@ export default function Budgets() {
                             {objectiveTransactions.map((transaction) => (
                               <div 
                                 key={transaction.id} 
-                                className="flex flex-col mb-2 pb-2 border-b border-gray-700 last:border-b-0 last:pb-0 last:mb-0"
+                                className="flex flex-col mb-2 pb-2 border-b border-zinc-800 last:border-b-0 last:pb-0 last:mb-0"
                               >
                                 <div className="flex justify-between items-center">
-                                  <span className="text-gray-400 truncate flex-1 mr-2 text-xs">
+                                  <span className="text-zinc-500 truncate flex-1 mr-2 text-xs">
                                     {transaction.description}
                                   </span>
                                   <div className="flex items-center space-x-2">
@@ -607,11 +568,11 @@ export default function Budgets() {
                       ) : (
                         <div>
                           <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-medium text-gray-300">
+                            <p className="text-sm font-medium text-zinc-300">
                               Transactions
                             </p>
                           </div>
-                          <div className="text-sm text-gray-400 mb-4">
+                          <div className="text-sm text-zinc-400 mb-4">
                             Créez des transactions "Économie {objective.title}" pour alimenter cet objectif
                           </div>
                         </div>
@@ -626,14 +587,14 @@ export default function Budgets() {
 
         {/* Add Objective Form Card */}
         {showAddForm ? (
-          <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
+          <div className="rounded-2xl border border-violet-500/40 flex flex-col h-80 bg-white/5 backdrop-blur-xl shadow-[0_0_30px_rgba(124,58,237,0.15)]">
             <form onSubmit={handleAddObjective} className="flex flex-col h-full">
               <div className="p-6 flex-1">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
                     <div 
                       className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                      style={{ backgroundColor: '#6226fa', color: 'white' }}
+                      style={{ backgroundColor: '#7c3aed', color: 'white' }}
                       title="Icône de l'objectif"
                     >
                       <TrophyIcon className="h-6 w-6" />
@@ -655,17 +616,17 @@ export default function Budgets() {
                           step="1"
                           value={formData.targetAmount}
                           onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                          className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent w-20"
+                          className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-20"
                           placeholder="1000"
                           required
                         />
-                        <span className="text-sm text-gray-300">€</span>
+                        <span className="text-sm text-zinc-300">€</span>
                         
                         <input
                           type="date"
                           value={formData.deadline}
                           onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                          className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent"
+                          className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent"
                         />
                       </div>
                     </div>
@@ -676,37 +637,36 @@ export default function Budgets() {
                   <textarea
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent resize-none"
+                    className="w-full text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent resize-none"
                     rows={3}
                     placeholder="Description de l'objectif..."
                   />
                 </div>
 
                 {/* Astuce */}
-                <div className="mt-4 p-3 rounded-md" style={{ backgroundColor: '#1f2226' }}>
-                  <p className="text-xs text-blue-400">
-                    <strong>💡 Astuce:</strong> Créez des transactions "Économie {formData.title || '[Titre]'}" pour alimenter cet objectif.
+                <div className="mt-4 p-3 rounded-lg bg-zinc-900/60">
+                  <p className="text-xs text-violet-400">
+                    <strong>Astuce :</strong> Créez des transactions "Économie {formData.title || '[Titre]'}" pour alimenter cet objectif.
                   </p>
                 </div>
               </div>
               
-              <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+              <div className="px-6 py-3 rounded-b-lg bg-zinc-900/60">
                 <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-zinc-500">
                     Nouvel objectif
                   </div>
                   <div className="flex space-x-2">
                     <button
                       type="button"
                       onClick={handleCancel}
-                      className="px-3 py-1 text-xs border border-gray-300 rounded text-white hover:text-gray-700 hover:bg-gray-100"
+                      className="px-3 py-1 text-xs border border-zinc-700 rounded-lg text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
                     >
                       Annuler
                     </button>
                     <button
                       type="submit"
-                      className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                      style={{ backgroundColor: '#6227f5' }}
+                      className="px-3 py-1 text-xs border border-transparent rounded-lg text-white bg-violet-600 hover:bg-violet-500 transition-colors"
                     >
                       Créer
                     </button>
@@ -717,24 +677,7 @@ export default function Budgets() {
           </div>
         ) : (
           <div 
-            className="shadow rounded-lg border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
-            style={{ 
-              borderColor: '#616875' // couleur intermédiaire
-            } as React.CSSProperties}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#6226fa';
-              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
-              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#6226fa';
-              if (text) text.style.color = '#6226fa';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#616875';
-              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
-              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#616875';
-              if (text) text.style.color = '#616875';
-            }}
+            className="rounded-2xl border-2 border-dashed border-zinc-700 transition-all flex flex-col h-80 cursor-pointer group hover:border-violet-500/50 hover:bg-white/[0.03]"
             onClick={() => {
               setEditingId(null);
               setEditingObjective(null);
@@ -749,12 +692,12 @@ export default function Budgets() {
             }}
           >
             <div className="flex flex-col items-center justify-center h-full p-6">
-              <div className="mb-4 transition-colors icon-plus" style={{ color: '#616875' }}>
+              <div className="mb-4 text-zinc-600 group-hover:text-violet-400 transition-colors">
                 <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                 </svg>
               </div>
-              <p className="text-center font-medium transition-colors text-add" style={{ color: '#616875' }}>
+              <p className="text-center font-medium text-zinc-600 group-hover:text-violet-400 transition-colors">
                 Ajouter un objectif
               </p>
             </div>
