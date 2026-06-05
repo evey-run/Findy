@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import { cleanupUnusedImages } from './utils/cleanupImages';
 
@@ -17,19 +18,33 @@ import objectiveRoutes from './routes/objectives';
 
 dotenv.config();
 
+// Dossier uploads: configurable via env (mode packagé) ou fallback local
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), 'public/uploads');
+fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// Expose aux routes via env pour éviter de refactorer chaque route
+process.env.UPLOADS_DIR = UPLOADS_DIR;
+
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 36321;
 
-// Middleware
+// CORS: accepte dev local ET Tauri webview (tauri://localhost)
+const allowedOrigins = process.env.FRONTEND_URL
+  ? [process.env.FRONTEND_URL]
+  : ['http://localhost:51737', 'tauri://localhost', 'http://tauri.localhost'];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:51737',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) callback(null, true);
+    else callback(new Error(`CORS: origin non autorisée: ${origin}`));
+  },
   credentials: true
 }));
 app.use(express.json());
 
 // Serve static files (images)
-app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Routes
 app.use('/api/users', userRoutes);

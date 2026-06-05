@@ -9,7 +9,7 @@ import { PrismaClient } from '@prisma/client';
  */
 export async function cleanupUnusedImages() {
   const prisma = new PrismaClient();
-  const uploadsDir = path.join(process.cwd(), 'public/uploads');
+  const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'public/uploads');
   
   try {
     // Vérifier si le dossier uploads existe

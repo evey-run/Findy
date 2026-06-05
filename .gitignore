@@ -26,3 +26,7 @@ dist-ssr
 /src/generated/prisma
 .env
 .env*
+
+# Binaires compilés (générés par scripts/build-server.sh)
+/src-tauri/binaries/finance-server-*
+/src-tauri/binaries/libquery_engine-*

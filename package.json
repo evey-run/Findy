@@ -16,7 +16,9 @@
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:server": "bash scripts/build-server.sh",
+    "build:mac": "bash scripts/build-mac.sh"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
