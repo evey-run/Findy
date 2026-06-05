@@ -101,7 +101,7 @@ npm install
 Créer un fichier `.env` à la racine du projet :
 ```env
 DATABASE_URL="file:./prisma/dev.db"
-PORT=3001
+PORT=36321
 ```
 
 4. **Initialiser la base de données**
@@ -126,16 +126,16 @@ npm run dev
 
 Ou séparément :
 ```bash
-# Frontend uniquement (port 5173)
+# Frontend uniquement (port 51737)
 npm run dev:frontend
 
-# Backend uniquement (port 3001)
+# Backend uniquement (port 36321)
 npm run dev:server
 ```
 
 ### Accès à l'application
-- **Frontend** : http://localhost:5173
-- **API Backend** : http://localhost:3001
+- **Frontend** : http://localhost:51737
+- **API Backend** : http://localhost:36321
 
 ## 🗄️ Scripts Disponibles
 

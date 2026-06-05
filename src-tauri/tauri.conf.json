@@ -5,7 +5,7 @@
   "identifier": "com.evey.finance",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5174",
+    "devUrl": "http://localhost:51737",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
