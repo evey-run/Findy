@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { useState, useEffect, useRef } from 'react';
+import { assetUrl } from '../lib/url';
 import {
   HomeIcon,
   CreditCardIcon,
@@ -62,7 +63,7 @@ export default function Layout({ children }: LayoutProps) {
     if (user?.avatar) {
       return (
         <img
-          src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:3001${user.avatar}`}
+          src={assetUrl(user.avatar)}
           alt={user.name}
           className={`${size} rounded-full object-cover ring-2 ring-white/10`}
         />
