@@ -1,95 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
+import { assetUrl } from '../lib/url';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 
 // Styles pour les cellules éditables sont intégrés directement dans les classes CSS
 
-// Styles pour la barre de scroll personnalisée
-const scrollbarStyles = `
-  /* Webkit browsers (Chrome, Safari, Edge) */
-  ::-webkit-scrollbar {
-    width: 12px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #272a2f;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #6227f5;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:active {
-    background: #6227f5;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Firefox */
-  html {
-    scrollbar-width: auto;
-    scrollbar-color: #272a2f #1f2226;
-  }
-  
-  /* Styles spécifiques pour les conteneurs avec scroll */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 12px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #272a2f !important;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #6227f5 !important;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:active {
-    background: #6227f5 !important;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Force pour tous les scrollbars */
-  * {
-    scrollbar-width: auto;
-    scrollbar-color: #272a2f #1f2226;
-  }
-  
-  /* Couleur des séparateurs de lignes */
-  .divide-y > * + * {
-    border-top-color: #1f2226 !important;
-  }
-  
-  .divide-gray-600 > * + * {
-    border-top-color: #1f2226 !important;
-  }
-`;
-
-// Injecter les styles dans le document
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = scrollbarStyles;
-  if (!document.head.querySelector('style[data-scrollbar-custom]')) {
-    styleElement.setAttribute('data-scrollbar-custom', 'true');
-    document.head.appendChild(styleElement);
-  }
-}
 
 interface EditingTransaction {
   id: string;
@@ -158,7 +74,7 @@ export default function Investissement() {
   const ITEMS_PER_PAGE = 50;
   
   
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<EditingTransaction | null>(null);
   
@@ -174,19 +90,19 @@ export default function Investissement() {
   });
 
   // États pour la modification en masse
-  const [bulkEditFilters, setBulkEditFilters] = useState({
+  const [_bulkEditFilters, _setBulkEditFilters] = useState({
     searchText: '',
     bankId: '',
     checked: '',
     startDate: '',
     endDate: ''
   });
-  const [bulkEditActions, setBulkEditActions] = useState({
+  const [_bulkEditActions, _setBulkEditActions] = useState({
     replaceText: { enabled: false, from: '', to: '', replaceAll: false },
     changeChecked: { enabled: false, checked: false },
     changeBank: { enabled: false, bankId: '' }
   });
-  const [bulkEditTransactions, setBulkEditTransactions] = useState([]);
+  const [_bulkEditTransactions, _setBulkEditTransactions] = useState([]);
 
 
   // État local pour la saisie du texte de recherche
@@ -217,9 +133,8 @@ export default function Investissement() {
         
         // Nous utilisons uniquement localSelectedBank pour la page Investissements
         
-        // Initialiser la banque locale avec la première banque d'investissement
-        const firstInvestmentBank = banks.find(bank => bank.accountType === 'INVESTMENT');
-        setLocalSelectedBank(firstInvestmentBank || null);
+        // Ne pas sélectionner de banque par défaut sur la page Investissements
+        setLocalSelectedBank(null);
         
         if (searchFromURL) {
           // Mettre à jour l'input de recherche avec la valeur de l'URL
@@ -237,13 +152,10 @@ export default function Investissement() {
         } else {
           // Chargement normal avec filtre par type de compte
           if (investmentBankIds.length > 0) {
-            // Forcer le rechargement complet des transactions d'investissement
-            // en ignorant le filtre global de banque sélectionnée
+            // Chargement initial: uniquement par type INVESTMENT, sans banque présélectionnée
             await loadTransactions({ 
               accountType: 'INVESTMENT',
-              forceIgnoreSelectedBank: true,
-              // Si une banque locale est déjà sélectionnée, l'utiliser comme filtre
-              ...(firstInvestmentBank ? { bankId: firstInvestmentBank.id } : {})
+              forceIgnoreSelectedBank: true
             } as any);
           }
         }
@@ -255,7 +167,7 @@ export default function Investissement() {
           description: '',
           date: new Date().toISOString().split('T')[0],
           checked: false,
-          bankId: firstInvestmentBank?.id || ''
+          bankId: ''
         });
       } catch (error) {
         console.error('Error initializing data:', error);
@@ -1501,7 +1413,7 @@ export default function Investissement() {
   
   // Fonction pour afficher les avatars des utilisateurs
   const renderUserAvatars = (users: any[], style?: React.CSSProperties) => {
-    if (!users || users.length === 0) return <span className="text-gray-400">-</span>;
+    if (!users || users.length === 0) return <span className="text-zinc-400">-</span>;
     return (
       <div className="flex -space-x-2">
         {users.map((user, index) => (
@@ -1512,13 +1424,13 @@ export default function Investissement() {
                 alt={user.name}
                 className="inline-block h-8 w-8 rounded-full object-cover"
                 title={user.name}
-                style={{ border: '2px solid #1f2226', ...style }}
+                style={{ border: '2px solid #18191c', ...style }}
               />
             ) : (
               <div
-                className="inline-block h-8 w-8 rounded-full bg-gray-400 flex items-center justify-center text-white text-sm font-medium"
+                className="inline-block h-8 w-8 rounded-full bg-zinc-600 flex items-center justify-center text-white text-sm font-medium"
                 title={user.name}
-                style={{ border: '2px solid #1f2226', ...style }}
+                style={{ border: '2px solid #09090b', ...style }}
               >
                 {user.name?.charAt(0)?.toUpperCase() || '?'}
               </div>
@@ -1531,18 +1443,18 @@ export default function Investissement() {
   
   // Rendu du composant
   return (
-    <div className="w-full pb-[40px]">
-      <div className="flex flex-col space-y-6">
+    <div className="flex flex-col h-full min-h-0 gap-4">
+      <div className="flex flex-col min-h-0 flex-1 gap-4">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
           <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">Investissements</h2>
-            <p className="text-sm text-gray-300 mt-1">Suivez et gérez vos investissements et leurs opérations associées</p>
+            <p className="text-sm text-zinc-300 mt-1">Suivez et gérez vos investissements et leurs opérations associées</p>
           </div>
           <div className="flex space-x-2 md:mt-0">
             <button
               onClick={handleOpenImportModal}
               className="px-3 py-2 text-sm font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center"
-              style={{ backgroundColor: '#6226fa' }}
+              style={{ backgroundColor: '#7c3aed' }}
             >
               <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -1555,10 +1467,10 @@ export default function Investissement() {
         </div>
         
         {/* Filtres */}
-        <div className="p-4 rounded-lg" style={{ backgroundColor: '#272a2f' }}>
+        <div className="p-6 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300">Banque</label>
+              <label className="block text-sm font-medium text-zinc-300">Banque</label>
               <select
                 value={localSelectedBank?.id || ''}
                 onChange={(e) => {
@@ -1566,15 +1478,15 @@ export default function Investissement() {
                   handleBankSelect(bank || null);
                 }}
                 className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-                style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+                style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
               >
-                <option value="" style={{ backgroundColor: '#1f2226' }}>Toutes</option>
+                <option value="" style={{ backgroundColor: '#18191c' }}>Toutes</option>
                 {banks.filter(bank => bank.accountType === 'INVESTMENT').map(bank => {
                   const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                   const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                   
                   return (
-                    <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1f2226' }}>
+                    <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
                       {bank.name}{bankUsersText}
                     </option>
                   );
@@ -1582,7 +1494,7 @@ export default function Investissement() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300">Recherche</label>
+              <label className="block text-sm font-medium text-zinc-300">Recherche</label>
               <input
                 type="text"
                 placeholder="Rechercher..."
@@ -1594,90 +1506,89 @@ export default function Investissement() {
                   }
                 }}
                 className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-                style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+                style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300">Date début</label>
+              <label className="block text-sm font-medium text-zinc-300">Date début</label>
               <input
                 type="date"
                 value={filters.startDate}
                 onChange={(e) => setFilters({...filters, startDate: e.target.value})}
                 className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-                style={{ backgroundColor: '#1f2226', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
+                style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300">Date fin</label>
+              <label className="block text-sm font-medium text-zinc-300">Date fin</label>
               <input
                 type="date"
                 value={filters.endDate}
                 onChange={(e) => setFilters({...filters, endDate: e.target.value})}
                 className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-                style={{ backgroundColor: '#1f2226' }}
+                style={{ backgroundColor: '#18191c' }}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300">Pointé</label>
+              <label className="block text-sm font-medium text-zinc-300">Pointé</label>
               <select
                 value={filters.checked}
                 onChange={(e) => setFilters({...filters, checked: e.target.value})}
                 className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-                style={{ backgroundColor: '#1f2226' }}
+                style={{ backgroundColor: '#18191c' }}
               >
-                <option value="" style={{ backgroundColor: '#1f2226' }}>Tous</option>
-                <option value="true" style={{ backgroundColor: '#1f2226' }}>Oui</option>
-                <option value="false" style={{ backgroundColor: '#1f2226' }}>Non</option>
+                <option value="" style={{ backgroundColor: '#18191c' }}>Tous</option>
+                <option value="true" style={{ backgroundColor: '#18191c' }}>Oui</option>
+                <option value="false" style={{ backgroundColor: '#18191c' }}>Non</option>
               </select>
             </div>
           </div>
         </div>
 
         {/* Tableau des transactions d'investissement */}
-        <div className="shadow rounded-lg overflow-hidden" style={{ backgroundColor: '#272a2f' }}>
-          <div 
-            className="overflow-y-auto custom-scrollbar"
-            style={{ maxHeight: '70vh' }}
+        <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10">
+          <div
+            className="overflow-y-auto custom-scrollbar h-full"
             onScroll={handleScroll}
           >
-            <table className="w-full divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
-              <thead className="sticky top-0 z-10" style={{ backgroundColor: '#1f2226' }}>
+            <table className="w-full divide-y divide-zinc-800">
+              <thead className="sticky top-0 z-10 bg-zinc-900/60">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
                     Date
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-64">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-64">
                     Description
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-32">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-32">
                     Banque
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
                     Propriétaires
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
                     Prix unitaire
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
                     Quantité
                   </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-24">
+                  <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
                     Montant
                   </th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-300 uppercase tracking-wider w-16">
+                  <th className="px-4 py-2 text-center text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-600" style={{ backgroundColor: '#272a2f' }}>
+              <tbody className="divide-y divide-zinc-800">
                 {/* Add form row - always visible as first row */}
-                <tr className="border-l-4" style={{ backgroundColor: '#1f2226', borderLeftColor: '#6226fa' }}>
+                <tr className="border-l-4 bg-zinc-900/60" style={{ borderLeftColor: '#7c3aed' }}>
                   <td className="px-4 py-2">
                     <input
                       type="date"
                       value={editingTransaction?.date || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-                      className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+                      className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                       required
                     />
                   </td>
@@ -1686,7 +1597,7 @@ export default function Investissement() {
                       type="text"
                       value={editingTransaction?.description || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-                      className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+                      className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                       placeholder="Description de la transaction"
                       required
                     />
@@ -1695,16 +1606,16 @@ export default function Investissement() {
                     <select
                       value={editingTransaction?.bankId || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
-                      className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+                      className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
                       required
                     >
-                      <option value="" style={{ backgroundColor: '#272a2f' }}>Sélectionnez une banque</option>
+                      <option value="" style={{ backgroundColor: '#1e2024' }}>Sélectionnez une banque</option>
                       {banks.filter(bank => bank.accountType === 'INVESTMENT').map(bank => {
                         const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                         const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                         
                         return (
-                          <option key={bank.id} value={bank.id} style={{ backgroundColor: '#272a2f' }}>
+                          <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1e2024' }}>
                             {bank.name}{bankUsersText}
                           </option>
                         );
@@ -1712,7 +1623,7 @@ export default function Investissement() {
                     </select>
                   </td>
                   <td className="px-4 py-2">
-                    <span className="text-sm text-gray-300">
+                    <span className="text-sm text-zinc-300">
                       {editingTransaction?.bankId ? 
                         (() => {
                           const selectedBankObj = banks.find(b => b.id === editingTransaction.bankId);
@@ -1730,7 +1641,7 @@ export default function Investissement() {
                       value={editingTransaction?.unitPrice || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, unitPrice: parseFloat(e.target.value) || 0} : null)}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                      style={{ backgroundColor: '#272a2f' }}
+                      style={{ backgroundColor: '#1e2024' }}
                       placeholder="0.00"
                     />
                   </td>
@@ -1741,7 +1652,7 @@ export default function Investissement() {
                       value={editingTransaction?.quantity || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, quantity: parseFloat(e.target.value) || 0} : null)}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                      style={{ backgroundColor: '#272a2f' }}
+                      style={{ backgroundColor: '#1e2024' }}
                       placeholder="0"
                     />
                   </td>
@@ -1752,7 +1663,7 @@ export default function Investissement() {
                       value={editingTransaction?.amount || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
-                      style={{ backgroundColor: '#272a2f' }}
+                      style={{ backgroundColor: '#1e2024' }}
                       placeholder="0.00"
                       required
                     />
@@ -1763,7 +1674,7 @@ export default function Investissement() {
                         type="button"
                         onClick={handleAddTransaction}
                         className="px-2 py-1 text-xs font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center gap-1"
-                        style={{ backgroundColor: '#6226fa', minWidth: '0' }}
+                        style={{ backgroundColor: '#7c3aed', minWidth: '0' }}
                         title="Ajouter"
                       >
                         <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
@@ -1777,9 +1688,9 @@ export default function Investissement() {
                 {filteredTransactions.map((transaction) => (
                   <tr
                     key={transaction.id}
-                    className="transition-colors cursor-pointer bg-[#272a2f] group"
+                    className="transition-colors cursor-pointer group"
                     style={{ borderLeft: '4px solid transparent' }}
-                    onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #6226fa'}
+                    onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #7c3aed'}
                     onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
                   >
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
@@ -1788,7 +1699,7 @@ export default function Investissement() {
                           type="date"
                           value={editingTransaction?.date || ''}
                           onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-                          className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent py-2 px-3" style={{ backgroundColor: '#1f2226' }}
+                          className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent py-2 px-3" style={{ backgroundColor: '#18191c' }}
                         />
                       ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'date' ? (
                         <input
@@ -1798,7 +1709,7 @@ export default function Investissement() {
                           onBlur={handleInlineSave}
                           onKeyDown={handleInlineKeyDown}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                           autoFocus
                         />
                       ) : (
@@ -1818,7 +1729,7 @@ export default function Investissement() {
                           value={editingTransaction?.description || ''}
                           onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                         />
                       ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'description' ? (
                         <input
@@ -1828,7 +1739,7 @@ export default function Investissement() {
                           onBlur={handleInlineSave}
                           onKeyDown={handleInlineKeyDown}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                           autoFocus
                         />
                       ) : (
@@ -1849,7 +1760,7 @@ export default function Investissement() {
                           onBlur={handleInlineSave}
                           onKeyDown={handleInlineKeyDown}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                           autoFocus
                         >
                           {banks
@@ -1859,7 +1770,7 @@ export default function Investissement() {
                               const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
                               
                               return (
-                                <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1f2226' }}>
+                                <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
                                   {bank.name}{bankUsersText}
                                 </option>
                               );
@@ -1873,7 +1784,7 @@ export default function Investissement() {
                         >
                           {transaction.bank.image ? (
                             <img
-                              src={`http://localhost:3001${transaction.bank.image}`}
+                              src={assetUrl(transaction.bank.image)}
                               alt={transaction.bank.name}
                               className="w-8 h-8 rounded-full object-cover"
                             />
@@ -1888,9 +1799,9 @@ export default function Investissement() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-300 text-center">
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-zinc-300 text-center">
                       <div className="flex justify-center">
-                        {renderUserAvatars(transaction.bank.users || [], { border: '2px solid #1f2226' })}
+                        {renderUserAvatars(transaction.bank.users || [], { border: '2px solid #18191c' })}
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
@@ -1901,7 +1812,7 @@ export default function Investissement() {
                           value={editingTransaction?.unitPrice || ''}
                           onChange={(e) => setEditingTransaction(prev => prev ? {...prev, unitPrice: parseFloat(e.target.value) || 0} : null)}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                         />
                       ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'unitPrice' ? (
                         <input
@@ -1912,7 +1823,7 @@ export default function Investissement() {
                           onBlur={handleInlineSave}
                           onKeyDown={handleInlineKeyDown}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                           autoFocus
                         />
                       ) : (
@@ -1933,7 +1844,7 @@ export default function Investissement() {
                           value={editingTransaction?.quantity || ''}
                           onChange={(e) => setEditingTransaction(prev => prev ? {...prev, quantity: parseFloat(e.target.value) || 0} : null)}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                         />
                       ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'quantity' ? (
                         <input
@@ -1944,7 +1855,7 @@ export default function Investissement() {
                           onBlur={handleInlineSave}
                           onKeyDown={handleInlineKeyDown}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                           autoFocus
                         />
                       ) : (
@@ -1965,7 +1876,7 @@ export default function Investissement() {
                           value={editingTransaction?.amount || ''}
                           onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                         />
                       ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
                         <input
@@ -1976,7 +1887,7 @@ export default function Investissement() {
                           onBlur={handleInlineSave}
                           onKeyDown={handleInlineKeyDown}
                           className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
-                          style={{ backgroundColor: '#1f2226' }}
+                          style={{ backgroundColor: '#18191c' }}
                           autoFocus
                         />
                       ) : (
@@ -1996,7 +1907,7 @@ export default function Investissement() {
                             onClick={handleSave}
                             className="transition-colors"
                             style={{ color: '#616875' }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
+                            onMouseEnter={(e) => e.currentTarget.style.color = '#7c3aed'}
                             onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           >
                             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2040,18 +1951,18 @@ export default function Investissement() {
           {/* Indicateur de chargement pour le scroll infini */}
           {loadingMore && (
             <div className="flex justify-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
-              <span className="ml-2 text-sm text-gray-300">Chargement...</span>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderBottomColor: '#7c3aed' }}></div>
+              <span className="ml-2 text-sm text-zinc-300">Chargement...</span>
             </div>
           )}
           
           {filteredTransactions.length === 0 && (
             <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="mx-auto h-12 w-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
               <h3 className="mt-2 text-sm font-medium text-white">Aucune transaction d'investissement</h3>
-              <p className="mt-1 text-sm text-gray-300">Commencez par ajouter une nouvelle transaction.</p>
+              <p className="mt-1 text-sm text-zinc-300">Commencez par ajouter une nouvelle transaction.</p>
             </div>
           )}
         </div>
@@ -2060,14 +1971,14 @@ export default function Investissement() {
       {/* Modal d'import CSV */}
       {showImportModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-          <div className="p-0 w-80 md:w-[24rem] lg:w-[28rem] xl:w-[32rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto" style={{ background: '#272a2f', maxHeight: '80vh' }}>
-            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between" style={{ background: '#1f2226' }}>
+          <div className="p-0 w-80 md:w-[24rem] lg:w-[28rem] xl:w-[32rem] max-h-[80vh] shadow-2xl rounded-xl overflow-y-auto bg-white/5 backdrop-blur-xl border border-white/10" style={{ maxHeight: '80vh' }}>
+            <div className="rounded-t-xl px-6 py-4 flex items-center justify-between bg-zinc-900/60">
               <h3 className="text-lg font-bold text-white">
                 Importer des transactions depuis un fichier CSV
               </h3>
               <button
                 onClick={() => setShowImportModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-zinc-400 hover:text-white transition-colors"
               >
                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2078,7 +1989,7 @@ export default function Investissement() {
 
               {/* Sélection de la banque */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Compte d'investissement de destination *
                 </label>
                 <select
@@ -2087,7 +1998,7 @@ export default function Investissement() {
                     setImportBankId(e.target.value);
                   }}
                   className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
-                  style={{ backgroundColor: '#1f2226' }}
+                  style={{ backgroundColor: '#18191c' }}
                   required
                 >
                   <option value="">Sélectionnez un compte...</option>
@@ -2108,16 +2019,16 @@ export default function Investissement() {
 
               {/* Zone de drop de fichier */}
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Fichier CSV *
                 </label>
-                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-700 border-dashed rounded-md hover:border-gray-400 transition-colors" style={{ backgroundColor: '#23262b' }}>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-zinc-800 border-dashed rounded-lg hover:border-zinc-600 transition-colors bg-zinc-900/40">
                   <div className="space-y-1 text-center">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                    <svg className="mx-auto h-12 w-12 text-zinc-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                       <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <div className="flex text-sm text-gray-400">
-                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-[#1f2226] rounded-md font-medium hover:text-purple-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-purple-500 px-2 py-1" style={{ color: '#6226fa' }}>
+                    <div className="flex text-sm text-zinc-400">
+                      <label htmlFor="csv-upload" className="relative cursor-pointer bg-zinc-900/80 rounded-md font-medium text-violet-400 hover:text-violet-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-violet-500 px-2 py-1">
                         <span>Choisir un fichier</span>
                         <input
                           id="csv-upload"
@@ -2130,7 +2041,7 @@ export default function Investissement() {
                       </label>
                       <p className="pl-1">ou glisser-déposer</p>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-zinc-500">
                       CSV uniquement (max 10MB)
                     </p>
                   </div>
@@ -2147,7 +2058,7 @@ export default function Investissement() {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-300 bg-[#23262b] border border-gray-700 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   Annuler
                 </button>
@@ -2155,7 +2066,7 @@ export default function Investissement() {
                   onClick={handleImportCSV}
                   disabled={!csvFile || !localSelectedBank || importProgress.isImporting}
                   className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#6226fa' }}
+                  style={{ background: '#7c3aed' }}
                 >
                   {importProgress.isImporting ? 'Import en cours...' : 'Importer'}
                 </button>
@@ -2164,13 +2075,13 @@ export default function Investissement() {
               {/* Barre de progression */}
               {importProgress.isImporting && (
                 <div className="mt-4">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                  <div className="flex justify-between text-sm text-zinc-600 mb-1">
                     <span>Import en cours...</span>
                     <span>{importProgress.imported}/{importProgress.total}</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-zinc-800 rounded-full h-2">
                     <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-violet-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${importProgress.total > 0 ? (importProgress.imported / importProgress.total) * 100 : 0}%` }}
                     ></div>
                   </div>

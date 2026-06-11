@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { User, Bank } from '../types/index.js';
+import { assetUrl } from '../lib/url';
 
 export default function Users() {
   const { users, loadUsers, loadBanks } = useAppStore();
   const [loading, setLoading] = useState(true);
-  const [selectedUserBanks, setSelectedUserBanks] = useState<Bank[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [_selectedUserBanks, _setSelectedUserBanks] = useState<Bank[]>([]);
+  const [selectedUserId, _setSelectedUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: ''
   });
@@ -31,36 +32,6 @@ export default function Users() {
     
     initUsers();
   }, [loadUsers, loadBanks]);
-
-  const loadUserBanks = async (userId: string) => {
-    try {
-      const response = await fetch(`/api/users/${userId}`);
-      if (response.ok) {
-        const userData = await response.json();
-        // Transformer les données pour obtenir les banques
-        const banks = userData.userBanks.map((userBank: any) => userBank.bank);
-        setSelectedUserBanks(banks);
-      }
-    } catch (error) {
-      console.error('Error loading user banks:', error);
-    }
-  };
-
-  const handleSelectUser = (userId: string) => {
-    setSelectedUserId(userId);
-    loadUserBanks(userId);
-    // Initialiser les données du formulaire avec les données de l'utilisateur sélectionné
-    const selectedUser = users.find(u => u.id === userId);
-    if (selectedUser) {
-      setFormData({
-        name: selectedUser.name
-      });
-      setAvatarPreview(selectedUser.avatar ? `http://localhost:3001${selectedUser.avatar}` : null);
-      setAvatarFile(null);
-    }
-    setEditingId(null);
-    setEditingUser(null);
-  };
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,7 +90,7 @@ export default function Users() {
         // Mettre à jour l'aperçu avec la nouvelle image si elle a été uploadée
         if (avatarFile) {
           const updatedUser = await response.json();
-          setAvatarPreview(updatedUser.avatar ? `http://localhost:3001${updatedUser.avatar}` : null);
+          setAvatarPreview(updatedUser.avatar ? assetUrl(updatedUser.avatar) : null);
         }
         alert('Utilisateur mis à jour avec succès');
       } else {
@@ -134,50 +105,23 @@ export default function Users() {
     }
   };
 
-  const handleRemoveBankAccess = async (bankId: string, userId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir retirer l\'accès à cette banque ?')) {
-      return;
-    }
-    
-    try {
-      const response = await fetch(`/api/banks/${bankId}/share/${userId}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        await loadUserBanks(userId);
-        alert('Accès retiré avec succès');
-      }
-    } catch (error) {
-      console.error('Error removing bank access:', error);
-      alert('Erreur lors du retrait d\'accès');
-    }
-  };
-
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
+          <h2 className="text-2xl font-bold leading-7 text-zinc-50 sm:text-3xl sm:truncate">
             Gestion des utilisateurs
           </h2>
-          <p className="text-sm text-gray-400 mt-1">
+          <p className="text-sm text-zinc-400 mt-1">
             Gérez les utilisateurs et leurs banques associées
           </p>
         </div>
@@ -188,8 +132,7 @@ export default function Users() {
         {users.map((user) => (
           <div
             key={user.id}
-            className={`shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow h-80 ${selectedUserId === user.id ? 'ring-2 ring-blue-500' : ''}`}
-            style={{ backgroundColor: '#272a2f' }}
+            className={`rounded-2xl overflow-hidden h-80 bg-white/5 backdrop-blur-xl border border-white/10 transition-all duration-300 hover:border-violet-500/20 ${selectedUserId === user.id ? 'ring-2 ring-violet-500' : ''}`}
           >
             {editingId === user.id ? (
               <form onSubmit={handleSubmitEdit} className="h-full w-full flex flex-col">
@@ -198,7 +141,7 @@ export default function Users() {
                     {/* Avatar cliquable avec contour pointillé et icône plus */}
                     <div className="mb-4 flex justify-center w-full">
                       <label className="relative cursor-pointer mx-auto block" htmlFor={`avatar-upload-${user.id}`}> 
-                        <span className="absolute inset-0 w-20 h-20 rounded-full border-2 border-dashed pointer-events-none" style={{ borderColor: '#6226fa' }}></span>
+                        <span className="absolute inset-0 w-20 h-20 rounded-full border-2 border-dashed border-violet-500/60 pointer-events-none"></span>
                         {avatarPreview ? (
                           <>
                             <img
@@ -218,7 +161,7 @@ export default function Users() {
                             </button>
                           </>
                         ) : (
-                          <div className="w-20 h-20 rounded-full bg-gray-600 flex items-center justify-center text-white text-2xl font-bold mx-auto hover:opacity-80 transition relative">
+                          <div className="w-20 h-20 rounded-full bg-zinc-700 flex items-center justify-center text-white text-2xl font-bold mx-auto hover:opacity-80 transition relative">
                             {formData.name ? formData.name[0].toUpperCase() : '?'}
                           </div>
                         )}
@@ -237,7 +180,7 @@ export default function Users() {
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="mt-1 block rounded-md border-none focus:ring-0 text-white bg-gray-800 border-gray-600 focus:ring-violet-500 py-2 px-3 h-10 min-h-[2.5rem] text-base text-center"
+                        className="mt-1 block rounded-lg border border-zinc-700 focus:ring-1 focus:ring-violet-500 focus:border-violet-500 text-zinc-50 bg-zinc-900 py-2 px-3 h-10 min-h-[2.5rem] text-base text-center"
                         style={{ minWidth: '180px', maxWidth: '220px' }}
                         placeholder="Nom de l'utilisateur"
                         required
@@ -247,10 +190,10 @@ export default function Users() {
                   </div>
                 </div>
                 {/* Zone des boutons - toujours en bas, pleine largeur */}
-                <div className="px-6 py-3 rounded-b-lg flex justify-end items-center gap-2 w-full" style={{ backgroundColor: '#1f2226' }}>
+                <div className="px-6 py-3 rounded-b-2xl flex justify-end items-center gap-2 w-full bg-zinc-900/60">
                   <button
                     type="button"
-                    className="px-4 py-2 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-transparent hover:bg-gray-800 transition-colors"
+                    className="px-4 py-2 border border-zinc-700 rounded-lg text-sm font-medium text-zinc-300 bg-transparent hover:bg-white/5 transition-colors"
                     onClick={() => { 
                       setEditingId(null); 
                       setEditingUser(null); 
@@ -275,14 +218,14 @@ export default function Users() {
                 <button
                   type="button"
                   className="absolute top-4 right-4 transition-colors z-10"
-                  style={{ color: '#616875' }}
-                  onMouseEnter={e => e.currentTarget.style.color = '#6226fa'}
-                  onMouseLeave={e => e.currentTarget.style.color = '#616875'}
+                  style={{ color: '#52525b' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#a78bfa'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#52525b'}
                   onClick={() => { 
                     setEditingId(user.id); 
                     setEditingUser(user); 
                     setFormData({ name: user.name }); 
-                    setAvatarPreview(user.avatar ? `http://localhost:3001${user.avatar}` : null); 
+                    setAvatarPreview(user.avatar ? assetUrl(user.avatar) : null);
                     setAvatarFile(null); 
                   }}
                   title="Modifier l'utilisateur"
@@ -293,16 +236,16 @@ export default function Users() {
                 </button>
                 {user.avatar ? (
                   <img
-                    src={`http://localhost:3001${user.avatar}`}
+                    src={assetUrl(user.avatar)}
                     alt={user.name}
-                    className="w-24 h-24 rounded-full object-cover border-2 border-gray-200 mb-4"
+                    className="w-24 h-24 rounded-full object-cover ring-2 ring-white/10 mb-4"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-gray-600 flex items-center justify-center text-white text-3xl font-bold mb-4">
+                  <div className="w-24 h-24 rounded-full bg-zinc-700 flex items-center justify-center text-white text-3xl font-bold mb-4">
                     {user.name ? user.name[0].toUpperCase() : '?'}
                   </div>
                 )}
-                <h4 className="text-xl font-medium text-white text-center px-4">{user.name}</h4>
+                <h4 className="text-xl font-medium text-zinc-50 text-center px-4">{user.name}</h4>
               </div>
             )}
           </div>

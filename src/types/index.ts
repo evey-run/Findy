@@ -2,6 +2,7 @@ export interface User {
   id: string;
   name: string;
   avatar?: string;
+  email?: string; // Optional field for future use
   createdAt: string;
   updatedAt: string;
   userBanks?: UserBank[];

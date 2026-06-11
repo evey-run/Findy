@@ -2,83 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { getAllBankBalances } from '../api/bankBalance';
+import { assetUrl } from '../lib/url';
 
-// Styles pour la barre de scroll personnalisée
-const scrollbarStyles = `
-  /* Webkit browsers (Chrome, Safari, Edge) */
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #6226fa;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:active {
-    background: #6226fa;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Firefox */
-  html {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
-  }
-  
-  /* Styles spécifiques pour les conteneurs avec scroll */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #6226fa !important;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed !important;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:active {
-    background: #6226fa !important;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Force pour tous les scrollbars */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
-  }
-`;
-
-// Injecter les styles dans le document
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = scrollbarStyles;
-  if (!document.head.querySelector('style[data-scrollbar-custom]')) {
-    styleElement.setAttribute('data-scrollbar-custom', 'true');
-    document.head.appendChild(styleElement);
-  }
-}
 
 // Helper function pour formater l'IBAN avec un espace tous les 4 caractères
 const formatIBAN = (iban: string): string => {
@@ -115,11 +40,7 @@ const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') =
   }
 };
 
-// Définition de l'interface User pour éviter les erreurs de typage
-interface User {
-  id: string;
-  name: string;
-}
+
 
 export default function Banks() {
   const { banks, transactions, loadBanks, loadTransactions, selectedUser, users, loadUsers } = useAppStore();
@@ -292,7 +213,7 @@ export default function Banks() {
     
     // Set image preview if bank has an image
     if (bank.image) {
-      setImagePreview(`http://localhost:3001${bank.image}`);
+      setImagePreview(assetUrl(bank.image));
     } else {
       setImagePreview(null);
     }
@@ -446,7 +367,7 @@ export default function Banks() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
       </div>
     );
   }
@@ -506,13 +427,13 @@ export default function Banks() {
   const bankStats = calculateBankStats();
   
   return (
-    <div className="space-y-6 min-h-screen pb-[40px]" style={{ backgroundColor: '#202427' }}>
+    <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             {selectedUser ? `Banques de ${selectedUser.name}` : 'Toutes les banques'}
           </h2>
-          <p className="text-sm text-gray-300 mt-1">
+          <p className="text-sm text-zinc-300 mt-1">
             {showArchived 
               ? 'Gérer les banques archivées - Cliquez sur "Restaurer" pour remettre une banque en service'
               : 'Cliquez sur une banque pour voir ses transactions'
@@ -530,7 +451,7 @@ export default function Banks() {
                 loadArchivedBanks();
               }
             }}
-            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
+            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-zinc-700 hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
           >
             {showArchived ? 'Voir les banques actives' : 'Voir les banques archivées'}
           </button>
@@ -539,21 +460,21 @@ export default function Banks() {
       
       {/* Bandeau récapitulatif */}
       {!showArchived && banks.length > 0 && (
-        <div className="p-6 rounded-lg shadow-lg mb-6 mt-4" style={{ backgroundColor: '#272a2f', borderLeft: '4px solid #6226fa' }}>
+        <div className="p-6 rounded-2xl mb-6 mt-4 bg-white/5 backdrop-blur-xl border border-white/10" style={{ borderLeft: '4px solid #7c3aed' }}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Solde total */}
             <div className="flex flex-col">
-              <span className="text-sm text-gray-400 mb-1">Solde total</span>
+              <span className="text-sm text-zinc-400 mb-1">Solde total</span>
               <span className="text-2xl font-bold text-white">{formatAmount(bankStats.totalBalance)}</span>
             </div>
             
             {/* Nombre de comptes */}
             <div className="flex flex-col">
-              <span className="text-sm text-gray-400 mb-1">Nombre de comptes</span>
+              <span className="text-sm text-zinc-400 mb-1">Nombre de comptes</span>
               <div className="flex items-center space-x-2">
                 <span className="text-2xl font-bold text-white">{bankStats.totalAccounts}</span>
                 <div className="flex flex-col text-xs">
-                  <span className="text-gray-300">{bankStats.currentAccounts} courants</span>
+                  <span className="text-zinc-300">{bankStats.currentAccounts} courants</span>
                   <span className="text-violet-300">{bankStats.savingsAccounts} épargne</span>
                   <span className="text-purple-300">{bankStats.investmentAccounts} investissement</span>
                 </div>
@@ -562,15 +483,15 @@ export default function Banks() {
             
             {/* Dernière mise à jour */}
             <div className="flex flex-col">
-              <span className="text-sm text-gray-400 mb-1">Dernière mise à jour</span>
+              <span className="text-sm text-zinc-400 mb-1">Dernière mise à jour</span>
               <div className="flex items-center space-x-2">
                 <span className="text-white">{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                 <button 
                   onClick={refreshBalances}
-                  className="p-1 rounded hover:bg-gray-700 transition-colors"
+                  className="p-1 rounded hover:bg-zinc-700 transition-colors"
                   title="Rafraîchir les soldes"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
                 </button>
@@ -586,7 +507,7 @@ export default function Banks() {
             <div key={bank.id}>
               {/* Si la banque est en cours d'édition, afficher le formulaire d'édition */}
               {editingBank?.id === bank.id ? (
-              <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
+              <div className="rounded-2xl border-2 flex flex-col h-80 bg-white/5 backdrop-blur-xl" style={{ borderColor: '#7c3aed' }}>
                 <form onSubmit={handleSubmit} className="flex flex-col h-full">
                   {/* Section principale - même structure qu'une carte de banque */}
                   <div className="p-6 flex-1">
@@ -596,7 +517,7 @@ export default function Banks() {
                         {/* Logo/Image - même taille que les cartes (w-12 h-12) */}
                         <div 
                           className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
-                          style={{ borderColor: '#6226fa', backgroundColor: '#f0f0ff' }}
+                          style={{ borderColor: '#7c3aed', backgroundColor: '#f0f0ff' }}
                           onClick={() => document.getElementById('imageInput-edit')?.click()}
                           title="Cliquez pour choisir une image"
                         >
@@ -607,7 +528,7 @@ export default function Banks() {
                               className="w-full h-full rounded-full object-cover"
                             />
                           ) : (
-                            <span className="text-lg font-bold" style={{ color: '#6226fa' }}>
+                            <span className="text-lg font-bold" style={{ color: '#7c3aed' }}>
                               {formData.shortName || 'LOGO'}
                             </span>
                           )}
@@ -641,7 +562,7 @@ export default function Banks() {
                                 setFormData({...formData, accountType: e.target.value as any});
                               }}
                               className="text-xs border-none focus:ring-0 rounded-md"
-                              style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                              style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                             >
                               <option value="CURRENT">Compte courant</option>
                               <option value="SAVINGS">Livret d'épargne</option>
@@ -655,7 +576,7 @@ export default function Banks() {
                             type="text"
                             value={formData.iban}
                             onChange={(e) => setFormData({...formData, iban: e.target.value.replace(/\s+/g, '')})}
-                            className="text-xs text-gray-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
+                            className="text-xs text-zinc-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
                             placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
                           />
                         </div>
@@ -666,7 +587,7 @@ export default function Banks() {
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="text-gray-400 hover:text-red-400 transition-colors"
+                          className="text-zinc-400 hover:text-red-400 transition-colors"
                           title="Annuler"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -685,7 +606,7 @@ export default function Banks() {
                           value={formData.shortName}
                           onChange={(e) => setFormData({...formData, shortName: e.target.value})}
                           className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
                           placeholder="Nom court (BNP)"
                           maxLength={3}
                           required
@@ -695,7 +616,7 @@ export default function Banks() {
                           value={formData.createdAt}
                           onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
                           className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
                           required
                         />
                         <input
@@ -703,8 +624,8 @@ export default function Banks() {
                           step="1"
                           value={formData.balance}
                           onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold text-white bg-gray-800 border-gray-600 focus:ring-violet-500"
-                          style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold text-white bg-zinc-800 border-zinc-600 focus:ring-violet-500"
+                          style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
                           placeholder="Solde initial"
                           required
                         />
@@ -713,10 +634,10 @@ export default function Banks() {
                       {/* Sélection utilisateurs - 2 utilisateurs par ligne */}
                       {(
                         <div>
-                          <label className="block text-xs font-medium text-gray-300 mb-1">
+                          <label className="block text-xs font-medium text-zinc-300 mb-1">
                             Utilisateurs ayant accès *
                           </label>
-                          <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#1f2226', border: '1px solid #272a2f' }}>
+                          <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#18191c', border: '1px solid #1e2024' }}>
                             {users.map(user => (
                               <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-white/10 px-1 py-0.5 rounded text-xs">
                                 <input
@@ -735,22 +656,22 @@ export default function Banks() {
                                       });
                                     }
                                   }}
-                                  className="w-3 h-3 rounded border-gray-600 focus:ring-2"
-                                  style={{ color: '#6226fa', accentColor: '#6226fa' }}
+                                  className="w-3 h-3 rounded border-zinc-700 focus:ring-2"
+                                  style={{ color: '#7c3aed', accentColor: '#7c3aed' }}
                                 />
                                 <div className="flex items-center space-x-1">
                                   {user.avatar ? (
                                     <img
-                                      src={`http://localhost:3001${user.avatar}`}
+                                      src={assetUrl(user.avatar)}
                                       alt={user.name}
                                       className="w-3 h-3 rounded-full object-cover"
                                     />
                                   ) : (
-                                    <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#6226fa' }}>
+                                    <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#7c3aed' }}>
                                       {user.name.charAt(0).toUpperCase()}
                                     </div>
                                   )}
-                                  <span className="text-xs text-gray-300">{user.name}</span>
+                                  <span className="text-xs text-zinc-300">{user.name}</span>
                                 </div>
                               </label>
                             ))}
@@ -762,17 +683,17 @@ export default function Banks() {
                   </div>
                   
                   {/* Footer - même style que les cartes */}
-                  <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+                  <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
                     <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-400">
+                      <div className="text-sm text-zinc-400">
                         Modification
                       </div>
                       <div className="flex space-x-2">
                         <button
                           type="button"
                           onClick={resetForm}
-                          className="px-3 py-1 text-xs border rounded hover:opacity-80 text-gray-300"
-                          style={{ backgroundColor: '#1f2226', borderColor: '#3a3d42' }}
+                          className="px-3 py-1 text-xs border rounded hover:opacity-80 text-zinc-300"
+                          style={{ backgroundColor: '#18191c', borderColor: '#3a3d42' }}
                         >
                           Annuler
                         </button>
@@ -780,7 +701,7 @@ export default function Banks() {
                           type="submit"
                           disabled={!formData.name.trim() || !formData.shortName.trim() || formData.userIds.length === 0}
                           className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                          style={{ backgroundColor: '#6227f5' }}
+                          style={{ backgroundColor: '#7c3aed' }}
                         >
                           Sauvegarder
                         </button>
@@ -791,21 +712,21 @@ export default function Banks() {
               </div>
             ) : (
               /* Carte normale de banque */
-              <div className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f' }}>
+              <div className="rounded-2xl overflow-hidden transition-shadow flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10">
                 <div className="p-6 flex-1 flex flex-col">
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       {bank.image ? (
                         <img
-                          src={`http://localhost:3001${bank.image}`}
+                          src={assetUrl(bank.image)}
                           alt={bank.name}
                           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                         />
                       ) : (
                         <div 
                           className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                          style={{ backgroundColor: '#6226fa' }}
+                          style={{ backgroundColor: '#7c3aed' }}
                         >
                           {bank.shortName}
                         </div>
@@ -813,11 +734,11 @@ export default function Banks() {
                       <div className="ml-4">
                         <div className="flex items-center gap-2">
                           <h3 className="text-lg font-medium text-white">{bank.name}</h3>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-zinc-400">
                             Créé le {new Date(bank.createdAt).toLocaleDateString('fr-FR')}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-300">
+                        <p className="text-sm text-zinc-300">
                           {getAccountTypeInfo(bank.accountType).label}
                           {!selectedUser && bank.users && bank.users.length > 0 && (
                             <span className="ml-2 text-violet-300">
@@ -826,7 +747,7 @@ export default function Banks() {
                           )}
                         </p>
                         {bank.iban && (
-                          <p className="text-xs text-gray-400 mt-1 font-mono">
+                          <p className="text-xs text-zinc-400 mt-1 font-mono">
                             {formatIBAN(bank.iban)}
                           </p>
                         )}
@@ -838,9 +759,9 @@ export default function Banks() {
                             e.stopPropagation();
                             handleEdit(bank);
                           }}
-                          className="transition-colors text-gray-400"
+                          className="transition-colors text-zinc-400"
                           onMouseEnter={(e) => e.currentTarget.className = 'transition-colors text-violet-300'}
-                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-gray-400'}
+                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-zinc-400'}
                           title="Modifier"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -852,9 +773,9 @@ export default function Banks() {
                             e.stopPropagation();
                             handleDelete(bank.id);
                           }}
-                          className="transition-colors text-gray-400"
+                          className="transition-colors text-zinc-400"
                           onMouseEnter={(e) => e.currentTarget.className = 'transition-colors text-red-400'}
-                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-gray-400'}
+                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-zinc-400'}
                           title="Supprimer"
                         >
                           <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -864,7 +785,7 @@ export default function Banks() {
                       </div>
                   </div>
                   <div className="mt-4">
-                    <div className="text-sm text-gray-300 mb-1">
+                    <div className="text-sm text-zinc-300 mb-1">
                       Solde actuel
                     </div>
                     <div className="text-2xl font-bold text-white">
@@ -872,14 +793,14 @@ export default function Banks() {
                     </div>
                   </div>
                 </div>
-                <div className="px-6 py-4" style={{ backgroundColor: '#1f2226' }}>
+                <div className="px-6 py-4" style={{ backgroundColor: '#18191c' }}>
                   {/* Section des transactions agrandie */}
                   {transactions.filter(t => t.bankId === bank.id).length > 0 ? (
                     <div>
                       <div 
                         className="flex items-center justify-between mb-3"
                       >
-                        <p className="text-sm font-medium text-gray-300">
+                        <p className="text-sm font-medium text-zinc-300">
                           Dernières transactions
                         </p>
 
@@ -893,7 +814,7 @@ export default function Banks() {
                               key={transaction.id} 
                               className="flex justify-between items-center text-sm"
                             >
-                              <span className="text-gray-400 truncate flex-1 mr-2 text-xs">
+                              <span className="text-zinc-400 truncate flex-1 mr-2 text-xs">
                                 {transaction.description}
                               </span>
                               <div className="flex items-center space-x-2">
@@ -912,12 +833,12 @@ export default function Banks() {
                       <div 
                         className="flex items-center justify-between mb-3"
                       >
-                        <p className="text-sm font-medium text-gray-300">
+                        <p className="text-sm font-medium text-zinc-300">
                           Transactions
                         </p>
 
                       </div>
-                      <div className="text-sm text-gray-400 mb-4">
+                      <div className="text-sm text-zinc-400 mb-4">
                         Aucune transaction récente
                       </div>
                     </div>
@@ -930,17 +851,17 @@ export default function Banks() {
         
         {/* Carte d'ajout de banque - toujours visible */}
         {!showAddForm ? (
-          <div 
-            className="shadow rounded-lg border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
+          <div
+            className="rounded-2xl border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
             style={{ 
               borderColor: '#616875' // couleur intermédiaire
             } as React.CSSProperties}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#6226fa';
+              e.currentTarget.style.borderColor = '#7c3aed';
               const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
               const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#6226fa';
-              if (text) text.style.color = '#6226fa';
+              if (icon) icon.style.color = '#7c3aed';
+              if (text) text.style.color = '#7c3aed';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = '#616875';
@@ -966,7 +887,7 @@ export default function Banks() {
             </div>
           </div>
         ) : (
-          <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
+          <div className="rounded-2xl border-2 flex flex-col h-80 bg-white/5 backdrop-blur-xl" style={{ borderColor: '#7c3aed' }}>
             <form onSubmit={handleSubmit} className="flex flex-col h-full">
               {/* Section principale - même structure qu'une carte de banque */}
               <div className="p-6 flex-1">
@@ -976,7 +897,7 @@ export default function Banks() {
                     {/* Logo/Image - même taille que les cartes (w-12 h-12) */}
                     <div 
                       className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
-                      style={{ borderColor: '#6226fa', backgroundColor: '#f0f0ff' }}
+                      style={{ borderColor: '#7c3aed', backgroundColor: '#f0f0ff' }}
                       onClick={() => document.getElementById('imageInput-add')?.click()}
                       title="Cliquez pour choisir une image"
                     >
@@ -987,7 +908,7 @@ export default function Banks() {
                           className="w-full h-full rounded-full object-cover"
                         />
                       ) : (
-                        <span className="text-lg font-bold" style={{ color: '#6226fa' }}>
+                        <span className="text-lg font-bold" style={{ color: '#7c3aed' }}>
                           {formData.shortName || '+'}
                         </span>
                       )}
@@ -1018,7 +939,7 @@ export default function Banks() {
                           value={formData.accountType}
                           onChange={(e) => setFormData({...formData, accountType: e.target.value as any})}
                           className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
-                          style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                          style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                         >
                           <option value="CURRENT">Compte courant</option>
                           <option value="SAVINGS">Livret d'épargne</option>
@@ -1032,7 +953,7 @@ export default function Banks() {
                         type="text"
                         value={formData.iban}
                         onChange={(e) => setFormData({...formData, iban: e.target.value.replace(/\s+/g, '')})}
-                        className="text-xs text-gray-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
+                        className="text-xs text-zinc-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
                         placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
                       />
                     </div>
@@ -1056,7 +977,7 @@ export default function Banks() {
                           setImagePreview(null);
                           setImageFile(null);
                         }}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-zinc-400 hover:text-zinc-600"
                         title="Annuler"
                       >
                         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1075,7 +996,7 @@ export default function Banks() {
                       value={formData.shortName}
                       onChange={(e) => setFormData({...formData, shortName: e.target.value})}
                       className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                      style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                      style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
                       placeholder="Nom court (BNP)"
                       maxLength={3}
                       required
@@ -1085,7 +1006,7 @@ export default function Banks() {
                       value={formData.createdAt}
                       onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
                       className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                      style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                      style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
                       required
                     />
                     <input
@@ -1094,7 +1015,7 @@ export default function Banks() {
                       value={formData.balance}
                       onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
                       className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold"
-                      style={{ backgroundColor: '#1f2226', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#6226fa' } as any}
+                      style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
                       placeholder="Solde initial"
                       required
                     />
@@ -1103,10 +1024,10 @@ export default function Banks() {
                   {/* Sélection utilisateurs - format horizontal compact */}
                   {(
                     <div>
-                      <label className="block text-xs font-medium text-gray-300 mb-1">
+                      <label className="block text-xs font-medium text-zinc-300 mb-1">
                         Utilisateurs ayant accès *
                       </label>
-                      <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#1f2226', border: '1px solid #272a2f' }}>
+                      <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#18191c', border: '1px solid #1e2024' }}>
                         {users.map(user => (
                           <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-white/10 px-1 py-0.5 rounded text-xs">
                             <input
@@ -1125,22 +1046,22 @@ export default function Banks() {
                                   });
                                 }
                               }}
-                              className="w-3 h-3 rounded border-gray-600 focus:ring-2"
-                              style={{ color: '#6226fa', accentColor: '#6226fa' }}
+                              className="w-3 h-3 rounded border-zinc-700 focus:ring-2"
+                              style={{ color: '#7c3aed', accentColor: '#7c3aed' }}
                             />
                             <div className="flex items-center space-x-1">
                               {user.avatar ? (
                                 <img
-                                  src={`http://localhost:3001${user.avatar}`}
+                                  src={assetUrl(user.avatar)}
                                   alt={user.name}
                                   className="w-3 h-3 rounded-full object-cover"
                                 />
                               ) : (
-                                <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#6226fa' }}>
+                                <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#7c3aed' }}>
                                   {user.name.charAt(0).toUpperCase()}
                                 </div>
                               )}
-                              <span className="text-xs text-gray-300 truncate max-w-16">{user.name}</span>
+                              <span className="text-xs text-zinc-300 truncate max-w-16">{user.name}</span>
                             </div>
                           </label>
                         ))}
@@ -1152,9 +1073,9 @@ export default function Banks() {
               </div>
               
               {/* Footer - même style que les cartes */}
-              <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+              <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
                 <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-zinc-500">
                     Nouveau compte
                   </div>
                   <div className="flex space-x-2">
@@ -1175,7 +1096,7 @@ export default function Banks() {
                         setImageFile(null);
                       }}
                       className="px-3 py-1 text-xs border rounded hover:opacity-80"
-                      style={{ backgroundColor: '#1f2226', color: '#a0aec0', borderColor: '#3a3d42' }}
+                      style={{ backgroundColor: '#18191c', color: '#a0aec0', borderColor: '#3a3d42' }}
                     >
                       Annuler
                     </button>
@@ -1183,7 +1104,7 @@ export default function Banks() {
                       type="submit"
                       disabled={!formData.name.trim() || !formData.shortName.trim() || formData.userIds.length === 0}
                       className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: '#6227f5' }}
+                      style={{ backgroundColor: '#7c3aed' }}
                     >
                       Ajouter
                     </button>
@@ -1202,13 +1123,13 @@ export default function Banks() {
           <h3 className="text-xl font-bold text-white mb-4">Banques archivées</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
             {archivedBanks.map((bank: Bank) => (
-              <div key={bank.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f', opacity: '0.85' }}>
+              <div key={bank.id} className="rounded-2xl overflow-hidden transition-shadow flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10" style={{ opacity: '0.85' }}>
                 <div className="p-6 flex-1 flex flex-col">
                   <div>
                     <div className="flex items-center">
                       {bank.image ? (
                         <img
-                          src={`http://localhost:3001${bank.image}`}
+                          src={assetUrl(bank.image)}
                           alt={bank.name}
                           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                           style={{ opacity: '0.7' }}
@@ -1216,7 +1137,7 @@ export default function Banks() {
                       ) : (
                         <div 
                           className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                          style={{ backgroundColor: '#6226fa', opacity: '0.7' }}
+                          style={{ backgroundColor: '#7c3aed', opacity: '0.7' }}
                         >
                           {bank.shortName}
                         </div>
@@ -1224,11 +1145,11 @@ export default function Banks() {
                       <div className="ml-4">
                         <div className="flex items-center gap-2">
                           <h3 className="text-lg font-medium text-white">{bank.name}</h3>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-zinc-400">
                             Archivé le {bank.archivedAt ? new Date(bank.archivedAt).toLocaleDateString('fr-FR') : 'N/A'}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-300">
+                        <p className="text-sm text-zinc-300">
                           {getAccountTypeInfo(bank.accountType).label}
                           {!selectedUser && bank.users && bank.users.length > 0 && (
                             <span className="ml-2 text-violet-300">
@@ -1237,7 +1158,7 @@ export default function Banks() {
                           )}
                         </p>
                         {bank.iban && (
-                          <p className="text-xs text-gray-400 mt-1 font-mono">
+                          <p className="text-xs text-zinc-400 mt-1 font-mono">
                             {formatIBAN(bank.iban)}
                           </p>
                         )}
@@ -1250,7 +1171,7 @@ export default function Banks() {
                         <div className="text-xl font-bold text-white">
                           {formatAmount(bank.balance)}
                         </div>
-                        <div className="text-xs text-gray-400">
+                        <div className="text-xs text-zinc-400">
                           Solde lors de l'archivage
                         </div>
                       </div>

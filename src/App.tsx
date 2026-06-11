@@ -41,7 +41,7 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-900">
+      <div className="min-h-screen bg-[#09090b]">
         <Layout>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -54,13 +54,15 @@ function App() {
             <Route path="/users" element={<Users />} />
           </Routes>
         </Layout>
-        <Toaster 
+        <Toaster
           position="top-right"
           toastOptions={{
             duration: 3000,
             style: {
-              background: '#363636',
-              color: '#fff',
+              background: '#18181b',
+              color: '#fafafa',
+              border: '1px solid rgba(255,255,255,0.1)',
+              backdropFilter: 'blur(24px)',
             },
           }}
         />

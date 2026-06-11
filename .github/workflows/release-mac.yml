@@ -1,0 +1,144 @@
+name: Release macOS
+
+# Déclenché sur un tag vX.Y.Z  →  git tag v1.0.0 && git push --tags
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  # Désactive la signature Apple (pas de certificat Developer ID)
+  TAURI_SIGNING_PRIVATE_KEY: ""
+
+jobs:
+  # ─── 1. Créer la release GitHub (vide) ─────────────────────────────────────
+  create-release:
+    name: Créer la release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create.outputs.upload_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Créer la release GitHub
+        id: create
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Finance ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          body: |
+            ## Finance ${{ github.ref_name }}
+
+            ### Téléchargement
+            | Fichier | Architecture |
+            |---------|-------------|
+            | `Finance_*_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
+            | `Finance_*_x64.dmg` | Intel Mac |
+
+            ### Installation
+            1. Ouvrir le `.dmg` correspondant à ton Mac
+            2. Glisser **Finance.app** dans `/Applications`
+            3. **Contourner Gatekeeper** (app non signée) — une seule fois :
+               ```bash
+               xattr -rd com.apple.quarantine /Applications/Finance.app
+               ```
+               ou double-cliquer sur **`fix-quarantine.command`** ci-joint.
+
+            ### Données persistantes
+            Base de données et images stockées dans :
+            `~/Library/Application Support/com.evey.finance/`
+          files: scripts/fix-quarantine.command
+
+  # ─── 2a. Build arm64 (Apple Silicon M1/M2/M3/M4) ──────────────────────────
+  build-arm64:
+    name: Build arm64 (Apple Silicon)
+    runs-on: macos-14
+    needs: create-release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "file:/tmp/build.db"
+
+      - name: Compiler le serveur (Bun)
+        run: bash scripts/build-server.sh
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri (arm64)
+        run: npm run tauri build
+
+      - name: Upload DMG arm64
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/dmg/*.dmg
+
+  # ─── 2b. Build x64 (Intel) ─────────────────────────────────────────────────
+  build-x64:
+    name: Build x64 (Intel)
+    runs-on: macos-13
+    needs: create-release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "file:/tmp/build.db"
+
+      - name: Compiler le serveur (Bun)
+        run: bash scripts/build-server.sh
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri (x64)
+        run: npm run tauri build
+
+      - name: Upload DMG x64
+        uses: softprops/action-gh-release@v2
+        with:
+          files: src-tauri/target/release/bundle/dmg/*.dmg
