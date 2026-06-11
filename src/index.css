@@ -2,61 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Fond global du site */
+:root {
+  --bg:           #09090b;
+  --surface:      #18181b;
+  --border:       #27272a;
+  --brand:        #7c3aed;
+  --brand-light:  #a78bfa;
+  --text:         #fafafa;
+  --text-muted:   #a1a1aa;
+}
+
 body {
-  background-color: #202427;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
 #root {
-  background-color: #202427;
+  background-color: var(--bg);
   min-height: 100vh;
 }
 
-/* Force French date format for all date inputs */
-input[type="date"] {
-  position: relative;
+::selection {
+  background-color: rgba(124, 58, 237, 0.3);
 }
 
-/* WebKit browsers (Chrome, Safari, Edge) */
-input[type="date"]::-webkit-datetime-edit-fields-wrapper {
-  display: flex;
+/* Custom scrollbar */
+::-webkit-scrollbar       { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3f3f46 transparent;
 }
 
-input[type="date"]::-webkit-datetime-edit-day-field {
-  order: 1;
-}
+/* Date inputs — French order */
+input[type="date"] { position: relative; text-align: left; direction: ltr; }
+input[type="date"]::-webkit-datetime-edit-fields-wrapper { display: flex; }
+input[type="date"]::-webkit-datetime-edit-day-field   { order: 1; }
+input[type="date"]::-webkit-datetime-edit-month-field { order: 2; }
+input[type="date"]::-webkit-datetime-edit-year-field  { order: 3; }
+input[type="date"]::-moz-focus-inner { border: 0; }
 
-input[type="date"]::-webkit-datetime-edit-month-field {
-  order: 2;
-}
-
-input[type="date"]::-webkit-datetime-edit-year-field {
-  order: 3;
-}
-
-/* Firefox */
-input[type="date"]::-moz-focus-inner {
-  border: 0;
-}
-
-/* General date input styling */
-input[type="date"] {
-  text-align: left;
-  direction: ltr;
-}
-
-input[type="date"]:lang(fr) {
-  text-align: left;
-}
-
-/* Style pour les avatars */
+/* Avatar tooltip */
 .avatar-tooltip {
   position: absolute;
   top: -32px;
   left: 50%;
   transform: translateX(-50%);
-  background-color: rgba(0, 0, 0, 0.8);
+  background-color: rgba(0, 0, 0, 0.85);
   color: white;
   padding: 4px 8px;
   border-radius: 4px;
@@ -67,6 +65,4 @@ input[type="date"]:lang(fr) {
   z-index: 1000;
 }
 
-.avatar-container:hover .avatar-tooltip {
-  opacity: 1;
-}
+.avatar-container:hover .avatar-tooltip { opacity: 1; }

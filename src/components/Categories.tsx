@@ -8,82 +8,6 @@ import {
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
-// Styles pour la barre de scroll personnalisée
-const scrollbarStyles = `
-  /* Webkit browsers (Chrome, Safari, Edge) */
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #6226fa;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:active {
-    background: #6226fa;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Firefox */
-  html {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
-  }
-  
-  /* Styles spécifiques pour les conteneurs avec scroll */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #6226fa !important;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed !important;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:active {
-    background: #6226fa !important;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Force pour tous les scrollbars */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
-  }
-`;
-
-// Injecter les styles dans le document
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = scrollbarStyles;
-  if (!document.head.querySelector('style[data-scrollbar-custom]')) {
-    styleElement.setAttribute('data-scrollbar-custom', 'true');
-    document.head.appendChild(styleElement);
-  }
-}
 
 interface EditingCategory {
   id: string;
@@ -113,11 +37,11 @@ export default function Categories() {
   const { 
     categories, 
     budgets,
-    transactions,
+    transactions: _transactions,
     allTransactions,
     loadCategories, 
     loadBudgets,
-    loadTransactions,
+    loadTransactions: _loadTransactions,
     loadAllTransactions,
     loadUsers,
     addCategory, 
@@ -125,8 +49,7 @@ export default function Categories() {
     removeCategory,
     addBudget,
     updateBudget,
-    removeBudget,
-    updateTransaction 
+    removeBudget
   } = useAppStore();
   
   const [loading, setLoading] = useState(true);
@@ -141,15 +64,21 @@ export default function Categories() {
   
   // Couleurs prédéfinies
   const predefinedColors = [
-    '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16',
-    '#22c55e', '#10b981', '#14b8a6', '#06b6d4', '#0ea5e9',
-    '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef',
-    '#ec4899', '#f43f5e', '#64748b', '#6b7280', '#374151'
+    '#54478c', // ultra-violet
+    '#2c699a', // lapis-lazuli
+    '#048ba8', // blue-munsell
+    '#0db39e', // keppel
+    '#16db93', // emerald
+    '#83e377', // light-green
+    '#b9e769', // mindaro
+    '#efea5a', // maize
+    '#f1c453', // saffron
+    '#f29e4c'  // sandy-brown
   ];
   
   // Types de catégories
   const categoryTypes = [
-    { value: 'INCOME', label: 'Revenus', color: '#10b981' },
+    { value: 'INCOME', label: 'Revenus', color: '#22c55e' },
     { value: 'EXPENSE', label: 'Dépenses', color: '#ef4444' },
     { value: 'FIXED', label: 'Fixe', color: '#6b7280' }
   ];
@@ -277,44 +206,6 @@ export default function Categories() {
       style: 'currency',
       currency: 'EUR'
     }).format(amount);
-  };
-
-  // Auto-assign uncategorized allTransactions based on category keywords
-  const autoAssignCategories = async () => {
-    try {
-      const rules = categories
-        .filter(c => c.keywords && c.keywords.length > 0)
-        .map(c => ({
-          categoryId: c.id,
-          keywords: (c.keywords || [])
-            .map(k => k.toLowerCase().trim())
-            .filter(Boolean)
-        }));
-
-      if (rules.length === 0) return;
-
-      const txToUpdate = allTransactions.filter(t => !t.categoryId && t.description);
-      for (const t of txToUpdate) {
-        const desc = (t.description || '').toLowerCase();
-        const match = rules.find(r => r.keywords.some(k => desc.includes(k)));
-        if (match) {
-          try {
-            const response = await fetch(`/api/allTransactions/${t.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ categoryId: match.categoryId })
-            });
-            if (response.ok) {
-              updateTransaction(t.id, { categoryId: match.categoryId });
-            }
-          } catch (e) {
-            console.error('Failed to auto-assign transaction', t.id, e);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('Auto-assign categories failed:', e);
-    }
   };
 
   // Appeler l'API backend pour appliquer les mots-clés d'une catégorie
@@ -590,20 +481,20 @@ export default function Categories() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderBottomColor: '#6226fa' }}></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 min-h-screen pb-[40px]" style={{ backgroundColor: '#202427' }}>
+    <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between">
         <div className="flex-1 min-w-0">
           <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
             Catégories & Budgets
           </h2>
-          <p className="text-sm text-gray-300 mt-1">
+          <p className="text-sm text-zinc-300 mt-1">
             Gérez vos catégories de transactions et leurs budgets associés
           </p>
         </div>
@@ -612,7 +503,7 @@ export default function Categories() {
             type="button"
             onClick={() => setShowPieChart(prev => !prev)}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white hover:opacity-80"
-            style={{ backgroundColor: '#6227f5' }}
+            style={{ backgroundColor: '#7c3aed' }}
             title={showPieChart ? 'Masquer le camembert' : 'Afficher le camembert'}
           >
             <ChartBarIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
@@ -631,7 +522,7 @@ export default function Categories() {
                   type="button"
                   onClick={() => setChartMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
                   className="p-2 rounded-md text-white hover:opacity-80"
-                  style={{ backgroundColor: '#1f2226' }}
+                  style={{ backgroundColor: '#18191c' }}
                   aria-label="Mois précédent"
                   title="Mois précédent"
                 >
@@ -644,7 +535,7 @@ export default function Categories() {
                   type="button"
                   onClick={() => setChartMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
                   className="p-2 rounded-md text-white hover:opacity-80"
-                  style={{ backgroundColor: '#1f2226' }}
+                  style={{ backgroundColor: '#18191c' }}
                   aria-label="Mois suivant"
                   title="Mois suivant"
                 >
@@ -699,14 +590,12 @@ export default function Categories() {
 
               if (totalBudget <= 0) {
                 return (
-                  <div className="text-sm text-gray-300 text-center">Aucune donnée disponible. Ajoutez des transactions pour afficher le camembert.</div>
+                  <div className="text-sm text-zinc-300 text-center">Aucune donnée disponible. Ajoutez des transactions pour afficher le camembert.</div>
                 );
               }
 
               const size = 520;
               const radius = 200;
-              const strokeW = 48;
-              const circumference = 2 * Math.PI * radius;
               let angleOffset = 0; // in radians
 
               // Ordonner par budget décroissant pour lisibilité
@@ -789,21 +678,21 @@ export default function Categories() {
                         <li key={idx} className="flex items-center justify-between">
                           <div className="flex items-center min-w-0">
                             <span className="inline-block w-3 h-3 rounded-sm mr-2 flex-shrink-0" style={{ backgroundColor: d.color }} />
-                            <span className="text-sm text-gray-200 truncate">{d.label}</span>
+                            <span className="text-sm text-zinc-200 truncate">{d.label}</span>
                           </div>
                           <div className="text-right ml-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-300">
+                            <div className="text-sm text-zinc-300">
                               Dépenses: {formatCurrency(d.spending)}
-                              <span className="text-xs text-gray-500 ml-2">
+                              <span className="text-xs text-zinc-500 ml-2">
                                 {((d.budget ? d.spending / d.budget : 0) * 100).toFixed(0)}%
                               </span>
                             </div>
-                            <div className="text-xs text-gray-500">Budget mensuel: {formatCurrency(d.budget)} ({((d.budget / totalBudget) * 100).toFixed(1)}%)</div>
+                            <div className="text-xs text-zinc-500">Budget mensuel: {formatCurrency(d.budget)} ({((d.budget / totalBudget) * 100).toFixed(1)}%)</div>
                           </div>
                         </li>
                       ))}
                     </ul>
-                    <div className="mt-4 text-sm text-gray-300 text-center">
+                    <div className="mt-4 text-sm text-zinc-300 text-center">
                       Budget total: <span className="font-medium text-white">{formatCurrency(totalBudget)}</span>
                     </div>
                   </div>
@@ -821,7 +710,7 @@ export default function Categories() {
           const categoryBudget = getCategoryBudget(category.id);
           
           return (
-            <div key={category.id} className="shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-80" style={{ backgroundColor: '#272a2f' }}>
+            <div key={category.id} className="rounded-2xl overflow-hidden transition-shadow flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10">
               {editingId === category.id ? (
                 /* Edit Form Card - appears in place of the category being edited */
                 <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full">
@@ -830,7 +719,7 @@ export default function Categories() {
                       <div className="flex items-center">
                         <div 
                           className="relative w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                          style={{ backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
+                          style={{ backgroundColor: editingCategory?.color || '#7c3aed', color: 'white' }}
                           title="Changer la couleur (cliquer)"
                           onClick={() => setShowColorPicker(prev => !prev)}
                         >
@@ -840,14 +729,14 @@ export default function Categories() {
                           {showColorPicker && (
                             <div
                               className="absolute z-50 top-14 left-0 p-2 rounded-lg shadow-lg flex flex-row flex-wrap gap-2"
-                              style={{ backgroundColor: '#1f2226', border: '1px solid #374151', width: 420 }}
+                              style={{ backgroundColor: '#18191c', border: '1px solid #374151', width: 420 }}
                             >
                               {predefinedColors.slice(0, 16).map(color => (
                                 <button
                                   key={color}
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); setEditingCategory(prev => prev ? { ...prev, color } : null); setShowColorPicker(false); }}
-                                  className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-gray-600'}`}
+                                  className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-zinc-700'}`}
                                   style={{ backgroundColor: color }}
                                   title={color}
                                 />
@@ -871,7 +760,7 @@ export default function Categories() {
                               type="text"
                               value={editingCategory?.icon || ''}
                               onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                              className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent w-16"
+                              className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-16"
                               placeholder="🛒"
                             />
                             
@@ -879,11 +768,11 @@ export default function Categories() {
                               value={editingCategory?.type || ''}
                               onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
                               className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
-                              style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                              style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                               required
                             >
                               {categoryTypes.map(type => (
-                                <option key={type.value} value={type.value} style={{ backgroundColor: '#1f2226' }}>{type.label}</option>
+                                <option key={type.value} value={type.value} style={{ backgroundColor: '#18191c' }}>{type.label}</option>
                               ))}
                             </select>
                           </div>
@@ -895,7 +784,7 @@ export default function Categories() {
 
                     {/* Keywords section */}
                     <div className="mb-4">
-                      <label className="block text-sm text-gray-300 mb-2">Mots-clés (séparez par Entrée)</label>
+                      <label className="block text-sm text-zinc-300 mb-2">Mots-clés (séparez par Entrée)</label>
                       <div className="flex items-center gap-2 mb-2">
                         <input
                           type="text"
@@ -913,7 +802,7 @@ export default function Categories() {
                               setKeywordInput('');
                             }
                           }}
-                          className="text-sm text-white border-none focus:ring-0 p-2 bg-[#1f2226] rounded-md w-full"
+                          className="text-sm text-white border-none focus:ring-0 p-2 bg-zinc-900/80 rounded-md w-full"
                           placeholder="Ex: amazon, uber, loyer"
                         />
                         <button
@@ -928,14 +817,14 @@ export default function Categories() {
                             setKeywordInput('');
                           }}
                           className="px-3 py-2 text-xs border border-transparent rounded text-white hover:opacity-80"
-                          style={{ backgroundColor: '#6227f5' }}
+                          style={{ backgroundColor: '#7c3aed' }}
                         >
                           Ajouter
                         </button>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {(editingCategory?.keywords || []).map((kw, idx) => (
-                          <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#1f2226', color: '#e5e7eb', border: '1px solid #374151' }}>
+                          <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#18191c', color: '#e5e7eb', border: '1px solid #374151' }}>
                             {kw}
                             <button
                               type="button"
@@ -943,7 +832,7 @@ export default function Categories() {
                                 ...prev,
                                 keywords: (prev.keywords || []).filter(k => k !== kw)
                               } : null)}
-                              className="ml-1 text-gray-400 hover:text-white"
+                              className="ml-1 text-zinc-400 hover:text-white"
                               aria-label={`Supprimer le mot-clé ${kw}`}
                             >
                               ×
@@ -956,7 +845,7 @@ export default function Categories() {
                     {/* Budget section - Only for EXPENSE categories */}
                     {editingCategory?.type === 'EXPENSE' && (
                       <div className="mt-4">
-                        <div className="text-sm text-gray-300 mb-2">
+                        <div className="text-sm text-zinc-300 mb-2">
                           Budget (optionnel)
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -987,35 +876,35 @@ export default function Categories() {
                               }
                             } : null)}
                             className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
-                            style={{ backgroundColor: '#1f2226', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                            style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                           >
-                            <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
-                            <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>
-                            <option value="QUARTERLY" style={{ backgroundColor: '#1f2226' }}>Trimestre</option>
-                            <option value="YEARLY" style={{ backgroundColor: '#1f2226' }}>Annuel</option>
+                            <option value="MONTHLY" style={{ backgroundColor: '#18191c' }}>Mensuel</option>
+                            <option value="WEEKLY" style={{ backgroundColor: '#18191c' }}>Hebdo</option>
+                            <option value="QUARTERLY" style={{ backgroundColor: '#18191c' }}>Trimestre</option>
+                            <option value="YEARLY" style={{ backgroundColor: '#18191c' }}>Annuel</option>
                           </select>
                         </div>
                       </div>
                     )}
                   </div>
                   
-                  <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+                  <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
                     <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
+                      <div className="text-sm text-zinc-500">
                         Modifier la catégorie
                       </div>
                       <div className="flex space-x-2">
                         <button
                           type="button"
                           onClick={handleCancel}
-                          className="px-3 py-1 text-xs border border-gray-300 rounded text-white hover:text-gray-700 hover:bg-gray-100"
+                          className="px-3 py-1 text-xs border border-zinc-700 rounded text-white hover:text-zinc-100 hover:bg-zinc-800"
                         >
                           Annuler
                         </button>
                         <button
                           type="submit"
                           className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                          style={{ backgroundColor: '#6227f5' }}
+                          style={{ backgroundColor: '#7c3aed' }}
                         >
                           Sauvegarder
                         </button>
@@ -1036,7 +925,7 @@ export default function Categories() {
                         </div>
                         <div className="ml-4">
                           <h3 className="text-lg font-medium text-white">{category.name}</h3>
-                          <p className="text-sm text-gray-300">
+                          <p className="text-sm text-zinc-300">
                             {getTypeLabel(category.type)}
                           </p>
                         </div>
@@ -1046,7 +935,7 @@ export default function Categories() {
                           onClick={() => handleEdit(category)}
                           className="transition-colors"
                           style={{ color: '#616875' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#6226fa'}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#7c3aed'}
                           onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
                           title="Modifier"
                         >
@@ -1074,32 +963,32 @@ export default function Categories() {
                       {category.type === 'EXPENSE' && categoryBudget && categorySpending && (
                         <div>
                           <div className="flex justify-between items-center mb-3">
-                            <span className="text-sm font-medium text-gray-300">
+                            <span className="text-sm font-medium text-zinc-300">
                               Budget {categoryBudget.period === 'MONTHLY' ? 'Mensuel' : 
                              categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
                              categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}
                             </span>
                             <span 
                               className="text-xl font-bold"
-                              style={{ color: categorySpending.isOverBudget ? '#ef4444' : '#6226fa' }}
+                              style={{ color: categorySpending.isOverBudget ? '#ef4444' : '#7c3aed' }}
                             >
                               {Math.round(categorySpending.percentage)}%
                             </span>
                           </div>
                           
-                          <div className="w-full rounded-full h-3" style={{ backgroundColor: '#1f2226' }}>
+                          <div className="w-full rounded-full h-3" style={{ backgroundColor: '#18191c' }}>
                             <div
                               className="h-3 rounded-full transition-all duration-300"
                               style={{ 
                                 width: `${Math.min(categorySpending.percentage, 100)}%`,
-                                backgroundColor: categorySpending.isOverBudget ? '#ef4444' : '#6226fa'
+                                backgroundColor: categorySpending.isOverBudget ? '#ef4444' : '#7c3aed'
                               }}
                             />
                           </div>
                           
-                          <div className="flex justify-between text-sm text-gray-400 mt-2">
+                          <div className="flex justify-between text-sm text-zinc-400 mt-2">
                             <span></span>
-                            <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-gray-400'}>
+                            <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-zinc-400'}>
                               {formatCurrency(categorySpending.totalSpent)}/{formatCurrency(categoryBudget.amount)}
                             </span>
                           </div>
@@ -1108,8 +997,8 @@ export default function Categories() {
 
                       {/* No budget message for EXPENSE categories */}
                       {category.type === 'EXPENSE' && !categoryBudget && (
-                        <div className="p-3 rounded-md" style={{ backgroundColor: '#1f2226' }}>
-                          <div className="flex items-center justify-center text-gray-400 mb-2">
+                        <div className="p-3 rounded-md" style={{ backgroundColor: '#18191c' }}>
+                          <div className="flex items-center justify-center text-zinc-400 mb-2">
                             <ChartBarIcon className="h-4 w-4 mr-1" />
                             <span className="text-sm">Pas de budget défini</span>
                           </div>
@@ -1117,15 +1006,15 @@ export default function Categories() {
                       )}
                     </div>
                   </div>
-                  <div className="px-6 py-4" style={{ backgroundColor: '#1f2226' }}>
+                  <div className="px-6 py-4" style={{ backgroundColor: '#18191c' }}>
                     {/* Section des transactions - identique à Banks */}
                     {allTransactions.filter(t => t.categoryId === category.id).length > 0 ? (
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-medium text-gray-300">
+                          <p className="text-sm font-medium text-zinc-300">
                             Dernières transactions
                           </p>
-                          <span className="text-gray-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                          <span className="text-zinc-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
                             &gt;
                           </span>
                         </div>
@@ -1138,7 +1027,7 @@ export default function Categories() {
                                 key={transaction.id} 
                                 className="flex justify-between items-center text-sm"
                               >
-                                <span className="text-gray-400 truncate flex-1 mr-2 text-xs">
+                                <span className="text-zinc-400 truncate flex-1 mr-2 text-xs">
                                   {transaction.description}
                                 </span>
                                 <div className="flex items-center space-x-2">
@@ -1155,14 +1044,14 @@ export default function Categories() {
                     ) : (
                       <div>
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-medium text-gray-300">
+                          <p className="text-sm font-medium text-zinc-300">
                             Transactions
                           </p>
-                          <span className="text-gray-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                          <span className="text-zinc-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
                             &gt;
                           </span>
                         </div>
-                        <div className="text-sm text-gray-400 mb-4">
+                        <div className="text-sm text-zinc-400 mb-4">
                           Aucune transaction récente
                         </div>
                       </div>
@@ -1176,14 +1065,14 @@ export default function Categories() {
 
         {/* Add Category Form Card */}
         {showAddForm ? (
-          <div className="shadow rounded-lg border-2 flex flex-col h-80" style={{ backgroundColor: '#272a2f', borderColor: '#6226fa' }}>
+          <div className="rounded-2xl border-2 flex flex-col h-80 bg-white/5 backdrop-blur-xl" style={{ borderColor: '#7c3aed' }}>
             <form onSubmit={handleAddCategory} className="flex flex-col h-full">
               <div className="p-4 flex-1">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
                     <div 
                       className="relative w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                      style={{ backgroundColor: editingCategory?.color || '#6226fa', color: 'white' }}
+                      style={{ backgroundColor: editingCategory?.color || '#7c3aed', color: 'white' }}
                       title="Changer la couleur (cliquer)"
                       onClick={() => setShowColorPicker(prev => !prev)}
                     >
@@ -1193,14 +1082,14 @@ export default function Categories() {
                       {showColorPicker && (
                         <div
                           className="absolute z-50 top-14 left-0 p-2 rounded-lg shadow-lg flex flex-row flex-wrap gap-2"
-                          style={{ backgroundColor: '#1f2226', border: '1px solid #374151', width: 420 }}
+                          style={{ backgroundColor: '#18191c', border: '1px solid #374151', width: 420 }}
                         >
                           {predefinedColors.slice(0, 16).map(color => (
                             <button
                               key={color}
                               type="button"
                               onClick={(e) => { e.stopPropagation(); setEditingCategory(prev => prev ? { ...prev, color } : null); setShowColorPicker(false); }}
-                              className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-gray-600'}`}
+                              className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-zinc-700'}`}
                               style={{ backgroundColor: color }}
                               title={color}
                             />
@@ -1224,7 +1113,7 @@ export default function Categories() {
                           type="text"
                           value={editingCategory?.icon || ''}
                           onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                          className="text-sm text-gray-300 border-none focus:ring-0 p-0 bg-transparent w-16"
+                          className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-16"
                           placeholder="🛒"
                         />
                         
@@ -1232,11 +1121,11 @@ export default function Categories() {
                           value={editingCategory?.type || ''}
                           onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
                           className="text-xs text-white border-none focus:ring-0 bg-transparent rounded-md"
-                          style={{ backgroundColor: '#1f2226', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                          style={{ backgroundColor: '#18191c', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                           required
                         >
                           {categoryTypes.map(type => (
-                            <option key={type.value} value={type.value} style={{ backgroundColor: '#1f2226' }}>{type.label}</option>
+                            <option key={type.value} value={type.value} style={{ backgroundColor: '#18191c' }}>{type.label}</option>
                           ))}
                         </select>
                       </div>
@@ -1248,7 +1137,7 @@ export default function Categories() {
 
                 {/* Keywords section */}
                 <div className="mb-4">
-                  <label className="block text-sm text-gray-300 mb-2">Mots-clés (séparez par Entrée)</label>
+                  <label className="block text-sm text-zinc-300 mb-2">Mots-clés (séparez par Entrée)</label>
                   <div className="flex items-center gap-2 mb-2">
                     <input
                       type="text"
@@ -1266,7 +1155,7 @@ export default function Categories() {
                           setKeywordInput('');
                         }
                       }}
-                      className="text-sm text-white border-none focus:ring-0 p-2 bg-[#1f2226] rounded-md w-full"
+                      className="text-sm text-white border-none focus:ring-0 p-2 bg-zinc-900/80 rounded-md w-full"
                       placeholder="Ex: amazon, uber, loyer"
                     />
                     <button
@@ -1281,14 +1170,14 @@ export default function Categories() {
                         setKeywordInput('');
                       }}
                       className="px-3 py-2 text-xs border border-transparent rounded text-white hover:opacity-80"
-                      style={{ backgroundColor: '#6227f5' }}
+                      style={{ backgroundColor: '#7c3aed' }}
                     >
                       Ajouter
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {(editingCategory?.keywords || []).map((kw, idx) => (
-                      <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#1f2226', color: '#e5e7eb', border: '1px solid #374151' }}>
+                      <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#18191c', color: '#e5e7eb', border: '1px solid #374151' }}>
                         {kw}
                         <button
                           type="button"
@@ -1296,7 +1185,7 @@ export default function Categories() {
                             ...prev,
                             keywords: (prev.keywords || []).filter(k => k !== kw)
                           } : null)}
-                          className="ml-1 text-gray-400 hover:text-white"
+                          className="ml-1 text-zinc-400 hover:text-white"
                           aria-label={`Supprimer le mot-clé ${kw}`}
                         >
                           ×
@@ -1309,7 +1198,7 @@ export default function Categories() {
                 {/* Budget section - Only for EXPENSE categories */}
                 {editingCategory?.type === 'EXPENSE' && (
                   <div className="mt-4">
-                    <div className="text-sm text-gray-300 mb-2">
+                    <div className="text-sm text-zinc-300 mb-2">
                       Budget (optionnel)
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1340,35 +1229,35 @@ export default function Categories() {
                           }
                         } : null)}
                         className="text-xs text-white border-none focus:ring-0 bg-transparent rounded-md"
-                        style={{ backgroundColor: '#1f2226', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
+                        style={{ backgroundColor: '#18191c', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
                       >
-                        <option value="MONTHLY" style={{ backgroundColor: '#1f2226' }}>Mensuel</option>
-                        <option value="WEEKLY" style={{ backgroundColor: '#1f2226' }}>Hebdo</option>
-                        <option value="QUARTERLY" style={{ backgroundColor: '#1f2226' }}>Trimestre</option>
-                        <option value="YEARLY" style={{ backgroundColor: '#1f2226' }}>Annuel</option>
+                        <option value="MONTHLY" style={{ backgroundColor: '#18191c' }}>Mensuel</option>
+                        <option value="WEEKLY" style={{ backgroundColor: '#18191c' }}>Hebdo</option>
+                        <option value="QUARTERLY" style={{ backgroundColor: '#18191c' }}>Trimestre</option>
+                        <option value="YEARLY" style={{ backgroundColor: '#18191c' }}>Annuel</option>
                       </select>
                     </div>
                   </div>
                 )}
               </div>
               
-              <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#1f2226' }}>
+              <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
                 <div className="flex justify-between items-center">
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm text-zinc-500">
                     Nouvelle catégorie
                   </div>
                   <div className="flex space-x-2">
                     <button
                       type="button"
                       onClick={handleCancel}
-                      className="px-3 py-1 text-xs border border-gray-300 rounded text-white hover:text-gray-700 hover:bg-gray-100"
+                      className="px-3 py-1 text-xs border border-zinc-700 rounded text-white hover:text-zinc-100 hover:bg-zinc-800"
                     >
                       Annuler
                     </button>
                     <button
                       type="submit"
                       className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                      style={{ backgroundColor: '#6227f5' }}
+                      style={{ backgroundColor: '#7c3aed' }}
                     >
                       Ajouter
                     </button>
@@ -1378,17 +1267,17 @@ export default function Categories() {
             </form>
           </div>
         ) : (
-          <div 
-            className="shadow rounded-lg border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
+          <div
+            className="rounded-2xl border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
             style={{ 
               borderColor: '#616875' // couleur intermédiaire
             } as React.CSSProperties}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#6226fa';
+              e.currentTarget.style.borderColor = '#7c3aed';
               const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
               const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#6226fa';
-              if (text) text.style.color = '#6226fa';
+              if (icon) icon.style.color = '#7c3aed';
+              if (text) text.style.color = '#7c3aed';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = '#616875';

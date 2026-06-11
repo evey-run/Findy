@@ -1,100 +1,151 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useAppStore } from '../store/index';
 import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
-  ChartBarIcon,
-  ShoppingCartIcon,
-  UsersIcon,
-  TrophyIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
-import type { Objective } from '../types';
 
-// Styles pour la barre de scroll personnalisée
-const scrollbarStyles = `
-  /* Webkit browsers (Chrome, Safari, Edge) */
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #6226fa;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed;
-    border: 1px solid #1f2226;
-  }
-  
-  ::-webkit-scrollbar-thumb:active {
-    background: #6226fa;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Firefox */
-  html {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
-  }
-  
-  /* Styles spécifiques pour les conteneurs avec scroll */
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: #1f2226;
-    border-radius: 8px;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #6226fa !important;
-    border-radius: 8px;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #7c3aed !important;
-    border: 1px solid #1f2226;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar-thumb:active {
-    background: #6226fa !important;
-    border: 1px solid #1f2226;
-  }
-  
-  /* Force pour tous les scrollbars */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #6226fa #1f2226;
-  }
-`;
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-// Injecter les styles dans le document
-if (typeof document !== 'undefined') {
-  const styleElement = document.createElement('style');
-  styleElement.textContent = scrollbarStyles;
-  if (!document.head.querySelector('style[data-scrollbar-custom]')) {
-    styleElement.setAttribute('data-scrollbar-custom', 'true');
-    document.head.appendChild(styleElement);
-  }
+function fmt(amount: number) {
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount);
 }
 
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(amount);
+function fmtCompact(amount: number) {
+  if (Math.abs(amount) >= 1000) {
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency', currency: 'EUR',
+      notation: 'compact', maximumFractionDigits: 1,
+    }).format(amount);
+  }
+  return fmt(amount);
 }
+
+const FREQ_LABEL: Record<string, string> = {
+  DAILY: 'Quotidien', WEEKLY: 'Hebdo', MONTHLY: 'Mensuel',
+  QUARTERLY: 'Trimestriel', YEARLY: 'Annuel',
+};
+
+// ─── skeleton ───────────────────────────────────────────────────────────────
+
+function Skeleton({ h = 'h-5', w = 'w-24', className = '' }) {
+  return <div className={`${h} ${w} bg-zinc-800 rounded animate-pulse ${className}`} />;
+}
+
+// ─── TrendPill ──────────────────────────────────────────────────────────────
+
+function TrendPill({ pct, invertColor = false }: { pct: number; invertColor?: boolean }) {
+  if (pct === 0) return <span className="text-xs text-zinc-500">Stable</span>;
+  const up = pct > 0;
+  const good = invertColor ? !up : up;
+  return (
+    <span className={`inline-flex items-center gap-0.5 text-xs font-medium ${good ? 'text-green-400' : 'text-red-400'}`}>
+      {up
+        ? <ArrowTrendingUpIcon className="h-3 w-3" />
+        : <ArrowTrendingDownIcon className="h-3 w-3" />}
+      {Math.abs(pct)}%
+    </span>
+  );
+}
+
+// ─── DonutChart (camembère) ─────────────────────────────────────────────────
+
+function DonutChart({ data, centerLabel, centerValue }: {
+  data: { label: string; value: number; color: string }[];
+  centerLabel: string; centerValue: string;
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const size = 168, cx = size / 2, cy = size / 2, radius = 74, inner = 50;
+  const polar = (r: number, a: number) => ({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+
+  let angle = -Math.PI / 2;
+  const arcs = data.map((d, i) => {
+    const slice = total > 0 ? (d.value / total) * 2 * Math.PI : 0;
+    const a0 = angle, a1 = angle + slice;
+    angle = a1;
+    const large = slice > Math.PI ? 1 : 0;
+    const p0 = polar(radius, a0), p1 = polar(radius, a1);
+    const q1 = polar(inner, a1), q0 = polar(inner, a0);
+    const path = `M ${p0.x} ${p0.y} A ${radius} ${radius} 0 ${large} 1 ${p1.x} ${p1.y} L ${q1.x} ${q1.y} A ${inner} ${inner} 0 ${large} 0 ${q0.x} ${q0.y} Z`;
+    return { path, color: d.color, key: i };
+  });
+
+  return (
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size}>
+        {total > 0
+          ? arcs.map(a => <path key={a.key} d={a.path} fill={a.color} />)
+          : <circle cx={cx} cy={cy} r={(radius + inner) / 2} fill="none" stroke="#27272a" strokeWidth={radius - inner} />}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-[10px] uppercase tracking-widest text-zinc-500">{centerLabel}</span>
+        <span className="text-base font-bold text-zinc-50">{centerValue}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── MonthlyFlux (barres revenus/dépenses) ──────────────────────────────────
+
+function MonthlyFlux({ data }: { data: { label: string; income: number; expense: number }[] }) {
+  const max = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
+  return (
+    <div className="flex items-end justify-between gap-2 h-full w-full px-1">
+      {data.map((m, i) => (
+        <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end min-w-0">
+          <div className="flex items-end justify-center gap-1 h-full w-full">
+            <div
+              className="w-2.5 rounded-t bg-green-500/80 transition-all duration-500"
+              style={{ height: `${(m.income / max) * 100}%` }}
+              title={`Revenus : ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(m.income)}`}
+            />
+            <div
+              className="w-2.5 rounded-t bg-red-500/70 transition-all duration-500"
+              style={{ height: `${(m.expense / max) * 100}%` }}
+              title={`Dépenses : ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(m.expense)}`}
+            />
+          </div>
+          <span className="text-[10px] text-zinc-500 capitalize truncate">{m.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── StatCard ───────────────────────────────────────────────────────────────
+
+function StatCard({
+  label, value, sub, trend, invertTrend = false, to, loading,
+}: {
+  label: string; value: string; sub?: string;
+  trend: number; invertTrend?: boolean; to: string; loading: boolean;
+}) {
+  return (
+    <Link
+      to={to}
+      className="flex flex-col gap-1 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-4
+        transition-all duration-200 hover:border-violet-500/25 hover:bg-white/[0.07] cursor-pointer"
+    >
+      <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">{label}</p>
+      {loading
+        ? <><Skeleton h="h-7" w="w-28" className="mt-1" /><Skeleton h="h-3" w="w-16" className="mt-2" /></>
+        : <>
+            <p className="text-xl font-bold text-zinc-50 leading-tight">{value}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <TrendPill pct={trend} invertColor={invertTrend} />
+              {sub && <span className="text-xs text-zinc-600">{sub}</span>}
+            </div>
+          </>
+      }
+    </Link>
+  );
+}
+
+// ─── main component ─────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const {
@@ -108,980 +159,541 @@ export default function Dashboard() {
     isLoading,
     setDateRange,
   } = useAppStore();
-  
-  const [objectives, setObjectives] = useState<Objective[]>([]);
-  const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: number }>({});
-  
-  // Types de périodes disponibles
+
   type PeriodType = 'week' | 'month' | 'year';
-  
-  // État pour le type de période sélectionné
   const [periodType, setPeriodType] = useState<PeriodType>('month');
-  
-  // État pour la date sélectionnée (peut être une semaine, un mois ou une année)
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
-  // Alias pour la compatibilité avec le code existant
-  const selectedMonth = selectedDate;
-  
-  // État pour stocker les données du mois précédent
-  const [previousMonthData, setPreviousMonthData] = useState<{
-    currentMonthIncome: number;
-    currentMonthExpense: number;
-    savingsTotal: number;
-    investmentMonthTotal: number;
-  }>({ 
-    currentMonthIncome: 0, 
-    currentMonthExpense: 0, 
-    savingsTotal: 0, 
-    investmentMonthTotal: 0 
-  });
-  
-  // Fonction pour obtenir le nom de la période
-  const getPeriodName = (date: Date, type: PeriodType): string => {
-    switch (type) {
-      case 'week':
-        // Obtenir le lundi de la semaine
-        const startOfWeek = new Date(date);
-        const dayOfWeek = startOfWeek.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
-        startOfWeek.setDate(startOfWeek.getDate() - dayOfWeek + 1); // Aller au lundi
-        
-        // Obtenir le dimanche de la semaine
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(endOfWeek.getDate() + 6);
-        
-        // Format: "10-16 janvier 2025"
-        return `${startOfWeek.getDate()}-${endOfWeek.getDate()} ${startOfWeek.toLocaleString('fr-FR', { month: 'long' })} ${startOfWeek.getFullYear()}`;
-        
-      case 'month':
-        // Format: "janvier 2025"
-        return date.toLocaleString('fr-FR', { month: 'long' }) + ' ' + date.getFullYear();
-        
-      case 'year':
-        // Format: "2025"
-        return date.getFullYear().toString();
-        
-      default:
-        return date.toLocaleString('fr-FR', { month: 'long' }) + ' ' + date.getFullYear();
+  const [previousData, setPreviousData] = useState({ income: 0, expense: 0, savings: 0, investment: 0 });
+  const [fluxData, setFluxData] = useState<{ label: string; income: number; expense: number }[]>([]);
+
+  // ── period helpers ─────────────────────────────────────────────────────────
+
+  const getPeriodName = (date: Date, type: PeriodType) => {
+    if (type === 'week') {
+      const start = new Date(date);
+      const dow = start.getDay() || 7;
+      start.setDate(start.getDate() - dow + 1);
+      const end = new Date(start); end.setDate(end.getDate() + 6);
+      return `${start.getDate()}–${end.getDate()} ${start.toLocaleString('fr-FR', { month: 'long' })} ${start.getFullYear()}`;
     }
+    if (type === 'month') return date.toLocaleString('fr-FR', { month: 'long' }) + ' ' + date.getFullYear();
+    return date.getFullYear().toString();
   };
-  
-  // Fonctions pour naviguer entre les périodes
-  const goToPrevious = () => {
-    setSelectedDate(prevDate => {
-      const newDate = new Date(prevDate);
-      
-      switch (periodType) {
-        case 'week':
-          // Reculer d'une semaine
-          newDate.setDate(newDate.getDate() - 7);
-          break;
-        case 'month':
-          // Reculer d'un mois
-          newDate.setMonth(newDate.getMonth() - 1);
-          break;
-        case 'year':
-          // Reculer d'une année
-          newDate.setFullYear(newDate.getFullYear() - 1);
-          break;
-      }
-      
-      return newDate;
-    });
-  };
-  
-  const goToNext = () => {
-    setSelectedDate(prevDate => {
-      const newDate = new Date(prevDate);
-      
-      switch (periodType) {
-        case 'week':
-          // Avancer d'une semaine
-          newDate.setDate(newDate.getDate() + 7);
-          break;
-        case 'month':
-          // Avancer d'un mois
-          newDate.setMonth(newDate.getMonth() + 1);
-          break;
-        case 'year':
-          // Avancer d'une année
-          newDate.setFullYear(newDate.getFullYear() + 1);
-          break;
-      }
-      
-      // Vérifier si la nouvelle date est dans le futur
-      const currentDate = new Date();
-      if (newDate > currentDate) {
-        // Si c'est dans le futur, rester à la date actuelle
-        return prevDate;
-      }
-      
-      return newDate;
-    });
-  };
-  
-  // Fonction pour changer le type de période
-  const changePeriodType = (type: PeriodType) => {
-    setPeriodType(type);
-  };
+
+  const goToPrevious = () => setSelectedDate(prev => {
+    const d = new Date(prev);
+    if (periodType === 'week') d.setDate(d.getDate() - 7);
+    else if (periodType === 'month') d.setMonth(d.getMonth() - 1);
+    else d.setFullYear(d.getFullYear() - 1);
+    return d;
+  });
+
+  const goToNext = () => setSelectedDate(prev => {
+    const d = new Date(prev);
+    if (periodType === 'week') d.setDate(d.getDate() + 7);
+    else if (periodType === 'month') d.setMonth(d.getMonth() + 1);
+    else d.setFullYear(d.getFullYear() + 1);
+    return d > new Date() ? prev : d;
+  });
+
+  // ── date range calculation ─────────────────────────────────────────────────
+
+  const { startDate, endDate, prevStart, prevEnd } = useMemo(() => {
+    let start: Date, end: Date, ps: Date, pe: Date;
+    if (periodType === 'week') {
+      start = new Date(selectedDate);
+      const dow = start.getDay() || 7;
+      start.setDate(start.getDate() - dow + 1);
+      end = new Date(start); end.setDate(end.getDate() + 6);
+      ps = new Date(start); ps.setDate(ps.getDate() - 7);
+      pe = new Date(end);   pe.setDate(pe.getDate() - 7);
+    } else if (periodType === 'month') {
+      start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      end   = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+      ps    = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+      pe    = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0);
+    } else {
+      start = new Date(selectedDate.getFullYear(), 0, 1);
+      end   = new Date(selectedDate.getFullYear(), 11, 31);
+      ps    = new Date(selectedDate.getFullYear() - 1, 0, 1);
+      pe    = new Date(selectedDate.getFullYear() - 1, 11, 31);
+    }
+    return { startDate: start.toISOString(), endDate: end.toISOString(), prevStart: ps.toISOString(), prevEnd: pe.toISOString() };
+  }, [periodType, selectedDate]);
+
+  // ── effects ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    // Déterminer la plage de dates en fonction du type de période sélectionné
-    let startDate: Date;
-    let endDate: Date;
-    let previousStartDate: Date;
-    let previousEndDate: Date;
-    
-    switch (periodType) {
-      case 'week':
-        // Début de la semaine (lundi)
-        startDate = new Date(selectedDate);
-        const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi, convert 0 to 7
-        startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
-        
-        // Fin de la semaine (dimanche)
-        endDate = new Date(startDate);
-        endDate.setDate(endDate.getDate() + 6);
-        
-        // Semaine précédente
-        previousStartDate = new Date(startDate);
-        previousStartDate.setDate(previousStartDate.getDate() - 7);
-        previousEndDate = new Date(endDate);
-        previousEndDate.setDate(previousEndDate.getDate() - 7);
-        break;
-        
-      case 'month':
-        // Début et fin du mois
-        startDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-        endDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
-        
-        // Mois précédent
-        previousStartDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
-        previousEndDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0);
-        break;
-        
-      case 'year':
-        // Début et fin de l'année
-        startDate = new Date(selectedDate.getFullYear(), 0, 1);
-        endDate = new Date(selectedDate.getFullYear(), 11, 31);
-        
-        // Année précédente
-        previousStartDate = new Date(selectedDate.getFullYear() - 1, 0, 1);
-        previousEndDate = new Date(selectedDate.getFullYear() - 1, 11, 31);
-        break;
-    }
-    
-    // Mettre à jour la plage de dates dans le store
-    setDateRange({
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString()
-    });
-    
-    // Charger les données du tableau de bord et des transactions
+    setDateRange({ startDate, endDate });
     loadDashboardOverview();
     loadAllTransactions({ forceIgnoreSelectedBank: true });
-    
-    // Charger les objectifs
-    loadObjectives();
-    
-    // Charger les données de la période précédente pour calculer les tendances
-    const fetchPreviousPeriodData = async () => {
-      try {
-        // Construire les paramètres de requête
-        const params = new URLSearchParams();
-        params.append('startDate', previousStartDate.toISOString());
-        params.append('endDate', previousEndDate.toISOString());
-        
-        // Faire la requête API
-        const response = await fetch(`/api/dashboard/overview?${params}`);
-        const data = await response.json();
-        
-        // Mettre à jour l'état avec les données de la période précédente
-        setPreviousMonthData({
-          currentMonthIncome: data.summary.currentMonthIncome || 0,
-          currentMonthExpense: data.summary.currentMonthExpense || 0,
-          savingsTotal: data.summary.savingsTotal || 0,
-          investmentMonthTotal: data.summary.investmentMonthTotal || 0
+  }, [startDate, endDate, selectedUser]);
+
+  useEffect(() => {
+    if (!prevStart) return;
+    fetch(`/api/dashboard/overview?startDate=${prevStart}&endDate=${prevEnd}`)
+      .then(r => r.json())
+      .then(data => setPreviousData({
+        income:     data.summary?.currentMonthIncome     ?? 0,
+        expense:    data.summary?.currentMonthExpense    ?? 0,
+        savings:    data.summary?.savingsTotal           ?? 0,
+        investment: data.summary?.investmentMonthTotal   ?? 0,
+      }))
+      .catch(() => {});
+  }, [prevStart, prevEnd, selectedUser]);
+
+  // 6-month income/expense flux — independent fetch (cross-period data)
+  useEffect(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const params = new URLSearchParams({
+      limit: '5000', offset: '0',
+      startDate: start.toISOString(), endDate: end.toISOString(),
+    });
+    fetch(`/api/transactions?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        const txns = Array.isArray(data) ? data : (data?.transactions ?? []);
+        const months = Array.from({ length: 6 }, (_, i) => {
+          const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
+          return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('fr-FR', { month: 'short' }), income: 0, expense: 0 };
         });
-      } catch (error) {
-        console.error('Erreur lors de la récupération des données de la période précédente:', error);
-      }
-    };
-    
-    fetchPreviousPeriodData();
-  }, [loadDashboardOverview, loadAllTransactions, selectedUser, selectedDate, periodType, setDateRange]);
-  
-  // Charger les objectifs depuis l'API
-  const loadObjectives = async () => {
-    try {
-      const response = await fetch('/api/objectives');
-      if (response.ok) {
-        const data = await response.json();
-        setObjectives(data);
-        
-        // Charger les données de progression pour chaque objectif
-        data.forEach((objective: Objective) => {
-          fetchObjectiveProgress(objective.id);
+        txns.forEach((t: any) => {
+          const d = new Date(t.date);
+          const m = months.find(mm => mm.key === `${d.getFullYear()}-${d.getMonth()}`);
+          if (m) {
+            if (t.amount > 0) m.income += t.amount;
+            else m.expense += Math.abs(t.amount);
+          }
         });
-      }
-    } catch (error) {
-      console.error('Error loading objectives:', error);
+        setFluxData(months.map(({ label, income, expense }) => ({ label, income, expense })));
+      })
+      .catch(() => {});
+  }, [selectedUser]);
+
+  // ── derived data ───────────────────────────────────────────────────────────
+
+  const summary = dashboardData?.summary;
+  const income     = summary?.currentMonthIncome    ?? 0;
+  const expense    = summary?.currentMonthExpense   ?? 0;
+  const savings    = summary?.savingsTotal          ?? 0;
+  const investment = summary?.investmentMonthTotal  ?? 0;
+
+  const calcTrend = (cur: number, prev: number) => {
+    if (prev === 0) return 0;
+    return Math.round(((cur - prev) / prev) * 100);
+  };
+
+  // Filter transactions for selected period
+  const periodFilter = useMemo(() => {
+    const s = new Date(startDate), e = new Date(endDate);
+    return (d: Date) => d >= s && d <= e;
+  }, [startDate, endDate]);
+
+  // Budget to monthly-equivalent helper
+  const toPeriodBudget = (b: { amount: number; period: string }) => {
+    let v = b.amount;
+    if (periodType === 'week') {
+      if (b.period === 'MONTHLY') v /= 4.345;
+      else if (b.period === 'QUARTERLY') v /= 13.035;
+      else if (b.period === 'YEARLY') v /= 52.14;
+    } else if (periodType === 'month') {
+      if (b.period === 'WEEKLY') v *= 4.345;
+      else if (b.period === 'QUARTERLY') v /= 3;
+      else if (b.period === 'YEARLY') v /= 12;
+    } else {
+      if (b.period === 'WEEKLY') v *= 52.14;
+      else if (b.period === 'MONTHLY') v *= 12;
+      else if (b.period === 'QUARTERLY') v *= 4;
     }
-  };
-  
-  // Récupérer la progression d'un objectif
-  const fetchObjectiveProgress = async (objectiveId: string) => {
-    try {
-      const response = await fetch(`/api/objectives/${objectiveId}/progress`);
-      if (response.ok) {
-        const data = await response.json();
-        setObjectiveProgress(prev => ({
-          ...prev,
-          [objectiveId]: data.percentage || 0
-        }));
-      }
-    } catch (error) {
-      console.error('Error fetching objective progress:', error);
-    }
-  };
-  
-  // Fonction pour générer le clipPath en fonction du pourcentage
-  const getClipPathForPercentage = (percentage: number): string => {
-    const p = Math.min(percentage, 100) / 100;
-    
-    if (p >= 1) return 'polygon(0 0, 100% 0, 100% 100%, 0 100%)';
-    
-    if (p <= 0) return 'polygon(50% 50%, 50% 0, 50% 0, 50% 0)';
-    
-    // Diviser le cercle en 8 segments pour une animation plus fluide
-    return `polygon(50% 50%, 50% 0%, ${p >= 0.125 ? '100%' : '50%'} 0%, ${p >= 0.375 ? '100%' : '50%'} ${p >= 0.25 ? '100%' : '50%'}, ${p >= 0.625 ? '100%' : '50%'} ${p >= 0.5 ? '100%' : '50%'}, ${p >= 0.875 ? '100%' : '50%'} ${p >= 0.75 ? '100%' : '50%'}, 50% ${p >= 1 ? '100%' : '50%'})`;
+    return v;
   };
 
-  if (isLoading || !dashboardData) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-600"></div>
-      </div>
-    );
-  }
+  // Budget progress bars data
+  const budgetData = useMemo(() => {
+    return categories
+      .filter(c => c.type === 'EXPENSE')
+      .map(c => {
+        const budget = budgets.find(b => b.categoryId === c.id);
+        if (!budget) return null;
+        const periodBudget = toPeriodBudget(budget);
+        const spent = allTransactions
+          .filter(t => t.categoryId === c.id && periodFilter(new Date(t.date)))
+          .reduce((sum, t) => sum + Math.abs(Number(t.amount) || 0), 0);
+        return { id: c.id, name: c.name, color: c.color, budget: periodBudget, spent };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b!.budget - a!.budget) as Array<{ id: string; name: string; color: string; budget: number; spent: number }>;
+  }, [categories, budgets, allTransactions, periodFilter, periodType]);
 
-  // Fonction pour calculer la tendance par rapport au mois précédent
-  const calculateTrend = (current: number, previous: number) => {
-    if (previous === 0) return { isUp: true, percentage: 100 };
-    if (current === previous) return { isUp: true, percentage: 0 };
-    
-    const diff = current - previous;
-    const percentage = Math.abs(Math.round((diff / previous) * 100));
-    
-    return {
-      isUp: diff > 0,
-      percentage
-    };
-  };
+  // Recent transactions split
+  const recentExpenses = useMemo(() =>
+    allTransactions.filter(t => t.amount < 0).slice(0, 5), [allTransactions]);
+  const recentIncome = useMemo(() =>
+    allTransactions.filter(t => t.amount > 0).slice(0, 5), [allTransactions]);
 
-  // Statistiques pour les cartes du haut
-  const topStats = [
-    {
-      name: 'Revenus',
-      value: formatCurrency(dashboardData.summary.currentMonthIncome || 0),
-      icon: ArrowTrendingUpIcon,
-      color: 'text-green-400',
-      bgColor: 'bg-green-900 bg-opacity-50',
-      description: 'Comptes courants',
-      action: <ArrowTrendingUpIcon className="h-4 w-4 text-green-400" />,
-      trend: calculateTrend(
-        dashboardData.summary.currentMonthIncome || 0,
-        previousMonthData.currentMonthIncome
-      )
-    },
-    {
-      name: 'Dépenses',
-      value: formatCurrency(dashboardData.summary.currentMonthExpense || 0),
-      icon: ShoppingCartIcon,
-      color: 'text-red-400',
-      bgColor: 'bg-red-900 bg-opacity-50',
-      description: 'Comptes courants',
-      action: <ShoppingCartIcon className="h-4 w-4 text-red-400" />,
-      trend: calculateTrend(
-        dashboardData.summary.currentMonthExpense || 0,
-        previousMonthData.currentMonthExpense
-      )
-    },
-    {
-      name: 'Économies',
-      value: formatCurrency(dashboardData.summary.savingsTotal || 0),
-      icon: UsersIcon,
-      color: 'text-violet-400',
-      bgColor: 'bg-violet-900 bg-opacity-50',
-      description: 'Livrets d\'épargne',
-      action: <UsersIcon className="h-4 w-4 text-violet-400" />,
-      trend: calculateTrend(
-        dashboardData.summary.savingsTotal || 0,
-        previousMonthData.savingsTotal
-      )
-    },
-    {
-      name: 'Investissements',
-      value: formatCurrency(dashboardData.summary.investmentMonthTotal || 0),
-      icon: ChartBarIcon,
-      color: 'text-blue-400',
-      bgColor: 'bg-blue-900 bg-opacity-50',
-      description: 'Dépenses du mois',
-      action: <ChartBarIcon className="h-4 w-4 text-blue-400" />,
-      trend: calculateTrend(
-        dashboardData.summary.investmentMonthTotal || 0,
-        previousMonthData.investmentMonthTotal
-      )
-    },
-  ];
+  // Upcoming recurrences
+  const upcoming = useMemo(() => {
+    const list = dashboardData?.upcomingRecurrences ?? [];
+    return [...list]
+      .filter(r => r.active)
+      .sort((a, b) => new Date(a.nextDue).getTime() - new Date(b.nextDue).getTime())
+      .slice(0, 6);
+  }, [dashboardData]);
+
+  // Savings rate
+  const savingsRate = income > 0 ? Math.round((savings / income) * 100) : 0;
+
+  // Donut data — expenses by category for the current period (real API data)
+  const donutData = useMemo(() => {
+    const list = dashboardData?.expensesByCategory ?? [];
+    return [...list]
+      .filter(e => e.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+      .map(e => ({ label: e.categoryName, value: e.amount, color: e.categoryColor || '#7c3aed' }));
+  }, [dashboardData]);
+
+  const donutTotal = donutData.reduce((s, d) => s + d.value, 0);
+
+  // ── render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6 pb-[40px]">
-      {/* Header */}
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
-            Tableau de bord
-          </h2>
-          <p className="text-sm text-gray-300 mt-1">
-            Suivez vos soldes, dépenses, revenus et tendances en un coup d'œil
-          </p>
+    <div className="flex flex-col h-full min-h-0 gap-4">
+
+      {/* ── Header ── */}
+      <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-50 leading-tight">Tableau de bord</h1>
+          <p className="text-sm text-zinc-400 mt-0.5">Aperçu de vos finances en un coup d'œil</p>
         </div>
-        
-        {/* Navigation et sélecteur de période */}
-        <div className="flex items-center space-x-4 mt-4 md:mt-0">
-          {/* Navigation par période */}
-          <div className="flex items-center space-x-2 rounded-xl px-4 py-2">
-            <button 
-              onClick={goToPrevious}
-              className="text-white hover:text-violet-400 focus:outline-none"
-              aria-label="Période précédente"
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
+
+        {/* Period controls */}
+        <div className="flex items-center gap-2">
+          {/* Period type switcher */}
+          <div className="flex items-center bg-white/[0.04] border border-white/[0.08] rounded-lg p-0.5">
+            {(['week', 'month', 'year'] as PeriodType[]).map(t => (
+              <button
+                key={t}
+                onClick={() => setPeriodType(t)}
+                className={`text-xs px-3 py-1.5 rounded-md font-medium transition-colors ${
+                  periodType === t
+                    ? 'bg-violet-600 text-white'
+                    : 'text-zinc-400 hover:text-zinc-100'
+                }`}
+              >
+                {t === 'week' ? 'Semaine' : t === 'month' ? 'Mois' : 'Année'}
+              </button>
+            ))}
+          </div>
+
+          {/* Prev / current / next */}
+          <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1">
+            <button onClick={goToPrevious} className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors rounded">
+              <ChevronLeftIcon className="h-4 w-4" />
             </button>
-            <span className="text-white font-medium capitalize px-2">
+            <span className="text-sm font-medium text-zinc-200 capitalize min-w-[120px] text-center">
               {getPeriodName(selectedDate, periodType)}
             </span>
-            <button 
-              onClick={goToNext}
-              className="text-white hover:text-violet-400 focus:outline-none"
-              aria-label="Période suivante"
-            >
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
-          </div>
-          
-          {/* Sélecteur de période */}
-          <div className="flex items-center rounded-xl px-4 py-2">
-            <button 
-              onClick={() => changePeriodType('week')}
-              className={`text-sm px-2 py-1 rounded ${periodType === 'week' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
-            >
-              Semaine
-            </button>
-            <button 
-              onClick={() => changePeriodType('month')}
-              className={`text-sm px-2 py-1 rounded mx-1 ${periodType === 'month' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
-            >
-              Mois
-            </button>
-            <button 
-              onClick={() => changePeriodType('year')}
-              className={`text-sm px-2 py-1 rounded ${periodType === 'year' ? 'bg-violet-700 text-white' : 'text-gray-300 hover:text-white'}`}
-            >
-              Année
+            <button onClick={goToNext} className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors rounded">
+              <ChevronRightIcon className="h-4 w-4" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Top Grid: Stats Cards (2x2) and Devices */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Stats Cards - Left Side (2x2 grid) */}
-        <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {topStats.map((stat) => (
-            <div
-              key={stat.name}
-              className="relative p-4 shadow rounded-2xl overflow-hidden flex flex-col"
-              style={{ backgroundColor: '#272a2f' }}
-            >
-              <div className="flex flex-col items-center">
-                <p className="text-sm font-medium text-gray-400 mb-2 text-center">
-                  {stat.name}
-                </p>
-                <p className="text-2xl font-bold text-white text-center mb-2">
-                  {stat.value}
-                </p>
-                <div className="flex items-center justify-center mt-1">
-                  {stat.trend.percentage > 0 ? (
-                    <div className={`flex items-center ${stat.name === 'Dépenses' || stat.name === 'Dépenses du mois' 
-                      ? (stat.trend.isUp ? 'text-red-400' : 'text-green-400') 
-                      : (stat.trend.isUp ? 'text-green-400' : 'text-red-400')}`}>
-                      {stat.trend.isUp ? (
-                        <ArrowTrendingUpIcon className="h-4 w-4 mr-1" />
-                      ) : (
-                        <ArrowTrendingDownIcon className="h-4 w-4 mr-1" />
-                      )}
-                      <span className="text-xs">
-                        {stat.trend.percentage}% {stat.trend.isUp ? 'hausse' : 'baisse'}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-gray-400">Stable</span>
-                  )}
-                </div>
+      {/* ── Stat cards ── */}
+      <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="Revenus" to="/transactions"
+          value={isLoading ? '' : fmtCompact(income)}
+          trend={calcTrend(income, previousData.income)}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Dépenses" to="/transactions"
+          value={isLoading ? '' : fmtCompact(expense)}
+          trend={calcTrend(expense, previousData.expense)}
+          invertTrend loading={isLoading}
+        />
+        <StatCard
+          label="Épargne" to="/banks"
+          value={isLoading ? '' : fmtCompact(savings)}
+          sub={income > 0 ? `Taux : ${savingsRate}%` : undefined}
+          trend={calcTrend(savings, previousData.savings)}
+          loading={isLoading}
+        />
+        <StatCard
+          label="Investissements" to="/investissement"
+          value={isLoading ? '' : fmtCompact(investment)}
+          trend={calcTrend(investment, previousData.investment)}
+          loading={isLoading}
+        />
+      </div>
+
+      {/* ── Main area : 2 rows ── */}
+      <div className="flex-1 min-h-0 flex flex-col gap-4 overflow-hidden">
+
+      {/* ── Row 1 : charts ── */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
+
+        {/* ── Flux mensuel (col 7) ── */}
+        <div className="lg:col-span-7 flex flex-col min-h-0 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 overflow-hidden">
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+            <span className="text-xs font-medium uppercase tracking-widest text-violet-400">Flux sur 6 mois</span>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1.5 text-zinc-400">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500/80" /> Revenus
+              </span>
+              <span className="flex items-center gap-1.5 text-zinc-400">
+                <span className="inline-block h-2 w-2 rounded-full bg-red-500/70" /> Dépenses
+              </span>
+            </div>
+          </div>
+          <div className="flex-1 min-h-0 p-4">
+            {fluxData.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-sm text-zinc-600">Aucune donnée</p>
               </div>
-            </div>
-          ))}
-        </div>
-        
-        {/* Dernières transactions - Right Side */}
-        <div className="lg:col-span-4 shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
-          <div className="px-6 py-6 sm:p-8">
-            <h3 className="text-sm font-medium text-gray-300 mb-4">
-              Dernières transactions
-            </h3>
-            <div className="flow-root">
-              {allTransactions.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-4">
-                  <ShoppingCartIcon className="h-10 w-10 text-gray-500 mb-2" />
-                  <p className="text-gray-400 text-center text-xs">Aucune transaction récente</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Colonne des dépenses */}
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-400 mb-2 text-center">Dépenses</h4>
-                    <ul className="-my-2 divide-y divide-gray-700">
-                      {allTransactions
-                        .filter(transaction => transaction.amount < 0)
-                        .slice(0, 3)
-                        .map((transaction) => (
-                          <li key={transaction.id} className="py-2">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex-shrink-0">
-                                <div className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium bg-red-600">
-                                  -
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-white truncate">
-                                  {transaction.description}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {new Date(transaction.date).toLocaleDateString('fr-FR')}
-                                </p>
-                              </div>
-                              <div className="flex-shrink-0">
-                                <span className="text-xs font-medium text-red-400">
-                                  {formatCurrency(Math.abs(transaction.amount))}
-                                </span>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                  
-                  {/* Colonne des revenus */}
-                  <div>
-                    <h4 className="text-xs font-medium text-gray-400 mb-2 text-center">Revenus</h4>
-                    <ul className="-my-2 divide-y divide-gray-700">
-                      {allTransactions
-                        .filter(transaction => transaction.amount > 0)
-                        .slice(0, 3)
-                        .map((transaction) => (
-                          <li key={transaction.id} className="py-2">
-                            <div className="flex items-center space-x-3">
-                              <div className="flex-shrink-0">
-                                <div className="h-6 w-6 rounded-full flex items-center justify-center text-white text-xs font-medium bg-green-600">
-                                  +
-                                </div>
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-white truncate">
-                                  {transaction.description}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  {new Date(transaction.date).toLocaleDateString('fr-FR')}
-                                </p>
-                              </div>
-                              <div className="flex-shrink-0">
-                                <span className="text-xs font-medium text-green-400">
-                                  {formatCurrency(Math.abs(transaction.amount))}
-                                </span>
-                              </div>
-                            </div>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-            </div>
+            ) : (
+              <MonthlyFlux data={fluxData} />
+            )}
           </div>
         </div>
-        
-        {/* Tricount - Right Side */}
-        <div className="lg:col-span-4 shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
-          <div className="px-6 py-6 sm:p-8">
-            <h3 className="text-sm font-medium text-gray-300 mb-4">
-              Impayés
-            </h3>
-            <div className="flow-root">
-              {/* Données fictives pour Tricount */}
-              <ul className="-my-2 divide-y divide-gray-700">
-                {[
-                  { id: 1, name: 'Soirée restaurant', amount: 45.50, paidBy: 'Vous', participants: ['Alex', 'Marie', 'Thomas'] },
-                  { id: 2, name: 'Location Airbnb', amount: 120.00, paidBy: 'Marie', participants: ['Vous', 'Marie', 'Thomas', 'Julie'] },
-                  { id: 3, name: 'Courses weekend', amount: 87.35, paidBy: 'Thomas', participants: ['Vous', 'Thomas'] },
-                  { id: 4, name: 'Cinéma', amount: 32.00, paidBy: 'Vous', participants: ['Vous', 'Julie'] },
-                ].map((expense) => (
-                  <li key={expense.id} className="py-2">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex-shrink-0">
-                        <div className="h-6 w-6 rounded-full bg-violet-600 flex items-center justify-center text-white text-xs font-medium">
-                          <UsersIcon className="h-3 w-3" />
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-white truncate">
-                          {expense.name}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          Payé par {expense.paidBy}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        <span className="text-xs font-medium text-violet-400">
-                          {formatCurrency(expense.amount)}
-                        </span>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: Projections and Goals + Revenue by Period */}
-        <div className="space-y-6">
-          {/* Chart 1: Projections and Goals */}
-          <div className="shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-sm font-medium text-gray-300 mb-4">
-                Projections and goals
-              </h3>
-              <div className="h-64 flex items-center justify-center">
-                <div className="w-full h-full flex items-end justify-between space-x-2">
-                  {[40, 65, 30, 80, 45, 60, 35, 70, 50, 75, 55, 65].map((height, index) => (
-                    <div key={index} className="flex flex-col items-center space-y-1 flex-1">
-                      <div className="w-full flex items-end justify-center space-x-1">
-                        <div 
-                          className={`w-2 ${index % 3 === 0 ? 'bg-violet-500' : index % 3 === 1 ? 'bg-white' : 'bg-green-400'}`} 
-                          style={{ height: `${height}%` }}
-                        ></div>
+        {/* ── Catégories donut (col 5) ── */}
+        <div className="lg:col-span-5 flex flex-col min-h-0 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 overflow-hidden">
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+            <span className="text-xs font-medium uppercase tracking-widest text-violet-400">Dépenses par catégorie</span>
+            <Link to="/categories" className="text-xs text-zinc-500 hover:text-violet-400 transition-colors">
+              Détails →
+            </Link>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center gap-4 px-5 py-3 overflow-hidden">
+            {isLoading ? (
+              <div className="flex items-center justify-center w-full">
+                <div className="h-32 w-32 rounded-full border-8 border-zinc-800 animate-pulse" />
+              </div>
+            ) : donutTotal === 0 ? (
+              <div className="flex items-center justify-center w-full">
+                <p className="text-sm text-zinc-600">Aucune dépense sur la période</p>
+              </div>
+            ) : (
+              <>
+                <DonutChart
+                  data={donutData}
+                  centerLabel="Total"
+                  centerValue={fmtCompact(donutTotal)}
+                />
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-1.5 pr-1">
+                  {donutData.slice(0, 6).map((d, i) => (
+                    <div key={i} className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                        <span className="text-xs text-zinc-300 truncate">{d.label}</span>
                       </div>
-                      <div className="text-xs text-gray-500">{['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][index]}</div>
+                      <span className="text-xs text-zinc-500 flex-shrink-0">
+                        {Math.round((d.value / donutTotal) * 100)}%
+                      </span>
                     </div>
                   ))}
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Objectifs - Circle Charts */}
-          <div className="shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-sm font-medium text-gray-300 mb-4">
-                Évolution des objectifs
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {objectives.slice(0, 3).map((objective) => {
-                  const percentage = objectiveProgress[objective.id] || 0;
-                  const clipPath = getClipPathForPercentage(percentage);
-                  
-                  return (
-                    <div key={objective.id} className="flex flex-col items-center">
-                      <div className="relative h-32 w-32 mb-2">
-                        {/* Cercle de fond */}
-                        <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
-                        {/* Cercle de progression */}
-                        <div 
-                          className="absolute inset-0 rounded-full border-4" 
-                          style={{ 
-                            borderColor: '#6226fa',
-                            clipPath: clipPath
-                          }}
-                        ></div>
-                        <div className="absolute inset-0 flex items-center justify-center flex-col">
-                          <span className="text-xl font-bold text-white">{Math.round(percentage)}%</span>
-                          <span className="text-xs text-gray-400 truncate max-w-full px-2 text-center">{objective.title}</span>
-                        </div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-sm font-medium text-white">{formatCurrency(objective.targetAmount * percentage / 100)}</div>
-                        <div className="text-xs text-gray-400">sur {formatCurrency(objective.targetAmount)}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {objectives.length === 0 && (
-                  <div className="col-span-3 flex flex-col items-center justify-center py-8">
-                    <TrophyIcon className="h-12 w-12 text-gray-500 mb-2" />
-                    <p className="text-gray-400 text-center">Aucun objectif trouvé</p>
-                  </div>
-                )}
-                
-                {objectives.length > 0 && objectives.length < 3 && Array.from({ length: 3 - objectives.length }).map((_, i) => (
-                  <div key={`empty-${i}`} className="flex flex-col items-center">
-                    <div className="relative h-32 w-32 mb-2">
-                      <div className="absolute inset-0 rounded-full border-4 border-gray-700"></div>
-                      <div className="absolute inset-0 flex items-center justify-center flex-col">
-                        <TrophyIcon className="h-8 w-8 text-gray-600" />
-                        <span className="text-xs text-gray-500 mt-1">Nouvel objectif</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Chart 2: Catégories du mois */}
-        <div className="shadow rounded-2xl" style={{ backgroundColor: '#272a2f' }}>
-          <div className="px-4 py-5 sm:p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-medium text-gray-300">
-                Catégories
-              </h3>
-              <div className="bg-violet-500 p-1 rounded">
-                <ChartBarIcon className="h-3 w-3 text-white" />
-              </div>
-            </div>
-            <div className="h-80 flex items-center justify-center pt-4">
-              {(() => {
-                // Filtrer les allTransactions du mois en cours
-                // Utiliser le mois sélectionné au lieu du mois actuel
-                const month = selectedMonth.getMonth();
-                const year = selectedMonth.getFullYear();
-                
-                // Vérifier si une date est dans le mois sélectionné
-                // Déterminer la période de filtrage en fonction du type de période sélectionné
-                let isInSelectedPeriod: (d: Date) => boolean;
-                
-                switch (periodType) {
-                  case 'week':
-                    // Début de la semaine (lundi)
-                    const startDate = new Date(selectedDate);
-                    const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
-                    startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
-                    
-                    // Fin de la semaine (dimanche)
-                    const endDate = new Date(startDate);
-                    endDate.setDate(endDate.getDate() + 6);
-                    
-                    isInSelectedPeriod = (d: Date) => d >= startDate && d <= endDate;
-                    break;
-                    
-                  case 'month':
-                    // Vérifier si une date est dans le mois sélectionné
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
-                    break;
-                    
-                  case 'year':
-                    // Vérifier si une date est dans l'année sélectionnée
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year;
-                    break;
-                    
-                  default:
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
-                }
-                
-                // Fonction utilitaire: budget adapté à la période sélectionnée
-                const getMonthlyBudget = (categoryId: string) => {
-                  const b = budgets.find(bu => bu.categoryId === categoryId);
-                  if (!b) return null;
-                  
-                  let periodBudget = b.amount;
-                  
-                  // Convertir le budget selon la période du budget et la période sélectionnée
-                  if (periodType === 'week') {
-                    // Convertir en budget hebdomadaire
-                    switch (b.period) {
-                      case 'WEEKLY':
-                        // Déjà hebdomadaire
-                        break;
-                      case 'MONTHLY':
-                        periodBudget /= 4.345; // ~12/52.14
-                        break;
-                      case 'QUARTERLY':
-                        periodBudget /= 13.035; // ~4.345*3
-                        break;
-                      case 'YEARLY':
-                        periodBudget /= 52.14;
-                        break;
-                    }
-                  } else if (periodType === 'month') {
-                    // Convertir en budget mensuel
-                    switch (b.period) {
-                      case 'WEEKLY':
-                        periodBudget *= 4.345; // ~52.14/12
-                        break;
-                      case 'MONTHLY':
-                        // Déjà mensuel
-                        break;
-                      case 'QUARTERLY':
-                        periodBudget /= 3;
-                        break;
-                      case 'YEARLY':
-                        periodBudget /= 12;
-                        break;
-                    }
-                  } else if (periodType === 'year') {
-                    // Convertir en budget annuel
-                    switch (b.period) {
-                      case 'WEEKLY':
-                        periodBudget *= 52.14;
-                        break;
-                      case 'MONTHLY':
-                        periodBudget *= 12;
-                        break;
-                      case 'QUARTERLY':
-                        periodBudget *= 4;
-                        break;
-                      case 'YEARLY':
-                        // Déjà annuel
-                        break;
-                    }
-                  }
-                  
-                  return periodBudget;
-                };
-                
-                // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
-                const data = categories
-                  .filter(c => c.type === 'EXPENSE')
-                  .map(c => {
-                    const monthlySpending = allTransactions
-                      .filter(t => t.categoryId === c.id)
-                      .filter(t => {
-                        const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInSelectedPeriod(dt);
-                      })
-                      .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
-                    
-                    const monthlyBudget = getMonthlyBudget(c.id);
-                    return { label: c.name, color: c.color, spending: monthlySpending, budget: monthlyBudget ?? 0 };
-                  })
-                  .filter(d => (d.budget ?? 0) > 0);
-                
-                const totalBudget = data.reduce((sum: number, d) => sum + d.budget, 0);
-                
-                if (totalBudget <= 0) {
-                  return (
-                    <div className="text-sm text-gray-300 text-center">Aucune donnée disponible.</div>
-                  );
-                }
-                
-                const size = 340;
-                const radius = 140;
-                let angleOffset = 0; // in radians
-                
-                // Ordonner par budget décroissant pour lisibilité
-                const sorted = [...data].sort((a, b) => b.budget - a.budget);
-                
-                // Helpers to draw sector paths
-                const polar = (r: number, a: number) => ({ x: r * Math.cos(a), y: r * Math.sin(a) });
-                const sectorPath = (rOuter: number, rInner: number, a0: number, a1: number) => {
-                  const largeArc = a1 - a0 > Math.PI ? 1 : 0;
-                  const p0 = polar(rOuter, a0);
-                  const p1 = polar(rOuter, a1);
-                  if (rInner <= 0) {
-                    // Wedge from center
-                    return `M 0 0 L ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`;
-                  }
-                  const q0 = polar(rInner, a0);
-                  const q1 = polar(rInner, a1);
-                  return `M ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} L ${q1.x} ${q1.y} A ${rInner} ${rInner} 0 ${largeArc} 0 ${q0.x} ${q0.y} Z`;
-                };
-                
-                return (
-                  <svg width={size} height={size}>
-                    <g transform={`translate(${size / 2}, ${size / 2}) rotate(-90)`}>
-                      {sorted.map((d, idx) => {
-                        const sliceAngle = (d.budget / totalBudget) * 2 * Math.PI;
-                        const start = angleOffset;
-                        const end = angleOffset + sliceAngle;
-                        angleOffset = end;
-                        
-                        const ratio = d.budget > 0 ? Math.min(d.spending / d.budget, 1) : 0;
-                        const fillOuter = radius * ratio;
-                        
-                        return (
-                          <g key={idx}>
-                            {/* Fond (budget total) */}
-                            <path d={sectorPath(radius, 0, start, end)} fill={d.color} fillOpacity={0.25} />
-                            {/* Remplissage radial (dépenses) */}
-                            {ratio > 0 && (
-                              <path d={sectorPath(fillOuter, 0, start, end)} fill={d.color} />
-                            )}
-                          </g>
-                        );
-                      })}
-                    </g>
-                  </svg>
-                );
-              })()}
-            </div>
-            {/* Légende des catégories */}
-            <div className="mt-10 grid grid-cols-2 gap-2 max-w-xs mx-auto">
-              {(() => {
-                // Filtrer les allTransactions du mois en cours
-                // Utiliser le mois sélectionné au lieu du mois actuel
-                const month = selectedMonth.getMonth();
-                const year = selectedMonth.getFullYear();
-                
-                // Vérifier si une date est dans le mois sélectionné
-                // Déterminer la période de filtrage en fonction du type de période sélectionné
-                let isInSelectedPeriod: (d: Date) => boolean;
-                
-                switch (periodType) {
-                  case 'week':
-                    // Début de la semaine (lundi)
-                    const startDate = new Date(selectedDate);
-                    const dayOfWeek = startDate.getDay() || 7; // 0 = dimanche, 1-6 = lundi-samedi
-                    startDate.setDate(startDate.getDate() - dayOfWeek + 1); // Aller au lundi
-                    
-                    // Fin de la semaine (dimanche)
-                    const endDate = new Date(startDate);
-                    endDate.setDate(endDate.getDate() + 6);
-                    
-                    isInSelectedPeriod = (d: Date) => d >= startDate && d <= endDate;
-                    break;
-                    
-                  case 'month':
-                    // Vérifier si une date est dans le mois sélectionné
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
-                    break;
-                    
-                  case 'year':
-                    // Vérifier si une date est dans l'année sélectionnée
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year;
-                    break;
-                    
-                  default:
-                    isInSelectedPeriod = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
-                }
-                
-                // Fonction utilitaire: budget adapté à la période sélectionnée
-                const getMonthlyBudget = (categoryId: string) => {
-                  const b = budgets.find(bu => bu.categoryId === categoryId);
-                  if (!b) return null;
-                  
-                  let periodBudget = b.amount;
-                  
-                  // Convertir le budget selon la période du budget et la période sélectionnée
-                  if (periodType === 'week') {
-                    // Convertir en budget hebdomadaire
-                    switch (b.period) {
-                      case 'WEEKLY':
-                        // Déjà hebdomadaire
-                        break;
-                      case 'MONTHLY':
-                        periodBudget /= 4.345; // ~12/52.14
-                        break;
-                      case 'QUARTERLY':
-                        periodBudget /= 13.035; // ~4.345*3
-                        break;
-                      case 'YEARLY':
-                        periodBudget /= 52.14;
-                        break;
-                    }
-                  } else if (periodType === 'month') {
-                    // Convertir en budget mensuel
-                    switch (b.period) {
-                      case 'WEEKLY':
-                        periodBudget *= 4.345; // ~52.14/12
-                        break;
-                      case 'MONTHLY':
-                        // Déjà mensuel
-                        break;
-                      case 'QUARTERLY':
-                        periodBudget /= 3;
-                        break;
-                      case 'YEARLY':
-                        periodBudget /= 12;
-                        break;
-                    }
-                  } else if (periodType === 'year') {
-                    // Convertir en budget annuel
-                    switch (b.period) {
-                      case 'WEEKLY':
-                        periodBudget *= 52.14;
-                        break;
-                      case 'MONTHLY':
-                        periodBudget *= 12;
-                        break;
-                      case 'QUARTERLY':
-                        periodBudget *= 4;
-                        break;
-                      case 'YEARLY':
-                        // Déjà annuel
-                        break;
-                    }
-                  }
-                  
-                  return periodBudget;
-                };
-                
-                // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
-                const data = categories
-                  .filter(c => c.type === 'EXPENSE')
-                  .map(c => {
-                    const monthlySpending = allTransactions
-                      .filter(t => t.categoryId === c.id)
-                      .filter(t => {
-                        const dt = new Date(t.date);
-                        return !isNaN(dt.getTime()) && isInSelectedPeriod(dt);
-                      })
-                      .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
-                    
-                    const monthlyBudget = getMonthlyBudget(c.id);
-                    return { label: c.name, color: c.color, spending: monthlySpending, budget: monthlyBudget ?? 0 };
-                  })
-                  .filter(d => (d.budget ?? 0) > 0);
-                
-                // Ordonner par budget décroissant pour lisibilité
-                const sorted = [...data].sort((a, b) => b.budget - a.budget);
-                
-                return sorted.slice(0, 4).map((d, idx) => (
-                  <div key={idx} className="flex items-center justify-between">
-                    <div className="flex items-center min-w-0">
-                      <span className="inline-block w-2 h-2 rounded-sm mr-1 flex-shrink-0" style={{ backgroundColor: d.color }} />
-                      <span className="text-xs text-gray-200 truncate">{d.label}</span>
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {formatCurrency(d.spending)}
-                      <span className="text-xs text-gray-500 ml-1">
-                        ({((d.budget ? d.spending / d.budget : 0) * 100).toFixed(0)}%)
-                      </span>
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
+              </>
+            )}
           </div>
         </div>
       </div>
-      
 
+      {/* ── Row 2 : 3 columns ── */}
+      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-4 overflow-hidden">
+
+        {/* ── Budgets (col 5) ── */}
+        <div className="lg:col-span-5 flex flex-col min-h-0 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 overflow-hidden">
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+            <span className="text-xs font-medium uppercase tracking-widest text-violet-400">Budgets</span>
+            <Link to="/budgets" className="text-xs text-zinc-500 hover:text-violet-400 transition-colors">
+              Voir tous →
+            </Link>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3 custom-scrollbar">
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="animate-pulse space-y-1.5">
+                  <div className="flex justify-between">
+                    <Skeleton h="h-3" w="w-24" />
+                    <Skeleton h="h-3" w="w-16" />
+                  </div>
+                  <Skeleton h="h-2" w="w-full" className="rounded-full" />
+                </div>
+              ))
+            ) : budgetData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-8 text-center">
+                <div className="h-10 w-10 rounded-full bg-zinc-800 flex items-center justify-center mb-3">
+                  <span className="text-zinc-600 text-lg">%</span>
+                </div>
+                <p className="text-sm text-zinc-500">Aucun budget défini</p>
+                <Link to="/budgets" className="text-xs text-violet-400 hover:text-violet-300 mt-1 transition-colors">
+                  Créer un budget →
+                </Link>
+              </div>
+            ) : (
+              budgetData.map(d => {
+                const pct = d.budget > 0 ? Math.min((d.spent / d.budget) * 100, 100) : 0;
+                const over = d.spent > d.budget;
+                const warn = !over && pct >= 80;
+                const barColor = over ? '#ef4444' : warn ? '#f59e0b' : '#22c55e';
+                return (
+                  <div key={d.id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="inline-block h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
+                        <span className="text-sm text-zinc-200 truncate">{d.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                        <span className={`text-xs font-medium ${over ? 'text-red-400' : warn ? 'text-amber-400' : 'text-zinc-400'}`}>
+                          {fmt(d.spent)}
+                        </span>
+                        <span className="text-xs text-zinc-600">/ {fmt(d.budget)}</span>
+                      </div>
+                    </div>
+                    <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${pct}%`, backgroundColor: barColor }}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* ── Transactions récentes (col 4) ── */}
+        <div className="lg:col-span-4 flex flex-col min-h-0 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 overflow-hidden">
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
+            <span className="text-xs font-medium uppercase tracking-widest text-violet-400">Activité récente</span>
+            <Link to="/transactions" className="text-xs text-zinc-500 hover:text-violet-400 transition-colors">
+              Voir toutes →
+            </Link>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+            {isLoading ? (
+              <div className="px-4 py-3 space-y-3 animate-pulse">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <Skeleton h="h-7" w="w-7" className="rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton h="h-3" w="w-32" />
+                      <Skeleton h="h-2.5" w="w-20" />
+                    </div>
+                    <Skeleton h="h-3" w="w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : recentExpenses.length === 0 && recentIncome.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-8 text-center px-4">
+                <p className="text-sm text-zinc-500">Aucune transaction</p>
+                <Link to="/transactions" className="text-xs text-violet-400 hover:text-violet-300 mt-1 transition-colors">
+                  Importer un CSV →
+                </Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/[0.04]">
+                {/* Expenses */}
+                {recentExpenses.length > 0 && (
+                  <div>
+                    <p className="px-4 pt-3 pb-1.5 text-xs font-medium text-zinc-600 uppercase tracking-wide">Dépenses</p>
+                    {recentExpenses.map(t => (
+                      <div key={t.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+                        <div className="h-7 w-7 rounded-full bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                          <span className="text-red-400 text-xs font-bold">−</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-zinc-100 truncate">{t.description}</p>
+                          <p className="text-xs text-zinc-600">{new Date(t.date).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <span className="text-xs font-semibold text-red-400 flex-shrink-0">{fmt(Math.abs(t.amount))}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Income */}
+                {recentIncome.length > 0 && (
+                  <div>
+                    <p className="px-4 pt-3 pb-1.5 text-xs font-medium text-zinc-600 uppercase tracking-wide">Revenus</p>
+                    {recentIncome.map(t => (
+                      <div key={t.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.03] transition-colors">
+                        <div className="h-7 w-7 rounded-full bg-green-500/15 flex items-center justify-center flex-shrink-0">
+                          <span className="text-green-400 text-xs font-bold">+</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-zinc-100 truncate">{t.description}</p>
+                          <p className="text-xs text-zinc-600">{new Date(t.date).toLocaleDateString('fr-FR')}</p>
+                        </div>
+                        <span className="text-xs font-semibold text-green-400 flex-shrink-0">{fmt(t.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Prochains paiements (col 3) ── */}
+        <div className="lg:col-span-3 flex flex-col min-h-0 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 overflow-hidden">
+          <div className="flex-shrink-0 px-5 py-3 border-b border-white/[0.06]">
+            <span className="text-xs font-medium uppercase tracking-widest text-violet-400">Prochains paiements</span>
+          </div>
+
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+            {isLoading ? (
+              <div className="px-4 py-3 space-y-3 animate-pulse">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <Skeleton h="h-3" w="w-28" />
+                    <Skeleton h="h-3" w="w-20" />
+                  </div>
+                ))}
+              </div>
+            ) : upcoming.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full py-8 text-center px-4">
+                <CalendarDaysIcon className="h-8 w-8 text-zinc-700 mb-2" />
+                <p className="text-sm text-zinc-500">Aucun paiement programmé</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/[0.04]">
+                {upcoming.map(r => {
+                  const due = new Date(r.nextDue);
+                  const today = new Date();
+                  const daysLeft = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                  const soon = daysLeft <= 3;
+                  return (
+                    <div key={r.id} className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-white/[0.03] transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-zinc-100 truncate">{r.description}</p>
+                        <p className={`text-xs mt-0.5 ${soon ? 'text-amber-400' : 'text-zinc-500'}`}>
+                          {daysLeft === 0 ? "Aujourd'hui" : daysLeft === 1 ? 'Demain' : due.toLocaleDateString('fr-FR')}
+                        </p>
+                        <span className="inline-block text-[10px] text-zinc-600 mt-0.5">
+                          {FREQ_LABEL[r.frequency] ?? r.frequency}
+                        </span>
+                      </div>
+                      <span className="text-xs font-semibold text-zinc-300 flex-shrink-0 mt-0.5">
+                        {fmt(Math.abs(r.amount))}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import type { Bank } from '../types/index.js';
+import type { Bank, User } from '../types/index.js';
 
 // Helper function pour obtenir les informations du type de compte
 const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
@@ -53,6 +53,9 @@ export default function Banks() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
+  // Filter visible banks (non-archived)
+  const visibleBanks = banks.filter(bank => !bank.archived);
+
   useEffect(() => {
     // Forcer le rechargement des banques
     const initBanks = async () => {
@@ -89,7 +92,7 @@ export default function Banks() {
     }
   };
 
-  const handleRestore = async (bankId: string) => {
+  const handleRestoreBank = async (bankId: string) => {
     try {
       const response = await fetch(`/api/banks/${bankId}/restore`, {
         method: 'PUT',
@@ -215,7 +218,7 @@ export default function Banks() {
     setImageFile(null);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleArchive = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette banque ?')) {
       return;
     }
@@ -246,7 +249,7 @@ export default function Banks() {
     }
   };
 
-  const handlePermanentDelete = async (bankId: string, bankName: string) => {
+  const handleDeletePermanently = async (bankId: string, bankName?: string) => {
     if (!confirm(`⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir supprimer définitivement la banque "${bankName}" ?\n\nCette action supprimera :\n- La banque elle-même\n- TOUTES ses transactions\n- Tous ses budgets associés\n- Toutes ses récurrences associées\n\nCette action est IRRÉVERSIBLE !`)) {
       return;
     }
@@ -291,12 +294,7 @@ export default function Banks() {
     setShowAddForm(false);
   };
 
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
+
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -526,7 +524,7 @@ export default function Banks() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {visibleBanks.map((bank) => {
                     const accountTypeInfo = getAccountTypeInfo(bank.accountType);
-                    const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
+                    const bankUsers = bank.users?.map((u: User) => u.name).filter(Boolean) || [];
                     
                     return (
                       <div
@@ -587,7 +585,7 @@ export default function Banks() {
                           <div className="mb-4">
                             <p className="text-slate-400 text-sm mb-2">Propriétaires</p>
                             <div className="flex -space-x-2">
-                              {bank.users?.slice(0, 3).map((user, index) => (
+                              {bank.users?.slice(0, 3).map((user) => (
                                 <div key={user.id} className="relative">
                                   {user.avatar ? (
                                     <img
