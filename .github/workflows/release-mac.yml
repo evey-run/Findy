@@ -6,6 +6,10 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
+# Autorise le GITHUB_TOKEN à créer la release et uploader les .dmg
+permissions:
+  contents: write
+
 env:
   # Désactive la signature Apple (pas de certificat Developer ID)
   TAURI_SIGNING_PRIVATE_KEY: ""
