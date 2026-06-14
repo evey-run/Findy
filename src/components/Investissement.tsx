@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store';
+import { assetUrl } from '../lib/url';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
 
@@ -1783,7 +1784,7 @@ export default function Investissement() {
                         >
                           {transaction.bank.image ? (
                             <img
-                              src={`http://localhost:3001${transaction.bank.image}`}
+                              src={assetUrl(transaction.bank.image)}
                               alt={transaction.bank.name}
                               className="w-8 h-8 rounded-full object-cover"
                             />
