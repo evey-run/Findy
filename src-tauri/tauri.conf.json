@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "Finance",
+  "productName": "Fyno",
   "version": "0.1.0",
-  "identifier": "com.evey.finance",
+  "identifier": "com.evey.fyno",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:51737",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Finance",
+        "title": "Fyno",
         "width": 1280,
         "height": 800,
         "minWidth": 960,

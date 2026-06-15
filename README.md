@@ -1,4 +1,4 @@
-# 💰 Finance Tracker
+# 💰 Fyno
 
 Une application moderne et complète de gestion financière personnelle développée avec React, TypeScript et Express.
 
