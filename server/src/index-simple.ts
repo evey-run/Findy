@@ -9,7 +9,7 @@ dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 36321;
 
 // Configuration multer pour l'upload d'images
 const storage = multer.diskStorage({
@@ -72,7 +72,7 @@ const uploadAvatar = multer({
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: process.env.FRONTEND_URL || 'http://localhost:51737',
   credentials: true
 }));
 app.use(express.json());

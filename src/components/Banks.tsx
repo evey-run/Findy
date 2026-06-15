@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { getAllBankBalances } from '../api/bankBalance';
+import { assetUrl } from '../lib/url';
 
 
 // Helper function pour formater l'IBAN avec un espace tous les 4 caractères
@@ -212,7 +213,7 @@ export default function Banks() {
     
     // Set image preview if bank has an image
     if (bank.image) {
-      setImagePreview(`http://localhost:3001${bank.image}`);
+      setImagePreview(assetUrl(bank.image));
     } else {
       setImagePreview(null);
     }
@@ -661,7 +662,7 @@ export default function Banks() {
                                 <div className="flex items-center space-x-1">
                                   {user.avatar ? (
                                     <img
-                                      src={`http://localhost:3001${user.avatar}`}
+                                      src={assetUrl(user.avatar)}
                                       alt={user.name}
                                       className="w-3 h-3 rounded-full object-cover"
                                     />
@@ -718,7 +719,7 @@ export default function Banks() {
                     <div className="flex items-center">
                       {bank.image ? (
                         <img
-                          src={`http://localhost:3001${bank.image}`}
+                          src={assetUrl(bank.image)}
                           alt={bank.name}
                           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                         />
@@ -1051,7 +1052,7 @@ export default function Banks() {
                             <div className="flex items-center space-x-1">
                               {user.avatar ? (
                                 <img
-                                  src={`http://localhost:3001${user.avatar}`}
+                                  src={assetUrl(user.avatar)}
                                   alt={user.name}
                                   className="w-3 h-3 rounded-full object-cover"
                                 />
@@ -1128,7 +1129,7 @@ export default function Banks() {
                     <div className="flex items-center">
                       {bank.image ? (
                         <img
-                          src={`http://localhost:3001${bank.image}`}
+                          src={assetUrl(bank.image)}
                           alt={bank.name}
                           className="w-12 h-12 rounded-full object-cover flex-shrink-0"
                           style={{ opacity: '0.7' }}

@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 // Configuration multer pour l'upload d'images
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(process.cwd(), 'public/uploads'));
+    cb(null, process.env.UPLOADS_DIR || path.join(process.cwd(), 'public/uploads'));
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

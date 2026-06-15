@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { User, Bank } from '../types/index.js';
+import { assetUrl } from '../lib/url';
 
 export default function Users() {
   const { users, loadUsers, loadBanks } = useAppStore();
@@ -89,7 +90,7 @@ export default function Users() {
         // Mettre à jour l'aperçu avec la nouvelle image si elle a été uploadée
         if (avatarFile) {
           const updatedUser = await response.json();
-          setAvatarPreview(updatedUser.avatar ? `http://localhost:3001${updatedUser.avatar}` : null);
+          setAvatarPreview(updatedUser.avatar ? assetUrl(updatedUser.avatar) : null);
         }
         alert('Utilisateur mis à jour avec succès');
       } else {
@@ -224,7 +225,7 @@ export default function Users() {
                     setEditingId(user.id); 
                     setEditingUser(user); 
                     setFormData({ name: user.name }); 
-                    setAvatarPreview(user.avatar ? `http://localhost:3001${user.avatar}` : null); 
+                    setAvatarPreview(user.avatar ? assetUrl(user.avatar) : null);
                     setAvatarFile(null); 
                   }}
                   title="Modifier l'utilisateur"
@@ -235,7 +236,7 @@ export default function Users() {
                 </button>
                 {user.avatar ? (
                   <img
-                    src={`http://localhost:3001${user.avatar}`}
+                    src={assetUrl(user.avatar)}
                     alt={user.name}
                     className="w-24 h-24 rounded-full object-cover ring-2 ring-white/10 mb-4"
                   />

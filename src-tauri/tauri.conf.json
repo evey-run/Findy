@@ -1,20 +1,22 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "finance",
+  "productName": "Fyno",
   "version": "0.1.0",
-  "identifier": "com.evey.finance",
+  "identifier": "com.evey.fyno",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5174",
+    "devUrl": "http://localhost:51737",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
       {
-        "title": "finance",
-        "width": 800,
-        "height": 600,
+        "title": "Fyno",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
         "resizable": true,
         "fullscreen": false
       }
@@ -25,13 +27,24 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["dmg", "app"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "externalBin": [
+      "binaries/finance-server"
+    ],
+    "resources": {
+      "binaries/libquery_engine-darwin-arm64.dylib.node": "libquery_engine-darwin-arm64.dylib.node",
+      "binaries/libquery_engine-darwin.dylib.node": "libquery_engine-darwin.dylib.node"
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "exceptionDomain": "localhost"
+    }
   }
 }

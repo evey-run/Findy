@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types/index.js';
+import { assetUrl } from '../lib/url';
 
 export default function UserProfile() {
   const { selectedUser, users, banks: _banks, loadUsers, loadBanks } = useAppStore();
@@ -49,7 +50,7 @@ export default function UserProfile() {
   const handleEdit = () => {
     if (currentUser) {
       setFormData({ name: currentUser.name, email: currentUser.email || '' });
-      setAvatarPreview(currentUser.avatar ? `http://localhost:3001${currentUser.avatar}` : null);
+      setAvatarPreview(currentUser.avatar ? assetUrl(currentUser.avatar) : null);
       setEditing(true);
     }
   };
@@ -223,7 +224,7 @@ export default function UserProfile() {
           ) : (
             <div className="flex items-center gap-4">
               {currentUser.avatar ? (
-                <img src={`http://localhost:3001${currentUser.avatar}`} alt={currentUser.name}
+                <img src={assetUrl(currentUser.avatar)} alt={currentUser.name}
                   className="w-20 h-20 rounded-full object-cover ring-2 ring-white/10" />
               ) : (
                 <div className="w-20 h-20 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400 text-2xl font-bold">
@@ -266,7 +267,7 @@ export default function UserProfile() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       {bank.image ? (
-                        <img src={`http://localhost:3001${bank.image}`} alt={bank.name}
+                        <img src={assetUrl(bank.image)} alt={bank.name}
                           className="w-10 h-10 rounded-full object-cover ring-1 ring-white/10" />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-300 text-sm font-bold">

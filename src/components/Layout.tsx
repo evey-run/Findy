@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { useState, useEffect, useRef } from 'react';
+import { assetUrl } from '../lib/url';
 import {
   HomeIcon,
   CreditCardIcon,
@@ -62,7 +63,7 @@ export default function Layout({ children }: LayoutProps) {
     if (user?.avatar) {
       return (
         <img
-          src={user.avatar.startsWith('http') ? user.avatar : `http://localhost:3001${user.avatar}`}
+          src={assetUrl(user.avatar)}
           alt={user.name}
           className={`${size} rounded-full object-cover ring-2 ring-white/10`}
         />
@@ -93,7 +94,7 @@ export default function Layout({ children }: LayoutProps) {
                 <line x1="15" y1="3" x2="15" y2="17" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
                 <line x1="1"  y1="14" x2="17" y2="5"  stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
               </svg>
-              <span className="text-zinc-50 font-semibold text-lg tracking-tight">tally</span>
+              <span className="text-zinc-50 font-semibold text-lg tracking-tight">Fyno</span>
             </div>
           </div>
 
