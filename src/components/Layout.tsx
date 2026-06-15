@@ -94,7 +94,7 @@ export default function Layout({ children }: LayoutProps) {
                 <line x1="15" y1="3" x2="15" y2="17" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
                 <line x1="1"  y1="14" x2="17" y2="5"  stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
               </svg>
-              <span className="text-zinc-50 font-semibold text-lg tracking-tight">tally</span>
+              <span className="text-zinc-50 font-semibold text-lg tracking-tight">Fyno</span>
             </div>
           </div>
 
