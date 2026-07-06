@@ -1,7 +1,6 @@
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'node:crypto';
-import fs from 'node:fs';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -11,10 +10,8 @@ let jwtCache: { token: string; expiresAt: number } | null = null;
 
 function buildJWT(): string {
   const appId = process.env.ENABLE_BANKING_APP_ID;
-  const keyPath = process.env.ENABLE_BANKING_KEY_PATH;
-  if (!appId || !keyPath) throw new Error('Enable Banking credentials not configured (ENABLE_BANKING_APP_ID / ENABLE_BANKING_KEY_PATH)');
-
-  const privateKey = fs.readFileSync(keyPath, 'utf8');
+  const privateKey = process.env.ENABLE_BANKING_RSA_KEY;
+  if (!appId || !privateKey) throw new Error('Enable Banking credentials not configured (ENABLE_BANKING_APP_ID / ENABLE_BANKING_RSA_KEY)');
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 3599;
 
@@ -51,9 +48,7 @@ async function ebFetch(path: string, options: RequestInit = {}): Promise<any> {
 
 // GET /api/enablebanking/configured
 router.get('/configured', (_req, res) => {
-  const appId = process.env.ENABLE_BANKING_APP_ID;
-  const keyPath = process.env.ENABLE_BANKING_KEY_PATH;
-  const configured = !!(appId && keyPath && fs.existsSync(keyPath));
+  const configured = !!(process.env.ENABLE_BANKING_APP_ID && process.env.ENABLE_BANKING_RSA_KEY);
   res.json({ configured });
 });
 
