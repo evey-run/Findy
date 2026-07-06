@@ -32,6 +32,12 @@ export interface Bank {
   userBanks?: UserBank[];
   // Computed fields for convenience
   users?: User[];
+  // Enable Banking integration
+  ebStatus?: 'PENDING' | 'LINKED' | 'EXPIRED' | null;
+  ebLinkedAt?: string | null;
+  ebExpiresAt?: string | null;
+  ebAccountUid?: string | null;
+  ebAspspName?: string | null;
 }
 
 export interface Category {

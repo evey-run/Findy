@@ -35,9 +35,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": [
-      "binaries/finance-server"
-    ],
+    "externalBin": [],
     "resources": {
       "binaries/libquery_engine-darwin-arm64.dylib.node": "libquery_engine-darwin-arm64.dylib.node",
       "binaries/libquery_engine-darwin.dylib.node": "libquery_engine-darwin.dylib.node"

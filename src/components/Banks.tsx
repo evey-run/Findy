@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { getAllBankBalances } from '../api/bankBalance';
 import { assetUrl } from '../lib/url';
+
+interface EbAspsp { name: string; country: string; logo: string; }
+type EbStep = 'search' | 'waiting';
 
 
 // Helper function pour formater l'IBAN avec un espace tous les 4 caractères
@@ -329,6 +332,17 @@ export default function Banks() {
     }
   };
 
+  // Enable Banking state
+  const [ebConfigured, setEbConfigured] = useState(false);
+  const [ebModal, setEbModal] = useState<{ bankId: string; bankName: string } | null>(null);
+  const [ebAspsps, setEbAspsps] = useState<EbAspsp[]>([]);
+  const [ebSearch, setEbSearch] = useState('');
+  const [ebCountry, setEbCountry] = useState('fr');
+  const [ebStep, setEbStep] = useState<EbStep>('search');
+  const [ebLinkUrl, setEbLinkUrl] = useState('');
+  const [ebSyncing, setEbSyncing] = useState<string | null>(null);
+  const ebPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Stocker les soldes calculés pour éviter des recalculs inutiles
   const [bankBalances, setBankBalances] = useState<{[key: string]: number}>({});
   
@@ -363,6 +377,98 @@ export default function Banks() {
   useEffect(() => {
     refreshBalances();
   }, [transactions.length]);
+
+  // ── Enable Banking ──────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetch('/api/enablebanking/configured')
+      .then(r => r.json())
+      .then(d => setEbConfigured(d.configured))
+      .catch(() => {});
+  }, []);
+
+  const openEbModal = async (bankId: string, bankName: string) => {
+    setEbModal({ bankId, bankName });
+    setEbStep('search');
+    setEbSearch('');
+    setEbAspsps([]);
+    try {
+      const res = await fetch(`/api/enablebanking/aspsps?country=${ebCountry}`);
+      if (!res.ok) throw new Error('Erreur API');
+      const data = await res.json();
+      setEbAspsps(data);
+    } catch {
+      alert('Impossible de charger la liste des banques Enable Banking. Vérifiez vos identifiants.');
+    }
+  };
+
+  const handleEbLink = async (aspspName: string, aspspCountry: string) => {
+    if (!ebModal) return;
+    try {
+      const res = await fetch('/api/enablebanking/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankId: ebModal.bankId, aspspName, aspspCountry }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setEbLinkUrl(data.link);
+      setEbStep('waiting');
+      window.open(data.link, '_blank');
+      // Start polling
+      if (ebPollRef.current) clearInterval(ebPollRef.current);
+      ebPollRef.current = setInterval(async () => {
+        try {
+          const sr = await fetch(`/api/enablebanking/banks/${ebModal.bankId}/status`);
+          const sd = await sr.json();
+          if (sd.ebStatus === 'LINKED') {
+            clearInterval(ebPollRef.current!);
+            ebPollRef.current = null;
+            await loadBanks();
+            setEbModal(null);
+            alert('Compte lié avec succès ! Cliquez sur "Synchroniser" pour importer vos transactions.');
+          }
+        } catch {}
+      }, 3000);
+    } catch (err: any) {
+      alert(`Erreur : ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    return () => { if (ebPollRef.current) clearInterval(ebPollRef.current); };
+  }, []);
+
+  const handleEbSync = async (bankId: string) => {
+    setEbSyncing(bankId);
+    try {
+      const res = await fetch(`/api/enablebanking/banks/${bankId}/sync`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      await loadTransactions();
+      alert(`Synchronisation réussie : ${data.imported} transaction(s) importée(s)${data.skipped ? `, ${data.skipped} déjà présente(s)` : ''}.`);
+    } catch (err: any) {
+      alert(`Erreur de synchronisation : ${err.message}`);
+    } finally {
+      setEbSyncing(null);
+    }
+  };
+
+  const handleEbUnlink = async (bankId: string) => {
+    if (!confirm('Délier ce compte de Enable Banking ? Les transactions déjà importées seront conservées.')) return;
+    try {
+      await fetch(`/api/enablebanking/banks/${bankId}/unlink`, { method: 'DELETE' });
+      await loadBanks();
+    } catch (err: any) {
+      alert(`Erreur : ${err.message}`);
+    }
+  };
+
+  const ebFilteredAspsps = ebAspsps.filter(i =>
+    i.name.toLowerCase().includes(ebSearch.toLowerCase())
+  );
+
+  // ────────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -732,8 +838,17 @@ export default function Banks() {
                         </div>
                       )}
                       <div className="ml-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-lg font-medium text-white">{bank.name}</h3>
+                          {bank.ebStatus === 'LINKED' && (
+                            <span
+                              className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-400 border border-green-700/50 cursor-pointer hover:bg-red-900/30 hover:text-red-400 hover:border-red-700/50 transition-colors"
+                              title="Enable Banking lié — cliquer pour délier"
+                              onClick={(e) => { e.stopPropagation(); handleEbUnlink(bank.id); }}
+                            >
+                              EB ✓
+                            </span>
+                          )}
                           <span className="text-xs text-zinc-400">
                             Créé le {new Date(bank.createdAt).toLocaleDateString('fr-FR')}
                           </span>
@@ -753,7 +868,37 @@ export default function Banks() {
                         )}
                       </div>
                     </div>
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2 items-center">
+                        {ebConfigured && (
+                          bank.ebStatus === 'LINKED' ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleEbSync(bank.id); }}
+                              disabled={ebSyncing === bank.id}
+                              className="transition-colors text-green-500 hover:text-green-300 disabled:opacity-40"
+                              title="Synchroniser les transactions Enable Banking"
+                            >
+                              <svg className={`h-5 w-5 ${ebSyncing === bank.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                          ) : bank.ebStatus === 'PENDING' ? (
+                            <span className="text-yellow-500" title="Authentification Enable Banking en attente">
+                              <svg className="h-5 w-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEbModal(bank.id, bank.name); }}
+                              className="transition-colors text-zinc-500 hover:text-violet-400"
+                              title="Connecter à Enable Banking (sync automatique)"
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                              </svg>
+                            </button>
+                          )
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -1202,6 +1347,129 @@ export default function Banks() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+      {/* ── Enable Banking Modal ─────────────────────────────────────────────── */}
+      {ebModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-zinc-900 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl mx-4">
+
+            {ebStep === 'search' && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-white">
+                    Connecter <span className="text-violet-400">{ebModal.bankName}</span>
+                  </h3>
+                  <button onClick={() => setEbModal(null)} className="text-zinc-400 hover:text-white">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <p className="text-sm text-zinc-400 mb-4">
+                  Sélectionnez votre banque pour autoriser l'accès à vos transactions via Enable Banking.
+                </p>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    placeholder="Rechercher une banque..."
+                    value={ebSearch}
+                    onChange={(e) => setEbSearch(e.target.value)}
+                    className="flex-1 px-3 py-2 text-sm rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    style={{ backgroundColor: '#18191c', border: '1px solid #3a3d42' }}
+                    autoFocus
+                  />
+                  <select
+                    value={ebCountry}
+                    onChange={(e) => {
+                      setEbCountry(e.target.value);
+                      setEbAspsps([]);
+                      fetch(`/api/enablebanking/aspsps?country=${e.target.value}`)
+                        .then(r => r.json()).then(setEbAspsps).catch(() => {});
+                    }}
+                    className="px-2 py-2 text-sm rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    style={{ backgroundColor: '#18191c', border: '1px solid #3a3d42' }}
+                  >
+                    <option value="fr">🇫🇷 FR</option>
+                    <option value="gb">🇬🇧 UK</option>
+                    <option value="de">🇩🇪 DE</option>
+                    <option value="es">🇪🇸 ES</option>
+                    <option value="it">🇮🇹 IT</option>
+                    <option value="nl">🇳🇱 NL</option>
+                    <option value="be">🇧🇪 BE</option>
+                    <option value="pl">🇵🇱 PL</option>
+                  </select>
+                </div>
+                <div className="overflow-y-auto max-h-64 space-y-1 custom-scrollbar">
+                  {ebAspsps.length === 0 && (
+                    <div className="text-center py-8 text-zinc-500 text-sm">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-violet-500 mx-auto mb-2"></div>
+                      Chargement des banques...
+                    </div>
+                  )}
+                  {ebFilteredAspsps.map(inst => (
+                    <button
+                      key={`${inst.name}-${inst.country}`}
+                      onClick={() => handleEbLink(inst.name, inst.country)}
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left"
+                    >
+                      {inst.logo ? (
+                        <img src={inst.logo} alt="" className="w-8 h-8 rounded object-contain bg-white/10 p-0.5 flex-shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-violet-800 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
+                          {inst.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">{inst.name}</p>
+                        <p className="text-xs text-zinc-500">{inst.country}</p>
+                      </div>
+                      <svg className="h-4 w-4 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  ))}
+                  {ebAspsps.length > 0 && ebFilteredAspsps.length === 0 && (
+                    <p className="text-center py-6 text-zinc-500 text-sm">Aucune banque trouvée pour "{ebSearch}"</p>
+                  )}
+                </div>
+              </>
+            )}
+
+            {ebStep === 'waiting' && (
+              <>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-white">Authentification en cours</h3>
+                  <button onClick={() => { setEbModal(null); if (ebPollRef.current) clearInterval(ebPollRef.current); }} className="text-zinc-400 hover:text-white">
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="text-center py-6">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500 mx-auto mb-4"></div>
+                  <p className="text-white mb-2">Une fenêtre de votre navigateur a été ouverte.</p>
+                  <p className="text-zinc-400 text-sm mb-6">
+                    Connectez-vous à votre banque pour autoriser l'accès. Cette fenêtre se mettra à jour automatiquement.
+                  </p>
+                  {ebLinkUrl && (
+                    <div className="mt-2">
+                      <p className="text-xs text-zinc-500 mb-2">Si la fenêtre ne s'est pas ouverte :</p>
+                      <a
+                        href={ebLinkUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-violet-400 hover:text-violet-300 underline break-all"
+                      >
+                        Ouvrir le lien manuellement
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
           </div>
         </div>
       )}
