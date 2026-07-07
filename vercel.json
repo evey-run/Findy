@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build && npm run build:server",
+  "outputDirectory": "dist",
+  "env": {
+    "ENABLE_BANKING_APP_ID": "@enable_banking_app_id",
+    "ENABLE_BANKING_RSA_KEY": "@enable_banking_rsa_key",
+    "DATABASE_URL": "@database_url",
+    "PORT": "3000"
+  },
+  "functions": {
+    "api/enablebanking-redirect.ts": {
+      "memory": 128,
+      "maxDuration": 10,
+      "runtime": "nodejs20.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/enablebanking/(.*)",
+      "destination": "/api/enablebanking-redirect?$1"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/enablebanking-link",
+      "destination": "/api/enablebanking-redirect",
+      "permanent": false
+    }
+  ]
+}

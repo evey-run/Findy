@@ -101,7 +101,20 @@ router.post('/link', async (req, res) => {
       },
     });
 
-    res.json({ link: authData.url });
+    // Use Vercel edge function for redirect handling if running on Vercel
+    // Falls back to direct link if not deployed to Vercel
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 36321}`;
+    const redirectLink = `${baseUrl}/api/enablebanking-redirect?${new URLSearchParams({
+      bankId,
+      aspspName: aspspName.toUpperCase(),
+      aspspCountry: aspspCountry.toUpperCase(),
+      redirectUrl: authData.url,
+    }).toString()}`;
+
+    res.json({
+      link: authData.url,
+      redirectLink, // Edge function redirect URL for analytics
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
