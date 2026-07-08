@@ -132,18 +132,27 @@ router.get('/:id', async (req, res) => {
 // POST /api/banks - Create a new bank
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    const { name, shortName, color, iban, balance, createdAt, accountType } = req.body;
-    
-    // Récupérer les userIds du FormData
-    const userIds: string[] = [];
-    for (const key in req.body) {
-      if (key.startsWith('userIds[')) {
-        userIds.push(req.body[key]);
+    let { name, shortName, color, iban, balance, createdAt, accountType, data } = req.body;
+    let userIds: string[] = [];
+
+    if (data) {
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+      name = parsed.name || name;
+      shortName = parsed.shortName || shortName;
+      color = parsed.color || color;
+      iban = parsed.iban || iban;
+      balance = parsed.balance !== undefined ? parsed.balance : balance;
+      accountType = parsed.accountType || accountType;
+      createdAt = parsed.createdAt || createdAt;
+      userIds = Array.isArray(parsed.userIds) ? parsed.userIds : [];
+    } else {
+      for (const key in req.body) {
+        if (key.startsWith('userIds[')) userIds.push(req.body[key]);
       }
     }
-    
+
     console.log('🔧 Creating bank with data:', { name, shortName, color, iban, balance, userIds, createdAt });
-    
+
     if (!name || userIds.length === 0) {
       return res.status(400).json({ error: 'Name and at least one user are required' });
     }

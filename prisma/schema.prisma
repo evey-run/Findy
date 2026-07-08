@@ -42,6 +42,15 @@ model Bank {
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+  // Enable Banking integration
+  ebAspspName    String?
+  ebAspspCountry String?
+  ebState        String?
+  ebSessionId    String?
+  ebAccountUid   String?
+  ebStatus       String?
+  ebLinkedAt     DateTime?
+  ebExpiresAt    DateTime?
   budgets      Budget[]
   recurrences  Recurrence[]
   transactions Transaction[]
@@ -83,8 +92,9 @@ model Transaction {
   description String
   date        DateTime  @default(now())
   checked     Boolean   @default(false)
-  unitPrice   Float?    // Prix unitaire pour les investissements
-  quantity    Float?    // Quantité pour les investissements
+  unitPrice   Float?
+  quantity    Float?
+  externalId  String?   // For deduplication (e.g. GoCardless transaction ID)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   bankId      String
