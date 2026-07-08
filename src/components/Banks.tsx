@@ -8,6 +8,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
   XMarkIcon,
+  LinkIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -17,10 +18,10 @@ const formatIBAN = (iban: string): string => {
 };
 
 const getAccountTypeInfo = (type: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
-  const info: Record<string, { label: string; icon: string; color: string }> = {
-    CURRENT: { label: 'Courant', icon: '💳', color: 'text-blue-400' },
-    SAVINGS: { label: 'Épargne', icon: '🏦', color: 'text-green-400' },
-    INVESTMENT: { label: 'Investissement', icon: '📈', color: 'text-purple-400' },
+  const info: Record<string, { label: string; icon: string }> = {
+    CURRENT: { label: 'Compte courant', icon: '💳' },
+    SAVINGS: { label: 'Livret d\'épargne', icon: '🏦' },
+    INVESTMENT: { label: 'Investissement', icon: '📈' },
   };
   return info[type] || info.CURRENT;
 };
@@ -61,6 +62,9 @@ const fmtCompact = (n: number) => {
   return fmt(n);
 };
 
+interface EbModal { bankId: string; bankName: string; }
+interface EbAspsp { name: string; country: string; logo: string; }
+
 export default function Banks() {
   const { banks, loadBanks, loadTransactions, loadUsers, users } = useAppStore();
   const [loading, setLoading] = useState(true);
@@ -70,6 +74,14 @@ export default function Banks() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Enable Banking modal
+  const [ebModal, setEbModal] = useState<EbModal | null>(null);
+  const [ebStep, setEbStep] = useState<'search' | 'waiting'>('search');
+  const [ebSearch, setEbSearch] = useState('');
+  const [ebCountry, setEbCountry] = useState('FR');
+  const [ebAspsps, setEbAspsps] = useState<EbAspsp[]>([]);
+  const [ebLinkUrl, setEbLinkUrl] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -182,6 +194,51 @@ export default function Banks() {
     }
   };
 
+  const openEbModal = async (bankId: string, bankName: string) => {
+    setEbModal({ bankId, bankName });
+    setEbStep('search');
+    setEbSearch('');
+    setEbAspsps([]);
+    try {
+      const res = await fetch(`/api/enablebanking/aspsps?country=${ebCountry}`);
+      if (!res.ok) throw new Error();
+      setEbAspsps(await res.json());
+    } catch {
+      toast.error('Impossible de charger la liste Enable Banking');
+    }
+  };
+
+  const handleEbLink = async (aspspName: string, aspspCountry: string) => {
+    if (!ebModal) return;
+    try {
+      const res = await fetch('/api/enablebanking/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bankId: ebModal.bankId, aspspName, aspspCountry }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setEbLinkUrl(data.link);
+      setEbStep('waiting');
+      window.open(data.link, '_blank');
+      // Poll for status
+      const poll = setInterval(async () => {
+        try {
+          const sr = await fetch(`/api/enablebanking/banks/${ebModal.bankId}/status`);
+          const sd = await sr.json();
+          if (sd.ebStatus === 'LINKED') {
+            clearInterval(poll);
+            await loadBanks();
+            setEbModal(null);
+            toast.success('Compte lié avec succès !');
+          }
+        } catch {}
+      }, 3000);
+    } catch (e: any) {
+      toast.error(e.message || 'Erreur Enable Banking');
+    }
+  };
+
   const handleDelete = async (bankId: string) => {
     setOpenMenuId(null);
     if (!confirm('Supprimer cette banque ?')) return;
@@ -279,7 +336,7 @@ export default function Banks() {
                 key={bank.id}
                 className="group relative rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 transition-all duration-200 hover:border-white/[0.16] hover:bg-white/[0.06]"
               >
-                {/* Row 1 — image + name + menu */}
+                {/* Row 1 — image + name + short name + menu */}
                 <div className="flex items-center gap-2.5">
                   {bank.image ? (
                     <img
@@ -292,9 +349,14 @@ export default function Banks() {
                       🏦
                     </div>
                   )}
-                  <h3 className="text-sm font-semibold text-zinc-50 truncate flex-1">
-                    {bank.name}
-                  </h3>
+                  <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                    <h3 className="text-sm font-semibold text-zinc-50 truncate">
+                      {bank.name}
+                    </h3>
+                    {bank.shortName && (
+                      <span className="text-xs text-zinc-500 flex-shrink-0">{bank.shortName}</span>
+                    )}
+                  </div>
 
                   {/* Actions menu */}
                   <div className="relative flex-shrink-0">
@@ -314,7 +376,20 @@ export default function Banks() {
                     {openMenuId === bank.id && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                        <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                        <div className="absolute right-0 top-7 z-20 w-52 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                          <button
+                            onClick={() => { setOpenMenuId(null); openEbModal(bank.id, bank.name); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <LinkIcon className="h-4 w-4 text-violet-400" />
+                            <span>Connecter Enable Banking</span>
+                            {bank.ebStatus === 'LINKED' && (
+                              <span className="ml-auto text-[10px] text-green-400 font-medium">Lié</span>
+                            )}
+                            {bank.ebStatus === 'PENDING' && (
+                              <span className="ml-auto text-[10px] text-amber-400 font-medium">En attente</span>
+                            )}
+                          </button>
                           <button
                             onClick={() => openEdit(bank)}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
@@ -335,30 +410,20 @@ export default function Banks() {
                   </div>
                 </div>
 
-                {/* Row 2 — balance (emphasis) */}
-                <div className="mt-3 text-lg font-bold text-zinc-50 tabular-nums">
+                {/* Row 2 — account type (subtitle) */}
+                <div className="mt-1 text-xs text-zinc-500">
+                  {typeInfo.label}
+                </div>
+
+                {/* Row 3 — balance (emphasis) */}
+                <div className="mt-2 text-lg font-bold text-zinc-50 tabular-nums">
                   {fmtCompact(bank.balance)}
                 </div>
 
-                {/* Row 3 — type + IBAN (compact) */}
-                <div className="mt-2.5 flex items-center justify-between">
-                  <span
-                    className={`text-xs font-medium px-2 py-1 rounded-md ${typeInfo.color}`}
-                    style={{ backgroundColor: `#${Math.random().toString(16).slice(2, 8)}20` }}
-                  >
-                    {typeInfo.label}
-                  </span>
-                  <span className="text-[10px] text-zinc-500 font-mono tabular-nums">
-                    {displayIban}
-                  </span>
+                {/* Row 4 — IBAN compact */}
+                <div className="mt-2 text-[10px] text-zinc-500 font-mono tabular-nums">
+                  {displayIban}
                 </div>
-
-                {/* Row 4 — short name / user count */}
-                {bank.shortName && (
-                  <div className="mt-2 text-xs text-zinc-400">
-                    {bank.shortName}
-                  </div>
-                )}
               </div>
             );
           })}
@@ -567,6 +632,92 @@ export default function Banks() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ── Enable Banking modal ── */}
+      {ebModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEbModal(null)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-50">Connecter Enable Banking</h3>
+                <p className="text-xs text-zinc-500 mt-0.5">{ebModal.bankName}</p>
+              </div>
+              <button
+                onClick={() => setEbModal(null)}
+                className="h-7 w-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {ebStep === 'search' ? (
+                <>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={ebSearch}
+                      onChange={(e) => setEbSearch(e.target.value)}
+                      placeholder="Rechercher une banque…"
+                      className="flex-1 rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none"
+                      autoFocus
+                    />
+                    <select
+                      value={ebCountry}
+                      onChange={(e) => { setEbCountry(e.target.value); openEbModal(ebModal.bankId, ebModal.bankName); }}
+                      className="rounded-lg bg-zinc-800/60 border border-white/10 px-2 py-2 text-sm text-zinc-100 outline-none [color-scheme:dark]"
+                    >
+                      {['FR','DE','ES','IT','BE','NL','PT','LU'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1 max-h-64 overflow-y-auto">
+                    {ebAspsps.length === 0 && (
+                      <p className="text-xs text-zinc-500 text-center py-4">Chargement…</p>
+                    )}
+                    {ebAspsps
+                      .filter(a => !ebSearch || a.name.toLowerCase().includes(ebSearch.toLowerCase()))
+                      .map((aspsp) => (
+                        <button
+                          key={aspsp.name}
+                          onClick={() => handleEbLink(aspsp.name, aspsp.country)}
+                          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                        >
+                          {aspsp.logo && (
+                            <img src={aspsp.logo} alt="" className="h-6 w-6 rounded object-contain" />
+                          )}
+                          <span className="truncate">{aspsp.name}</span>
+                          <span className="ml-auto text-xs text-zinc-600">{aspsp.country}</span>
+                        </button>
+                      ))}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-6">
+                  <LinkIcon className="h-10 w-10 text-violet-400 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-zinc-50">Autorisation en cours</p>
+                  <p className="text-xs text-zinc-500 mt-1 mb-4">
+                    Complétez l'authentification dans la fenêtre ouverte, puis revenez ici.
+                  </p>
+                  {ebLinkUrl && (
+                    <a
+                      href={ebLinkUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-violet-400 hover:text-violet-300 underline"
+                    >
+                      Rouvrir le lien
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
