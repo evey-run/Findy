@@ -2,10 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Objective, Transaction } from '../types';
-import { 
-  TrophyIcon, 
-  ChartBarIcon,
-  ArrowRightIcon
+import {
+  TrophyIcon,
+  PlusIcon,
+  EllipsisHorizontalIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  XMarkIcon,
+  ArrowUpRightIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -20,53 +25,71 @@ interface ObjectiveProgress {
   recentTransactions: Transaction[];
 }
 
+const emptyForm = {
+  title: '',
+  description: '',
+  targetAmount: '',
+  deadline: '',
+  icon: 'TrophyIcon',
+};
 
+// ── Helpers ──────────────────────────────────────────────────────────────
+const fmt = (n: number) => `${Math.round(n).toLocaleString('fr-FR')} €`;
+
+const fmtCompact = (n: number) => {
+  const abs = Math.abs(n);
+  if (abs >= 1000) {
+    const v = n / 1000;
+    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} k€`;
+  }
+  return fmt(n);
+};
+
+const fmtDeadline = (d: string) =>
+  new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+
+const isOverdue = (deadline: string) => new Date(deadline) < new Date();
 
 export default function Budgets() {
   const navigate = useNavigate();
-  const { loadCategories, loadBanks, transactions, loadTransactions } = useAppStore();
-  
+  const { loadCategories, loadBanks } = useAppStore();
+
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: ObjectiveProgress }>({});
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Formulaire
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    targetAmount: '',
-    deadline: '',
-    icon: 'TrophyIcon'
-  });
+  // Modal (create + edit share the same form)
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingObjective, setEditingObjective] = useState<Objective | null>(null);
+  const [formData, setFormData] = useState(emptyForm);
 
-  // Inject custom scrollbar styles
-  // scrollbar styles handled globally in index.css
+  // Per-card actions menu
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     loadObjectives();
     loadCategories();
     loadBanks();
-    // Charger toutes les transactions sans filtrage par banque
-    loadTransactions({ forceLoadAll: true });
-  }, [loadCategories, loadBanks, loadTransactions]);
+  }, [loadCategories, loadBanks]);
 
   useEffect(() => {
-    // Charger les données de progression pour chaque objectif
-    objectives.forEach(objective => {
-      fetchObjectiveProgress(objective.id);
-    });
+    objectives.forEach((objective) => fetchObjectiveProgress(objective.id));
   }, [objectives]);
+
+  // Close modal on Escape
+  useEffect(() => {
+    if (!isFormOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeForm();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isFormOpen]);
 
   const loadObjectives = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/objectives');
       if (response.ok) {
-        const data = await response.json();
-        setObjectives(data);
+        setObjectives(await response.json());
       }
     } catch (error) {
       console.error('Error loading objectives:', error);
@@ -76,635 +99,414 @@ export default function Budgets() {
     }
   };
 
-  // Fonction pour filtrer les transactions par objectif
-  const getObjectiveTransactions = (objectiveTitle: string): Transaction[] => {
-    // Créer plusieurs patterns possibles pour être plus flexible
-    const possiblePatterns = [
-      `economie ${objectiveTitle.toLowerCase()}`,
-      `économie ${objectiveTitle.toLowerCase()}`,
-      `epargne ${objectiveTitle.toLowerCase()}`,
-      `épargne ${objectiveTitle.toLowerCase()}`,
-      objectiveTitle.toLowerCase()
-    ];
-    
-    return transactions
-      .filter(transaction => {
-        const lowerDesc = transaction.description.toLowerCase();
-        // Vérifier si au moins un des patterns correspond
-        return possiblePatterns.some(pattern => lowerDesc.includes(pattern));
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-      .slice(0, 3); // Afficher les 3 dernières transactions
-  };
-
   const fetchObjectiveProgress = async (objectiveId: string) => {
     try {
       const response = await fetch(`/api/objectives/${objectiveId}/progress`);
       if (response.ok) {
         const data = await response.json();
-        setObjectiveProgress(prev => ({
-          ...prev,
-          [objectiveId]: data
-        }));
+        setObjectiveProgress((prev) => ({ ...prev, [objectiveId]: data }));
       }
     } catch (error) {
       console.error('Error fetching objective progress:', error);
     }
   };
 
-  const handleEdit = (objective: Objective) => {
-    // Fermer le formulaire d'ajout s'il est ouvert
-    setShowAddForm(false);
-    setEditingId(objective.id);
+  // ── Form open/close ──────────────────────────────────────────────────
+  const openCreate = () => {
+    setEditingObjective(null);
+    setFormData(emptyForm);
+    setIsFormOpen(true);
+  };
+
+  const openEdit = (objective: Objective) => {
+    setOpenMenuId(null);
     setEditingObjective(objective);
     setFormData({
       title: objective.title,
       description: objective.description || '',
       targetAmount: objective.targetAmount.toString(),
       deadline: objective.deadline ? objective.deadline.split('T')[0] : '',
-      icon: objective.icon || 'TrophyIcon'
+      icon: objective.icon || 'TrophyIcon',
     });
+    setIsFormOpen(true);
   };
 
-  const handleSave = async (e?: React.FormEvent) => {
-    if (e) {
-      e.preventDefault();
-    }
-    
-    if (!editingObjective || !formData.title || !formData.targetAmount) {
-      toast.error('Veuillez remplir tous les champs requis');
-      return;
-    }
-
-    try {
-      const objectiveData = {
-        ...formData,
-        targetAmount: parseFloat(formData.targetAmount),
-        deadline: formData.deadline || null
-      };
-
-      console.log('Sending objective data:', objectiveData); // Debug log
-
-      const response = await fetch(`/api/objectives/${editingObjective.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(objectiveData)
-      });
-
-      if (response.ok) {
-        const updatedObjective = await response.json();
-        console.log('Updated objective received:', updatedObjective); // Debug log
-        setObjectives(prev => prev.map(obj => 
-          obj.id === editingObjective.id ? updatedObjective : obj
-        ));
-        toast.success('Objectif mis à jour avec succès');
-        handleCancel();
-      } else {
-        const errorData = await response.text();
-        console.error('Server error:', errorData);
-        throw new Error('Erreur lors de la mise à jour');
-      }
-    } catch (error) {
-      console.error('Error updating objective:', error);
-      toast.error('Erreur lors de la sauvegarde de l\'objectif');
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingId(null);
+  const closeForm = () => {
+    setIsFormOpen(false);
     setEditingObjective(null);
-    setShowAddForm(false);
-    resetForm();
+    setFormData(emptyForm);
   };
 
-  const handleAddObjective = async (e: React.FormEvent) => {
+  // ── CRUD ─────────────────────────────────────────────────────────────
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!formData.title || !formData.targetAmount) {
       toast.error('Veuillez remplir tous les champs requis');
       return;
     }
 
+    const payload = {
+      ...formData,
+      targetAmount: parseFloat(formData.targetAmount),
+      deadline: formData.deadline || null,
+    };
+
     try {
-      const objectiveData = {
-        ...formData,
-        targetAmount: parseFloat(formData.targetAmount),
-        deadline: formData.deadline || null
-      };
+      const editing = editingObjective;
+      const response = await fetch(
+        editing ? `/api/objectives/${editing.id}` : '/api/objectives',
+        {
+          method: editing ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
 
-      console.log('Creating objective with data:', objectiveData); // Debug log
+      if (!response.ok) throw new Error(await response.text());
 
-      const response = await fetch('/api/objectives', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(objectiveData)
-      });
-
-      if (response.ok) {
-        const newObjective = await response.json();
-        console.log('New objective received:', newObjective); // Debug log
-        setObjectives(prev => [newObjective, ...prev]);
-        toast.success('Objectif créé avec succès');
-        handleCancel();
+      const saved = await response.json();
+      if (editing) {
+        setObjectives((prev) => prev.map((o) => (o.id === editing.id ? saved : o)));
+        toast.success('Objectif mis à jour');
       } else {
-        const errorData = await response.text();
-        console.error('Server error during creation:', errorData);
-        throw new Error('Erreur lors de la création');
+        setObjectives((prev) => [saved, ...prev]);
+        toast.success('Objectif créé');
       }
+      closeForm();
     } catch (error) {
-      console.error('Error creating objective:', error);
-      toast.error('Erreur lors de la création de l\'objectif');
+      console.error('Error saving objective:', error);
+      toast.error("Erreur lors de la sauvegarde de l'objectif");
     }
   };
 
   const handleDelete = async (objectiveId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet objectif ?')) {
-      return;
-    }
+    setOpenMenuId(null);
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cet objectif ?')) return;
 
     try {
-      const response = await fetch(`/api/objectives/${objectiveId}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        setObjectives(prev => prev.filter(obj => obj.id !== objectiveId));
-        toast.success('Objectif supprimé avec succès');
-      } else {
-        throw new Error('Erreur lors de la suppression');
-      }
+      const response = await fetch(`/api/objectives/${objectiveId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Erreur lors de la suppression');
+      setObjectives((prev) => prev.filter((o) => o.id !== objectiveId));
+      toast.success('Objectif supprimé');
     } catch (error) {
       console.error('Error deleting objective:', error);
-      toast.error('Erreur lors de la suppression de l\'objectif');
+      toast.error("Erreur lors de la suppression de l'objectif");
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      targetAmount: '',
-      deadline: '',
-      icon: 'TrophyIcon'
-    });
-    setEditingObjective(null);
+  const viewTransactions = (objective: Objective) => {
+    setOpenMenuId(null);
+    navigate(`/transactions?search=${encodeURIComponent(`Économie ${objective.title}`)}`);
   };
 
-  const isOverdue = (deadline: string) => {
-    return new Date(deadline) < new Date();
-  };
-
-  // Calculer les statistiques
+  // ── Aggregate stats ──────────────────────────────────────────────────
   const totalObjectives = objectives.length;
-  const completedObjectives = objectives.filter(obj => obj.isCompleted).length;
-  const totalTargetAmount = objectives.reduce((sum, obj) => sum + obj.targetAmount, 0);
-  const totalSaved = objectives.reduce((sum, obj) => {
-    const progress = objectiveProgress[obj.id];
-    return sum + (progress ? progress.totalSaved : 0);
-  }, 0);
+  const completedObjectives = objectives.filter((o) => {
+    const p = objectiveProgress[o.id];
+    return p ? p.isCompleted : o.isCompleted;
+  }).length;
+  const totalTargetAmount = objectives.reduce((sum, o) => sum + o.targetAmount, 0);
+  const totalSaved = objectives.reduce(
+    (sum, o) => sum + (objectiveProgress[o.id]?.totalSaved ?? 0),
+    0
+  );
+  const globalPct = totalTargetAmount > 0 ? Math.round((totalSaved / totalTargetAmount) * 100) : 0;
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-violet-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" />
       </div>
     );
   }
 
+  const stats = [
+    { label: 'Objectifs', value: totalObjectives.toString() },
+    { label: 'Atteints', value: `${completedObjectives}/${totalObjectives || 0}` },
+    { label: 'Économisé', value: fmtCompact(totalSaved) },
+    { label: 'Cible totale', value: fmtCompact(totalTargetAmount) },
+  ];
+
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
-      <div className="flex flex-col gap-4">
-        {/* Header */}
-        <div className="md:flex md:items-center md:justify-between">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-bold leading-7 text-zinc-50 sm:text-3xl sm:truncate">
-              Objectifs d'Épargne
-            </h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Créez et suivez vos objectifs d'épargne. Ajoutez des transactions "Économie [NomObjectif]" pour les alimenter automatiquement.
-            </p>
-          </div>
+      {/* ── Header (compact, single row) ── */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-baseline gap-2.5 min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Objectifs</h2>
+          {totalObjectives > 0 && (
+            <span className="text-xs font-medium text-zinc-500 tabular-nums">
+              {globalPct}% · {fmtCompact(totalSaved)} / {fmtCompact(totalTargetAmount)}
+            </span>
+          )}
         </div>
+        <button
+          onClick={openCreate}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors flex-shrink-0"
+        >
+          <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+          <span className="hidden sm:inline">Nouvel objectif</span>
+        </button>
+      </div>
 
-        {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ChartBarIcon className="h-7 w-7 text-violet-400" />
+      {/* ── KPI bar (single card, divided) ── */}
+      {totalObjectives > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 rounded-xl bg-white/[0.04] border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden">
+          {stats.map((s) => (
+            <div key={s.label} className="px-4 py-2.5">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                {s.label}
               </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-zinc-400 truncate">Objectifs Totaux</dt>
-                  <dd className="text-lg font-semibold text-zinc-50">{totalObjectives}</dd>
-                </dl>
+              <div className="mt-0.5 text-base font-semibold text-zinc-50 tabular-nums">
+                {s.value}
               </div>
             </div>
-          </div>
-
-          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <TrophyIcon className="h-7 w-7 text-amber-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-zinc-400 truncate">Objectifs Atteints</dt>
-                  <dd className="text-lg font-semibold text-zinc-50">{completedObjectives}</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <TrophyIcon className="h-7 w-7 text-green-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-zinc-400 truncate">Économisé</dt>
-                  <dd className="text-lg font-semibold text-zinc-50">{totalSaved.toLocaleString('fr-FR')} €</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <TrophyIcon className="h-7 w-7 text-violet-400" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-zinc-400 truncate">Objectif Total</dt>
-                  <dd className="text-lg font-semibold text-zinc-50">{totalTargetAmount.toLocaleString('fr-FR')} €</dd>
-                </dl>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
+      )}
 
-        {/* Liste des objectifs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr">
-          {objectives.map(objective => {
+      {/* ── Empty state ── */}
+      {totalObjectives === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-16 text-center">
+          <div className="h-11 w-11 rounded-xl bg-violet-500/10 flex items-center justify-center">
+            <TrophyIcon className="h-5 w-5 text-violet-400" />
+          </div>
+          <p className="mt-4 text-sm font-medium text-zinc-300">Aucun objectif pour le moment</p>
+          <p className="mt-1 text-xs text-zinc-500">Créez votre premier objectif d'épargne.</p>
+          <button
+            onClick={openCreate}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3.5 py-2 transition-colors"
+          >
+            <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+            Nouvel objectif
+          </button>
+        </div>
+      ) : (
+        /* ── Dense grid of compact cards ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+          {objectives.map((objective) => {
             const progress = objectiveProgress[objective.id];
             const percentage = progress ? progress.percentage : 0;
             const isCompleted = progress ? progress.isCompleted : objective.isCompleted;
-            const deadline = objective.deadline;
-            // Suppression du carré rouge autour des objectifs en retard
-            
+            const saved = progress?.totalSaved ?? 0;
+            const remaining = progress?.remaining ?? objective.targetAmount;
+            const { deadline } = objective;
+            const overdue = deadline && isOverdue(deadline) && !isCompleted;
+            const accent = isCompleted ? '#22c55e' : '#a78bfa';
+
             return (
-              <div key={objective.id} className="rounded-2xl overflow-hidden flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10 transition-all duration-300 hover:border-violet-500/20">
-              {editingId === objective.id ? (
-                <form onSubmit={handleSave} className="flex flex-col h-full">
-                  <div className="p-6 flex-1">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                          style={{ backgroundColor: '#7c3aed', color: 'white' }}
-                          title="Icône de l'objectif"
-                        >
-                          <TrophyIcon className="h-6 w-6" />
-                        </div>
+              <div
+                key={objective.id}
+                className="group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]"
+              >
+                {/* Row 1 — icon + title + actions */}
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ backgroundColor: isCompleted ? 'rgba(34,197,94,0.12)' : 'rgba(124,58,237,0.14)' }}
+                  >
+                    {isCompleted ? (
+                      <CheckCircleIcon className="h-4 w-4 text-green-400" />
+                    ) : (
+                      <TrophyIcon className="h-4 w-4 text-violet-400" />
+                    )}
+                  </div>
+                  <h3 className="text-sm font-semibold text-zinc-50 truncate flex-1">
+                    {objective.title}
+                  </h3>
 
-                        <div className="ml-4 flex-1">
-                          <input
-                            type="text"
-                            value={formData.title}
-                            onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                            className="text-lg font-medium text-zinc-50 border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
-                            placeholder="Titre de l'objectif"
-                            required
-                          />
-                          
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="number"
-                              step="1"
-                              value={formData.targetAmount}
-                              onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                              className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-20"
-                              placeholder="1000"
-                              required
-                            />
-                            <span className="text-sm text-zinc-300">€</span>
-                            
-                            <input
-                              type="date"
-                              value={formData.deadline}
-                              onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                              className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-4">
-                      <textarea
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent resize-none"
-                        rows={3}
-                        placeholder="Description de l'objectif..."
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="px-6 py-3 rounded-b-lg bg-zinc-900/60">
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-zinc-500">
-                        Modifier l'objectif
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={handleCancel}
-                          className="px-3 py-1 text-xs border border-zinc-700 rounded-lg text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
-                        >
-                          Annuler
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-3 py-1 text-xs border border-transparent rounded-lg text-white bg-violet-600 hover:bg-violet-500 transition-colors"
-                        >
-                          Sauvegarder
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: '#7c3aed', color: 'white' }}
-                        >
-                          <TrophyIcon className="h-6 w-6" />
-                        </div>
-                        <div className="ml-4">
-                          <h3 className="text-lg font-medium text-zinc-50">{objective.title}</h3>
-                          {objective.description && (
-                            <p className="text-sm text-zinc-400">
-                              {objective.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(objective)}
-                          className="transition-colors"
-                          style={{ color: '#52525b' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#a78bfa'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#52525b'}
-                          title="Modifier"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(objective.id)}
-                          className="transition-colors"
-                          style={{ color: '#52525b' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#52525b'}
-                          title="Supprimer"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <span className="text-sm font-medium text-zinc-400">
-                          Objectif {objective.targetAmount.toLocaleString('fr-FR')} €
-                        </span>
-                        <span
-                          className="text-xl font-bold"
-                          style={{ color: isCompleted ? '#22c55e' : '#7c3aed' }}
-                        >
-                          {Math.round(percentage)}%
-                        </span>
-                      </div>
-                      
-                      <div className="w-full rounded-full h-2.5 bg-zinc-800">
-                        <div
-                          className="h-2.5 rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.min(percentage, 100)}%`,
-                            backgroundColor: isCompleted ? '#22c55e' : '#7c3aed'
-                          }}
-                        />
-                      </div>
-                      
-                      <div className="flex justify-between text-sm text-zinc-500 mt-2">
-                        <span className={deadline && isOverdue(deadline) && !isCompleted ? 'text-red-400 font-medium' : ''}>{deadline ? `Échéance: ${new Date(deadline).toLocaleDateString('fr-FR')}` : 'Pas d\'échéance'}</span>
-                        <span className={isCompleted ? 'text-green-400' : 'text-zinc-400'}>
-                          {progress ? 
-                            (progress.remaining > 0 ? 
-                              `${progress.remaining.toLocaleString('fr-FR')} € restant` : 
-                              'Objectif atteint ! 🎉'
-                            ) : 
-                            `${objective.targetAmount.toLocaleString('fr-FR')} € restant`
-                          }
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="px-6 py-4 bg-zinc-900/60">
-                    {(() => {
-                      const objectiveTransactions = getObjectiveTransactions(objective.title);
-                      return objectiveTransactions.length > 0 ? (
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-medium text-zinc-400">
-                              Dernières transactions ({objectiveTransactions.length})
-                            </p>
-                            {objectiveTransactions.length > 0 && (
-                              <button 
-                                className="text-violet-400 hover:text-violet-300 transition-colors flex items-center"
-                                onClick={() => {
-                                  // Créer le pattern de recherche pour la page transactions
-                                  const searchPattern = `Économie ${objective.title}`;
-                                  // Naviguer vers la page transactions avec le paramètre de recherche
-                                  navigate(`/transactions?search=${encodeURIComponent(searchPattern)}`);
-                                }}
-                                title="Voir toutes les transactions"
-                              >
-                                <ArrowRightIcon className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                          <div className="space-y-2 mb-4">
-                            {objectiveTransactions.map((transaction) => (
-                              <div 
-                                key={transaction.id} 
-                                className="flex flex-col mb-2 pb-2 border-b border-zinc-800 last:border-b-0 last:pb-0 last:mb-0"
-                              >
-                                <div className="flex justify-between items-center">
-                                  <span className="text-zinc-500 truncate flex-1 mr-2 text-xs">
-                                    {transaction.description}
-                                  </span>
-                                  <div className="flex items-center space-x-2">
-                                    <span className="font-semibold text-green-400 text-xs">
-                                      +{transaction.amount.toLocaleString('fr-FR')} €
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-center justify-between mb-3">
-                            <p className="text-sm font-medium text-zinc-300">
-                              Transactions
-                            </p>
-                          </div>
-                          <div className="text-sm text-zinc-400 mb-4">
-                            Créez des transactions "Économie {objective.title}" pour alimenter cet objectif
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Add Objective Form Card */}
-        {showAddForm ? (
-          <div className="rounded-2xl border border-violet-500/40 flex flex-col h-80 bg-white/5 backdrop-blur-xl shadow-[0_0_30px_rgba(124,58,237,0.15)]">
-            <form onSubmit={handleAddObjective} className="flex flex-col h-full">
-              <div className="p-6 flex-1">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                      style={{ backgroundColor: '#7c3aed', color: 'white' }}
-                      title="Icône de l'objectif"
+                  {/* Actions menu */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === objective.id ? null : objective.id);
+                      }}
+                      className={`h-6 w-6 -mr-1 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
+                        openMenuId === objective.id ? 'opacity-100' : 'opacity-100'
+                      }`}
+                      title="Actions"
                     >
-                      <TrophyIcon className="h-6 w-6" />
-                    </div>
-                    
-                    <div className="ml-4 flex-1">
-                      <input
-                        type="text"
-                        value={formData.title}
-                        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                        className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
-                        placeholder="Titre de l'objectif"
-                        required
-                      />
-                      
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="number"
-                          step="1"
-                          value={formData.targetAmount}
-                          onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
-                          className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-20"
-                          placeholder="1000"
-                          required
-                        />
-                        <span className="text-sm text-zinc-300">€</span>
-                        
-                        <input
-                          type="date"
-                          value={formData.deadline}
-                          onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                          className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent"
-                        />
-                      </div>
-                    </div>
+                      <EllipsisHorizontalIcon className="h-5 w-5" />
+                    </button>
+
+                    {openMenuId === objective.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                        <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                          <button
+                            onClick={() => openEdit(objective)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
+                            Modifier
+                          </button>
+                          <button
+                            onClick={() => viewTransactions(objective)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <ArrowUpRightIcon className="h-4 w-4 text-zinc-500" />
+                            Voir les transactions
+                          </button>
+                          <button
+                            onClick={() => handleDelete(objective.id)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                            Supprimer
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-                
-                <div className="mb-4">
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent resize-none"
-                    rows={3}
-                    placeholder="Description de l'objectif..."
+
+                {/* Row 2 — amounts + percentage */}
+                <div className="mt-3 flex items-end justify-between">
+                  <div className="text-sm tabular-nums">
+                    <span className="font-semibold text-zinc-50">{fmt(saved)}</span>
+                    <span className="text-zinc-500"> / {fmt(objective.targetAmount)}</span>
+                  </div>
+                  <span
+                    className="text-base font-bold tabular-nums leading-none"
+                    style={{ color: accent }}
+                  >
+                    {Math.round(percentage)}%
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="mt-2 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(percentage, 100)}%`, backgroundColor: accent }}
                   />
                 </div>
 
-                {/* Astuce */}
-                <div className="mt-4 p-3 rounded-lg bg-zinc-900/60">
-                  <p className="text-xs text-violet-400">
-                    <strong>Astuce :</strong> Créez des transactions "Économie {formData.title || '[Titre]'}" pour alimenter cet objectif.
-                  </p>
+                {/* Row 3 — remaining (emphasis) + deadline */}
+                <div className="mt-2.5 flex items-center justify-between text-xs">
+                  <span className={isCompleted ? 'text-green-400 font-medium' : 'text-zinc-400'}>
+                    {isCompleted ? 'Objectif atteint 🎉' : `${fmt(remaining)} restant`}
+                  </span>
+                  {deadline && (
+                    <span
+                      className={`tabular-nums ${overdue ? 'text-red-400 font-medium' : 'text-zinc-500'}`}
+                    >
+                      {fmtDeadline(deadline)}
+                    </span>
+                  )}
                 </div>
               </div>
-              
-              <div className="px-6 py-3 rounded-b-lg bg-zinc-900/60">
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-zinc-500">
-                    Nouvel objectif
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      type="button"
-                      onClick={handleCancel}
-                      className="px-3 py-1 text-xs border border-zinc-700 rounded-lg text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-1 text-xs border border-transparent rounded-lg text-white bg-violet-600 hover:bg-violet-500 transition-colors"
-                    >
-                      Créer
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-        ) : (
-          <div 
-            className="rounded-2xl border-2 border-dashed border-zinc-700 transition-all flex flex-col h-80 cursor-pointer group hover:border-violet-500/50 hover:bg-white/[0.03]"
-            onClick={() => {
-              setEditingId(null);
-              setEditingObjective(null);
-              setShowAddForm(true);
-              setFormData({
-                title: '',
-                description: '',
-                targetAmount: '',
-                deadline: '',
-                icon: 'TrophyIcon'
-              });
-            }}
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Create / Edit modal ── */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeForm} />
+          <form
+            onSubmit={handleSubmit}
+            className="relative w-full max-w-md rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl"
           >
-            <div className="flex flex-col items-center justify-center h-full p-6">
-              <div className="mb-4 text-zinc-600 group-hover:text-violet-400 transition-colors">
-                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </div>
-              <p className="text-center font-medium text-zinc-600 group-hover:text-violet-400 transition-colors">
-                Ajouter un objectif
-              </p>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <h3 className="text-base font-semibold text-zinc-50">
+                {editingObjective ? "Modifier l'objectif" : 'Nouvel objectif'}
+              </h3>
+              <button
+                type="button"
+                onClick={closeForm}
+                className="h-7 w-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
             </div>
-          </div>
-        )}
-      </div>
-      </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Titre</label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
+                  placeholder="Vacances, Voiture, Épargne…"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Montant cible</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="1"
+                      value={formData.targetAmount}
+                      onChange={(e) => setFormData({ ...formData, targetAmount: e.target.value })}
+                      className="w-full rounded-lg bg-zinc-800/60 border border-white/10 pl-3 pr-7 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors tabular-nums"
+                      placeholder="1000"
+                      required
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">€</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                    Échéance <span className="text-zinc-600">(optionnel)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.deadline}
+                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                    className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors [color-scheme:dark]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Description <span className="text-zinc-600">(optionnel)</span>
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  rows={2}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors resize-none"
+                  placeholder="Une courte note…"
+                />
+              </div>
+
+              {!editingObjective && (
+                <p className="text-xs text-zinc-500 leading-relaxed">
+                  Astuce : ajoutez des transactions «&nbsp;Économie {formData.title || '[Titre]'}&nbsp;»
+                  pour alimenter automatiquement cet objectif.
+                </p>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[0.06]">
+              <button
+                type="button"
+                onClick={closeForm}
+                className="rounded-lg border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-violet-600 hover:bg-violet-500 px-3.5 py-2 text-sm font-medium text-white transition-colors"
+              >
+                {editingObjective ? 'Enregistrer' : 'Créer'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
