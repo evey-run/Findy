@@ -1,150 +1,156 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
-import { getAllBankBalances } from '../api/bankBalance';
 import { assetUrl } from '../lib/url';
+import {
+  PlusIcon,
+  EllipsisHorizontalIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline';
+import toast from 'react-hot-toast';
 
-interface EbAspsp { name: string; country: string; logo: string; }
-type EbStep = 'search' | 'waiting';
-
-
-// Helper function pour formater l'IBAN avec un espace tous les 4 caractères
 const formatIBAN = (iban: string): string => {
-  // Supprimer tous les espaces existants
-  const cleanIban = iban.replace(/\s+/g, '');
-  
-  // Ajouter un espace tous les 4 caractères
-  return cleanIban.replace(/(.{4})(?=.)/g, '$1 ');
+  const clean = iban.replace(/\s+/g, '');
+  return clean.replace(/(.{4})(?=.)/g, '$1 ');
 };
 
-// Helper function pour obtenir les informations du type de compte
-const getAccountTypeInfo = (accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
-  switch (accountType) {
-    case 'CURRENT':
-      return {
-        label: 'Compte courant',
-        color: 'text-white'
-      };
-    case 'SAVINGS':
-      return {
-        label: 'Livret d\'épargne',
-        color: 'bg-violet-900 text-violet-200'
-      };
-    case 'INVESTMENT':
-      return {
-        label: 'Compte d\'investissement',
-        color: 'bg-purple-900 text-purple-200'
-      };
-    default:
-      return {
-        label: 'Compte courant',
-        color: 'text-white'
-      };
+const getAccountTypeInfo = (type: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
+  const info: Record<string, { label: string; icon: string; color: string }> = {
+    CURRENT: { label: 'Courant', icon: '💳', color: 'text-blue-400' },
+    SAVINGS: { label: 'Épargne', icon: '🏦', color: 'text-green-400' },
+    INVESTMENT: { label: 'Investissement', icon: '📈', color: 'text-purple-400' },
+  };
+  return info[type] || info.CURRENT;
+};
+
+interface FormData {
+  name: string;
+  shortName: string;
+  iban: string;
+  balance: number | string;
+  accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT';
+  userIds: string[];
+  createdAt: string;
+}
+
+const emptyForm: FormData = {
+  name: '',
+  shortName: '',
+  iban: '',
+  balance: 0,
+  accountType: 'CURRENT',
+  userIds: [],
+  createdAt: new Date().toISOString().split('T')[0],
+};
+
+const fmt = (n: number) =>
+  `${Math.round(n).toLocaleString('fr-FR')} €`;
+
+const fmtCompact = (n: number) => {
+  const abs = Math.abs(n);
+  if (abs >= 1000000) {
+    const v = n / 1000000;
+    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} M€`;
   }
+  if (abs >= 1000) {
+    const v = n / 1000;
+    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} k€`;
+  }
+  return fmt(n);
 };
-
-
 
 export default function Banks() {
-  const { banks, transactions, loadBanks, loadTransactions, selectedUser, users, loadUsers } = useAppStore();
+  const { banks, loadBanks, loadTransactions, loadUsers, users } = useAppStore();
   const [loading, setLoading] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
-  const [archivedBanks, setArchivedBanks] = useState<Bank[]>([]);
-  const [formData, setFormData] = useState({
-    name: '',
-    shortName: '',
-    iban: '',
-    balance: 0,
-    accountType: 'CURRENT' as 'CURRENT' | 'SAVINGS' | 'INVESTMENT',
-    userIds: [] as string[], // Utilisateurs qui auront accès à ce compte
-    createdAt: new Date().toISOString().split('T')[0] // Date au format YYYY-MM-DD
-  });
+  const [formData, setFormData] = useState(emptyForm);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  
-  // État pour les soldes des banques
-  // Suppression de la redéclaration de bankBalances qui est déjà définie plus loin
 
-  // Effet pour charger les données initiales (banques, transactions, utilisateurs)
   useEffect(() => {
-    const initBanks = async () => {
+    const load = async () => {
       setLoading(true);
       try {
-        await loadUsers(); // Charger les utilisateurs
+        await loadUsers();
         await loadBanks();
         await loadTransactions();
-      } catch (error) {
-        console.error('Error loading banks:', error);
+      } catch (e) {
+        console.error('Error loading:', e);
       } finally {
         setLoading(false);
       }
     };
-    
-    initBanks();
-  }, [loadBanks, loadTransactions, loadUsers]); // Retirer banks des dépendances
-  
-  // Effet séparé pour mettre à jour les banques archivées quand banks change
+    load();
+  }, [loadBanks, loadTransactions, loadUsers]);
+
   useEffect(() => {
-    if (banks) {
-      const archived = banks.filter(bank => bank.archived);
-      setArchivedBanks(archived);
-    }
-  }, [banks]);
+    if (!isFormOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeForm();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isFormOpen]);
 
-
-
-  const loadArchivedBanks = async () => {
-    try {
-      const url = selectedUser 
-        ? `/api/banks?userId=${selectedUser.id}&archived=true`
-        : '/api/banks?archived=true';
-      
-      const response = await fetch(url);
-      if (response.ok) {
-        const data = await response.json();
-        setArchivedBanks(data);
-      }
-    } catch (error) {
-      console.error('Error loading archived banks:', error);
-    }
+  const openCreate = () => {
+    setEditingBank(null);
+    setFormData(emptyForm);
+    setImageFile(null);
+    setImagePreview(null);
+    setIsFormOpen(true);
   };
 
-  const handleRestore = async (bankId: string) => {
-    try {
-      const response = await fetch(`/api/banks/${bankId}/restore`, {
-        method: 'PUT',
-      });
+  const openEdit = (bank: Bank) => {
+    setOpenMenuId(null);
+    setEditingBank(bank);
+    setFormData({
+      name: bank.name,
+      shortName: bank.shortName || '',
+      iban: bank.iban || '',
+      balance: bank.balance,
+      accountType: bank.accountType,
+      userIds: (bank.userBanks || []).map((ub) => ub.userId),
+      createdAt: bank.createdAt.split('T')[0],
+    });
+    setImageFile(null);
+    setImagePreview(bank.image ? assetUrl(bank.image) : null);
+    setIsFormOpen(true);
+  };
 
-      if (response.ok) {
-        await loadBanks();
-        await loadArchivedBanks();
-      }
-    } catch (error) {
-      console.error('Error restoring bank:', error);
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingBank(null);
+    setFormData(emptyForm);
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        setImagePreview(evt.target?.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔧 handleSubmit called');
-    console.log('🔧 formData:', formData);
-    console.log('🔧 accountType value:', formData.accountType);
-    
-    // Vérifier qu'au moins un utilisateur est sélectionné
-    if (formData.userIds.length === 0) {
-      alert('Veuillez sélectionner au moins un utilisateur pour ce compte');
+    if (!formData.name || !formData.iban || formData.userIds.length === 0) {
+      toast.error('Remplissez tous les champs requis et sélectionnez au moins un utilisateur');
       return;
     }
-    
+
     try {
-      const url = editingBank ? `/api/banks/${editingBank.id}` : '/api/banks';
-      const method = editingBank ? 'PUT' : 'POST';
-      
-      console.log('🔧 Making request to:', url, 'with method:', method);
-      
-      // Créer un objet avec toutes les données du formulaire
+      const isEdit = editingBank;
+      const url = isEdit ? `/api/banks/${isEdit.id}` : '/api/banks';
+      const method = isEdit ? 'PUT' : 'POST';
+
       const bankData = {
         name: formData.name,
         shortName: formData.shortName,
@@ -152,1325 +158,415 @@ export default function Banks() {
         balance: parseFloat(formData.balance.toString()),
         accountType: formData.accountType,
         createdAt: formData.createdAt,
-        userIds: formData.userIds // Envoyer directement le tableau d'IDs
+        userIds: formData.userIds,
       };
-      
-      // Créer le FormData
-      const formDataToSend = new FormData();
-      
-      // Ajouter les données JSON
-      formDataToSend.append('data', JSON.stringify(bankData));
-      
-      // Ajouter le fichier image s'il y en a un
+
+      const fd = new FormData();
+      fd.append('data', JSON.stringify(bankData));
       if (imageFile) {
-        formDataToSend.append('image', imageFile);
+        fd.append('image', imageFile);
       }
-      
-      const response = await fetch(url, {
-        method,
-        body: formDataToSend,
-      });
 
-      console.log('🔧 Response status:', response.status);
-      console.log('🔧 Response ok:', response.ok);
-
-      if (response.ok) {
-        const responseData = await response.json();
-        console.log('🔧 API Response data:', responseData);
-        
-        // Vérifier si la réponse contient la banque mise à jour
-        if (responseData && responseData.accountType) {
-          console.log('🔧 Updated bank data from API:', responseData);
-        }
-        
-        console.log('🔧 Bank saved successfully, reloading banks...');
-        await loadBanks(); // Recharger les données depuis le store
-        resetForm();
-        console.log('🔧 Banks reloaded and form reset');
+      const res = await fetch(url, { method, body: fd });
+      if (res.ok) {
+        await loadBanks();
+        toast.success(isEdit ? 'Banque mise à jour' : 'Banque créée');
+        closeForm();
       } else {
-        const errorData = await response.json().catch(() => null);
-        console.error('🔧 Error response:', errorData);
-        const errorMessage = errorData?.details || errorData?.error || 'Erreur lors de l\'enregistrement de la banque';
-        alert(`Erreur: ${errorMessage}`);
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Erreur');
       }
     } catch (error) {
-      console.error('🔧 Error saving bank:', error);
-      alert('Erreur lors de l\'enregistrement de la banque');
+      console.error('Error saving:', error);
+      toast.error('Erreur lors de la sauvegarde');
     }
   };
 
-  const handleEdit = (bank: Bank) => {
-    console.log('🔧 Editing bank:', bank);
-    console.log('🔧 Bank account type:', bank.accountType);
-    setEditingBank(bank);
-    setShowAddForm(false); // Fermer le formulaire d'ajout si ouvert
-    setFormData({
-      name: bank.name,
-      shortName: bank.shortName || '',
-      iban: bank.iban || '',
-      balance: bank.balance,
-      accountType: bank.accountType,
-      userIds: bank.users?.map(u => u.id) || [],
-      createdAt: bank.createdAt ? new Date(bank.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
-    });
-    
-    // Set image preview if bank has an image
-    if (bank.image) {
-      setImagePreview(assetUrl(bank.image));
-    } else {
-      setImagePreview(null);
-    }
-    setImageFile(null);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette banque ?')) {
-      return;
-    }
+  const handleDelete = async (bankId: string) => {
+    setOpenMenuId(null);
+    if (!confirm('Supprimer cette banque ?')) return;
 
     try {
-      const response = await fetch(`/api/banks/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        
-        if (result.archived) {
-          alert(`Banque archivée car elle contient ${result.transactionCount} transaction(s). Vous pouvez la restaurer depuis les archives.`);
-        } else {
-          alert('Banque supprimée définitivement.');
-        }
-        
-        await loadBanks(); // Recharger les données depuis le store
-        await loadArchivedBanks(); // Recharger les archives
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Erreur lors de la suppression');
+      const res = await fetch(`/api/banks/${bankId}`, { method: 'DELETE' });
+      if (res.ok) {
+        await loadBanks();
+        toast.success('Banque supprimée');
       }
     } catch (error) {
-      console.error('Error deleting bank:', error);
-      alert('Erreur lors de la suppression');
+      console.error('Error deleting:', error);
+      toast.error('Erreur lors de la suppression');
     }
   };
-
-  const handlePermanentDelete = async (bankId: string, bankName: string) => {
-    if (!confirm(`⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir supprimer définitivement la banque "${bankName}" ?\n\nCette action supprimera :\n- La banque elle-même\n- TOUTES ses transactions\n- Tous ses budgets associés\n- Toutes ses récurrences associées\n\nCette action est IRRÉVERSIBLE !`)) {
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/banks/${bankId}/permanent`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        alert(`✅ Banque "${result.bankName}" supprimée définitivement.\n\n${result.deletedTransactions} transaction(s) supprimée(s).`);
-        
-        // Recharger à la fois les banques normales et les archives
-        await Promise.all([
-          loadBanks(),
-          loadArchivedBanks()
-        ]);
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Erreur lors de la suppression définitive');
-      }
-    } catch (error) {
-      console.error('Error permanently deleting bank:', error);
-      alert('Erreur lors de la suppression définitive');
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      shortName: '',
-      iban: '',
-      balance: 0,
-      accountType: 'CURRENT',
-      userIds: [],
-      createdAt: new Date().toISOString().split('T')[0]
-    });
-    setImageFile(null);
-    setImagePreview(null);
-    setEditingBank(null);
-    setShowAddForm(false);
-  };
-
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Vérifier le type de fichier
-      if (!file.type.startsWith('image/')) {
-        alert('Veuillez sélectionner un fichier image');
-        return;
-      }
-      
-      // Vérifier la taille (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('L\'image doit faire moins de 5MB');
-        return;
-      }
-      
-      setImageFile(file);
-      
-      // Créer une prévisualisation
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Enable Banking state
-  const [ebConfigured, setEbConfigured] = useState(false);
-  const [ebModal, setEbModal] = useState<{ bankId: string; bankName: string } | null>(null);
-  const [ebAspsps, setEbAspsps] = useState<EbAspsp[]>([]);
-  const [ebSearch, setEbSearch] = useState('');
-  const [ebCountry, setEbCountry] = useState('fr');
-  const [ebStep, setEbStep] = useState<EbStep>('search');
-  const [ebLinkUrl, setEbLinkUrl] = useState('');
-  const [ebSyncing, setEbSyncing] = useState<string | null>(null);
-  const ebPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Stocker les soldes calculés pour éviter des recalculs inutiles
-  const [bankBalances, setBankBalances] = useState<{[key: string]: number}>({});
-  
-  // Charger les soldes pour toutes les banques en utilisant l'API dédiée
-  const loadAllBankBalances = async () => {
-    try {
-      if (banks.length > 0) {
-        const balances = await getAllBankBalances(banks);
-        setBankBalances(balances);
-      }
-    } catch (error) {
-      console.error('Failed to load bank balances:', error);
-    }
-  };
-  
-  // Charger les soldes au chargement du composant et quand les banques changent
-  useEffect(() => {
-    loadAllBankBalances();
-  }, [banks]);
-  
-  const getCurrentBalance = (bankId: string, initialBalance: number) => {
-    // Utiliser le solde précalculé s'il existe, sinon utiliser le solde initial
-    return bankBalances[bankId] !== undefined ? bankBalances[bankId] : initialBalance;
-  };
-  
-  // Fonction pour forcer le rechargement des soldes (utile après ajout/modification de transaction)
-  const refreshBalances = () => {
-    loadAllBankBalances();
-  };
-  
-  // Recharger les soldes quand les transactions changent
-  useEffect(() => {
-    refreshBalances();
-  }, [transactions.length]);
-
-  // ── Enable Banking ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    fetch('/api/enablebanking/configured')
-      .then(r => r.json())
-      .then(d => setEbConfigured(d.configured))
-      .catch(() => {});
-  }, []);
-
-  const openEbModal = async (bankId: string, bankName: string) => {
-    setEbModal({ bankId, bankName });
-    setEbStep('search');
-    setEbSearch('');
-    setEbAspsps([]);
-    try {
-      const res = await fetch(`/api/enablebanking/aspsps?country=${ebCountry}`);
-      if (!res.ok) throw new Error('Erreur API');
-      const data = await res.json();
-      setEbAspsps(data);
-    } catch {
-      alert('Impossible de charger la liste des banques Enable Banking. Vérifiez vos identifiants.');
-    }
-  };
-
-  const handleEbLink = async (aspspName: string, aspspCountry: string) => {
-    if (!ebModal) return;
-    try {
-      const res = await fetch('/api/enablebanking/link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bankId: ebModal.bankId, aspspName, aspspCountry }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setEbLinkUrl(data.link);
-      setEbStep('waiting');
-      window.open(data.link, '_blank');
-      // Start polling
-      if (ebPollRef.current) clearInterval(ebPollRef.current);
-      ebPollRef.current = setInterval(async () => {
-        try {
-          const sr = await fetch(`/api/enablebanking/banks/${ebModal.bankId}/status`);
-          const sd = await sr.json();
-          if (sd.ebStatus === 'LINKED') {
-            clearInterval(ebPollRef.current!);
-            ebPollRef.current = null;
-            await loadBanks();
-            setEbModal(null);
-            alert('Compte lié avec succès ! Cliquez sur "Synchroniser" pour importer vos transactions.');
-          }
-        } catch {}
-      }, 3000);
-    } catch (err: any) {
-      alert(`Erreur : ${err.message}`);
-    }
-  };
-
-  useEffect(() => {
-    return () => { if (ebPollRef.current) clearInterval(ebPollRef.current); };
-  }, []);
-
-  const handleEbSync = async (bankId: string) => {
-    setEbSyncing(bankId);
-    try {
-      const res = await fetch(`/api/enablebanking/banks/${bankId}/sync`, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      await loadTransactions();
-      alert(`Synchronisation réussie : ${data.imported} transaction(s) importée(s)${data.skipped ? `, ${data.skipped} déjà présente(s)` : ''}.`);
-    } catch (err: any) {
-      alert(`Erreur de synchronisation : ${err.message}`);
-    } finally {
-      setEbSyncing(null);
-    }
-  };
-
-  const handleEbUnlink = async (bankId: string) => {
-    if (!confirm('Délier ce compte de Enable Banking ? Les transactions déjà importées seront conservées.')) return;
-    try {
-      await fetch(`/api/enablebanking/banks/${bankId}/unlink`, { method: 'DELETE' });
-      await loadBanks();
-    } catch (err: any) {
-      alert(`Erreur : ${err.message}`);
-    }
-  };
-
-  const ebFilteredAspsps = ebAspsps.filter(i =>
-    i.name.toLowerCase().includes(ebSearch.toLowerCase())
-  );
-
-  // ────────────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" />
       </div>
     );
   }
-  
-  // Calculer les statistiques pour le bandeau récapitulatif
-  const calculateBankStats = () => {
-    if (!banks || banks.length === 0) return {
-      totalBalance: 0,
-      accountCount: 0,
-      lastUpdate: '',
-      totalAccounts: 0,
-      currentAccounts: 0,
-      savingsAccounts: 0,
-      investmentAccounts: 0
-    };
 
-    // Calculer le solde total
-    const totalBalance = banks.reduce((total, bank) => {
-      const currentBalance = getCurrentBalance(bank.id, bank.balance);
-      return total + currentBalance;
-    }, 0);
+  const totalBalance = banks.reduce((sum, b) => sum + b.balance, 0);
+  const stats = [
+    { label: 'Comptes', value: banks.length.toString(), icon: '🏦' },
+    { label: 'Solde total', value: fmtCompact(totalBalance), icon: '💰' },
+  ];
 
-    // Nombre de comptes
-    const accountCount = banks.length;
-    const totalAccounts = accountCount;
-    
-    // Compter les différents types de comptes
-    const currentAccounts = banks.filter(bank => bank.accountType === 'CURRENT').length;
-    const savingsAccounts = banks.filter(bank => bank.accountType === 'SAVINGS').length;
-    const investmentAccounts = banks.filter(bank => bank.accountType === 'INVESTMENT').length;
-
-    // Dernière mise à jour (utiliser la date la plus récente des transactions)
-    let lastUpdate = '';
-    if (transactions && transactions.length > 0) {
-      // Trier les transactions par date décroissante
-      const sortedTransactions = [...transactions].sort((a, b) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      
-      // Prendre la date de la transaction la plus récente
-      if (sortedTransactions[0]) {
-        lastUpdate = new Date(sortedTransactions[0].date).toLocaleDateString('fr-FR');
-      }
-    }
-
-    return {
-      totalBalance,
-      accountCount,
-      lastUpdate,
-      totalAccounts,
-      currentAccounts,
-      savingsAccounts,
-      investmentAccounts
-    };
-  };
-  
-  const bankStats = calculateBankStats();
-  
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
-            {selectedUser ? `Banques de ${selectedUser.name}` : 'Toutes les banques'}
-          </h2>
-          <p className="text-sm text-zinc-300 mt-1">
-            {showArchived 
-              ? 'Gérer les banques archivées - Cliquez sur "Restaurer" pour remettre une banque en service'
-              : 'Cliquez sur une banque pour voir ses transactions'
-            }
-          </p>
+      {/* ── Header (compact) ── */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-baseline gap-2.5 min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Banques</h2>
+          {banks.length > 0 && (
+            <span className="text-xs font-medium text-zinc-500">
+              {banks.length} compte{banks.length > 1 ? 's' : ''}
+            </span>
+          )}
         </div>
-        <div className="mt-4 flex md:mt-0 md:ml-4">
+        <button
+          onClick={openCreate}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors flex-shrink-0"
+        >
+          <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+          <span className="hidden sm:inline">Nouveau compte</span>
+        </button>
+      </div>
+
+      {/* ── KPI bar ── */}
+      {banks.length > 0 && (
+        <div className="grid grid-cols-2 rounded-xl bg-white/[0.04] border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden">
+          {stats.map((s) => (
+            <div key={s.label} className="px-4 py-2.5">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                {s.label}
+              </div>
+              <div className="mt-0.5 text-base font-semibold text-zinc-50 tabular-nums">
+                {s.value}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Empty state ── */}
+      {banks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-16 text-center">
+          <div className="h-11 w-11 rounded-xl bg-violet-500/10 flex items-center justify-center text-lg">
+            🏦
+          </div>
+          <p className="mt-4 text-sm font-medium text-zinc-300">Aucun compte bancaire</p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Connectez votre première banque pour commencer à tracker vos finances.
+          </p>
           <button
-            type="button"
-            onClick={() => {
-              const newShowArchived = !showArchived;
-              setShowArchived(newShowArchived);
-              if (newShowArchived) {
-                // Charger les banques archivées depuis l'API quand on active l'affichage
-                loadArchivedBanks();
-              }
-            }}
-            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-zinc-700 hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
+            onClick={openCreate}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3.5 py-2 transition-colors"
           >
-            {showArchived ? 'Voir les banques actives' : 'Voir les banques archivées'}
+            <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+            Nouveau compte
           </button>
         </div>
-      </div>
-      
-      {/* Bandeau récapitulatif */}
-      {!showArchived && banks.length > 0 && (
-        <div className="p-6 rounded-2xl mb-6 mt-4 bg-white/5 backdrop-blur-xl border border-white/10" style={{ borderLeft: '4px solid #7c3aed' }}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Solde total */}
-            <div className="flex flex-col">
-              <span className="text-sm text-zinc-400 mb-1">Solde total</span>
-              <span className="text-2xl font-bold text-white">{formatAmount(bankStats.totalBalance)}</span>
-            </div>
-            
-            {/* Nombre de comptes */}
-            <div className="flex flex-col">
-              <span className="text-sm text-zinc-400 mb-1">Nombre de comptes</span>
-              <div className="flex items-center space-x-2">
-                <span className="text-2xl font-bold text-white">{bankStats.totalAccounts}</span>
-                <div className="flex flex-col text-xs">
-                  <span className="text-zinc-300">{bankStats.currentAccounts} courants</span>
-                  <span className="text-violet-300">{bankStats.savingsAccounts} épargne</span>
-                  <span className="text-purple-300">{bankStats.investmentAccounts} investissement</span>
+      ) : (
+        /* ── Grid of compact bank cards ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+          {banks.map((bank) => {
+            const typeInfo = getAccountTypeInfo(bank.accountType);
+            const displayIban = bank.iban ? formatIBAN(bank.iban).slice(-15) : '—';
+
+            return (
+              <div
+                key={bank.id}
+                className="group relative rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 transition-all duration-200 hover:border-white/[0.16] hover:bg-white/[0.06]"
+              >
+                {/* Row 1 — image + name + menu */}
+                <div className="flex items-center gap-2.5">
+                  {bank.image ? (
+                    <img
+                      src={assetUrl(bank.image)}
+                      alt={bank.name}
+                      className="h-8 w-8 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0 text-sm">
+                      🏦
+                    </div>
+                  )}
+                  <h3 className="text-sm font-semibold text-zinc-50 truncate flex-1">
+                    {bank.name}
+                  </h3>
+
+                  {/* Actions menu */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === bank.id ? null : bank.id);
+                      }}
+                      className={`h-6 w-6 -mr-1 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
+                        openMenuId === bank.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      title="Actions"
+                    >
+                      <EllipsisHorizontalIcon className="h-5 w-5" />
+                    </button>
+
+                    {openMenuId === bank.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                        <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                          <button
+                            onClick={() => openEdit(bank)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
+                            Modifier
+                          </button>
+                          <button
+                            onClick={() => handleDelete(bank.id)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                            Supprimer
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
+
+                {/* Row 2 — balance (emphasis) */}
+                <div className="mt-3 text-lg font-bold text-zinc-50 tabular-nums">
+                  {fmtCompact(bank.balance)}
+                </div>
+
+                {/* Row 3 — type + IBAN (compact) */}
+                <div className="mt-2.5 flex items-center justify-between">
+                  <span
+                    className={`text-xs font-medium px-2 py-1 rounded-md ${typeInfo.color}`}
+                    style={{ backgroundColor: `#${Math.random().toString(16).slice(2, 8)}20` }}
+                  >
+                    {typeInfo.label}
+                  </span>
+                  <span className="text-[10px] text-zinc-500 font-mono tabular-nums">
+                    {displayIban}
+                  </span>
+                </div>
+
+                {/* Row 4 — short name / user count */}
+                {bank.shortName && (
+                  <div className="mt-2 text-xs text-zinc-400">
+                    {bank.shortName}
+                  </div>
+                )}
               </div>
-            </div>
-            
-            {/* Dernière mise à jour */}
-            <div className="flex flex-col">
-              <span className="text-sm text-zinc-400 mb-1">Dernière mise à jour</span>
-              <div className="flex items-center space-x-2">
-                <span className="text-white">{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                <button 
-                  onClick={refreshBalances}
-                  className="p-1 rounded hover:bg-zinc-700 transition-colors"
-                  title="Rafraîchir les soldes"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       )}
-        {/* Grille des banques */}
-      {!showArchived && banks && banks.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-          {banks.slice().reverse().map((bank: Bank) => (
-            <div key={bank.id}>
-              {/* Si la banque est en cours d'édition, afficher le formulaire d'édition */}
-              {editingBank?.id === bank.id ? (
-              <div className="rounded-2xl border-2 flex flex-col h-80 bg-white/5 backdrop-blur-xl" style={{ borderColor: '#7c3aed' }}>
-                <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                  {/* Section principale - même structure qu'une carte de banque */}
-                  <div className="p-6 flex-1">
-                    {/* Header avec logo et nom - même position que les cartes */}
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        {/* Logo/Image - même taille que les cartes (w-12 h-12) */}
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
-                          style={{ borderColor: '#7c3aed', backgroundColor: '#f0f0ff' }}
-                          onClick={() => document.getElementById('imageInput-edit')?.click()}
-                          title="Cliquez pour choisir une image"
-                        >
-                          {imagePreview ? (
-                            <img 
-                              src={imagePreview} 
-                              alt="Preview" 
-                              className="w-full h-full rounded-full object-cover"
-                            />
-                          ) : (
-                            <span className="text-lg font-bold" style={{ color: '#7c3aed' }}>
-                              {formData.shortName || 'LOGO'}
-                            </span>
-                          )}
-                        </div>
-                        <input
-                          id="imageInput-edit"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleImageChange}
-                          className="hidden"
-                        />
-                        
-                        {/* Nom et informations - même position */}
-                        <div className="ml-4 flex-1">
-                          {/* Nom de la banque */}
-                          <input
-                            type="text"
-                            value={formData.name}
-                            onChange={(e) => setFormData({...formData, name: e.target.value})}
-                            className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1 placeholder-gray-300"
-                            placeholder="Nom de la banque"
-                            required
-                          />
-                          
-                          {/* Type de compte et nom court - même ligne */}
-                          <div className="flex items-center space-x-2 mb-1">
-                            <select
-                              value={formData.accountType}
-                              onChange={(e) => {
-                                console.log('🔧 Selected account type:', e.target.value);
-                                setFormData({...formData, accountType: e.target.value as any});
-                              }}
-                              className="text-xs border-none focus:ring-0 rounded-md"
-                              style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
-                            >
-                              <option value="CURRENT">Compte courant</option>
-                              <option value="SAVINGS">Livret d'épargne</option>
-                              <option value="INVESTMENT">Compte d'investissement</option>
-                            </select>
 
-                          </div>
-                          
-                          {/* IBAN - même position que sur les cartes */}
-                          <input
-                            type="text"
-                            value={formData.iban}
-                            onChange={(e) => setFormData({...formData, iban: e.target.value.replace(/\s+/g, '')})}
-                            className="text-xs text-zinc-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
-                            placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
-                          />
-                        </div>
-                      </div>
-                      
-                      {/* Bouton fermer - même position que sur les cartes */}
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={resetForm}
-                          className="text-zinc-400 hover:text-red-400 transition-colors"
-                          title="Annuler"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Champs supplémentaires en mode compact */}
-                    <div className="space-y-2 mb-4">
-                      {/* Nom court, Date et Solde sur la même ligne */}
-                      <div className="grid grid-cols-3 gap-2">
-                        <input
-                          type="text"
-                          value={formData.shortName}
-                          onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                          style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
-                          placeholder="Nom court (BNP)"
-                          maxLength={3}
-                          required
-                        />
-                        <input
-                          type="date"
-                          value={formData.createdAt}
-                          onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                          style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
-                          required
-                        />
-                        <input
-                          type="number"
-                          step="1"
-                          value={formData.balance}
-                          onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                          className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold text-white bg-zinc-800 border-zinc-600 focus:ring-violet-500"
-                          style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
-                          placeholder="Solde initial"
-                          required
-                        />
-                      </div>
-                      
-                      {/* Sélection utilisateurs - 2 utilisateurs par ligne */}
-                      {(
-                        <div>
-                          <label className="block text-xs font-medium text-zinc-300 mb-1">
-                            Utilisateurs ayant accès *
-                          </label>
-                          <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#18191c', border: '1px solid #1e2024' }}>
-                            {users.map(user => (
-                              <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-white/10 px-1 py-0.5 rounded text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={formData.userIds.includes(user.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setFormData({
-                                        ...formData,
-                                        userIds: [...formData.userIds, user.id]
-                                      });
-                                    } else {
-                                      setFormData({
-                                        ...formData,
-                                        userIds: formData.userIds.filter(id => id !== user.id)
-                                      });
-                                    }
-                                  }}
-                                  className="w-3 h-3 rounded border-zinc-700 focus:ring-2"
-                                  style={{ color: '#7c3aed', accentColor: '#7c3aed' }}
-                                />
-                                <div className="flex items-center space-x-1">
-                                  {user.avatar ? (
-                                    <img
-                                      src={assetUrl(user.avatar)}
-                                      alt={user.name}
-                                      className="w-3 h-3 rounded-full object-cover"
-                                    />
-                                  ) : (
-                                    <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#7c3aed' }}>
-                                      {user.name.charAt(0).toUpperCase()}
-                                    </div>
-                                  )}
-                                  <span className="text-xs text-zinc-300">{user.name}</span>
-                                </div>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                  </div>
-                  
-                  {/* Footer - même style que les cartes */}
-                  <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-zinc-400">
-                        Modification
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={resetForm}
-                          className="px-3 py-1 text-xs border rounded hover:opacity-80 text-zinc-300"
-                          style={{ backgroundColor: '#18191c', borderColor: '#3a3d42' }}
-                        >
-                          Annuler
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={!formData.name.trim() || !formData.shortName.trim() || formData.userIds.length === 0}
-                          className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                          style={{ backgroundColor: '#7c3aed' }}
-                        >
-                          Sauvegarder
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              </div>
-            ) : (
-              /* Carte normale de banque */
-              <div className="rounded-2xl overflow-hidden transition-shadow flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10">
-                <div className="p-6 flex-1 flex flex-col">
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      {bank.image ? (
-                        <img
-                          src={assetUrl(bank.image)}
-                          alt={bank.name}
-                          className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                          style={{ backgroundColor: '#7c3aed' }}
-                        >
-                          {bank.shortName}
-                        </div>
-                      )}
-                      <div className="ml-4">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-lg font-medium text-white">{bank.name}</h3>
-                          {bank.ebStatus === 'LINKED' && (
-                            <span
-                              className="text-xs px-1.5 py-0.5 rounded bg-green-900/50 text-green-400 border border-green-700/50 cursor-pointer hover:bg-red-900/30 hover:text-red-400 hover:border-red-700/50 transition-colors"
-                              title="Enable Banking lié — cliquer pour délier"
-                              onClick={(e) => { e.stopPropagation(); handleEbUnlink(bank.id); }}
-                            >
-                              EB ✓
-                            </span>
-                          )}
-                          <span className="text-xs text-zinc-400">
-                            Créé le {new Date(bank.createdAt).toLocaleDateString('fr-FR')}
-                          </span>
-                        </div>
-                        <p className="text-sm text-zinc-300">
-                          {getAccountTypeInfo(bank.accountType).label}
-                          {!selectedUser && bank.users && bank.users.length > 0 && (
-                            <span className="ml-2 text-violet-300">
-                              • {bank.users.map(u => u.name).join(', ')}
-                            </span>
-                          )}
-                        </p>
-                        {bank.iban && (
-                          <p className="text-xs text-zinc-400 mt-1 font-mono">
-                            {formatIBAN(bank.iban)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2 items-center">
-                        {ebConfigured && (
-                          bank.ebStatus === 'LINKED' ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleEbSync(bank.id); }}
-                              disabled={ebSyncing === bank.id}
-                              className="transition-colors text-green-500 hover:text-green-300 disabled:opacity-40"
-                              title="Synchroniser les transactions Enable Banking"
-                            >
-                              <svg className={`h-5 w-5 ${ebSyncing === bank.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                            </button>
-                          ) : bank.ebStatus === 'PENDING' ? (
-                            <span className="text-yellow-500" title="Authentification Enable Banking en attente">
-                              <svg className="h-5 w-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </span>
-                          ) : (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); openEbModal(bank.id, bank.name); }}
-                              className="transition-colors text-zinc-500 hover:text-violet-400"
-                              title="Connecter à Enable Banking (sync automatique)"
-                            >
-                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                              </svg>
-                            </button>
-                          )
-                        )}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleEdit(bank);
-                          }}
-                          className="transition-colors text-zinc-400"
-                          onMouseEnter={(e) => e.currentTarget.className = 'transition-colors text-violet-300'}
-                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-zinc-400'}
-                          title="Modifier"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(bank.id);
-                          }}
-                          className="transition-colors text-zinc-400"
-                          onMouseEnter={(e) => e.currentTarget.className = 'transition-colors text-red-400'}
-                          onMouseLeave={(e) => e.currentTarget.className = 'transition-colors text-zinc-400'}
-                          title="Supprimer"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                  </div>
-                  <div className="mt-4">
-                    <div className="text-sm text-zinc-300 mb-1">
-                      Solde actuel
-                    </div>
-                    <div className="text-2xl font-bold text-white">
-                      {formatAmount(getCurrentBalance(bank.id, bank.balance))}
-                    </div>
-                  </div>
-                </div>
-                <div className="px-6 py-4" style={{ backgroundColor: '#18191c' }}>
-                  {/* Section des transactions agrandie */}
-                  {transactions.filter(t => t.bankId === bank.id).length > 0 ? (
-                    <div>
-                      <div 
-                        className="flex items-center justify-between mb-3"
-                      >
-                        <p className="text-sm font-medium text-zinc-300">
-                          Dernières transactions
-                        </p>
-
-                      </div>
-                      <div className="space-y-2 mb-4">
-                        {transactions
-                          .filter(t => t.bankId === bank.id)
-                          .slice(0, 3)
-                          .map((transaction) => (
-                            <div 
-                              key={transaction.id} 
-                              className="flex justify-between items-center text-sm"
-                            >
-                              <span className="text-zinc-400 truncate flex-1 mr-2 text-xs">
-                                {transaction.description}
-                              </span>
-                              <div className="flex items-center space-x-2">
-                                <span className={`font-semibold text-xs ${
-                                  transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
-                                }`}>
-                                  {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div 
-                        className="flex items-center justify-between mb-3"
-                      >
-                        <p className="text-sm font-medium text-zinc-300">
-                          Transactions
-                        </p>
-
-                      </div>
-                      <div className="text-sm text-zinc-400 mb-4">
-                        Aucune transaction récente
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-        
-        {/* Carte d'ajout de banque - toujours visible */}
-        {!showAddForm ? (
-          <div
-            className="rounded-2xl border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
-            style={{ 
-              borderColor: '#616875' // couleur intermédiaire
-            } as React.CSSProperties}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#7c3aed';
-              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
-              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#7c3aed';
-              if (text) text.style.color = '#7c3aed';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#616875';
-              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
-              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#616875';
-              if (text) text.style.color = '#616875';
-            }}
-            onClick={() => {
-              setShowAddForm(true);
-              setEditingBank(null); // Annuler l'édition si en cours
-            }}
+      {/* ── Create / Edit modal ── */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeForm} />
+          <form
+            onSubmit={handleSubmit}
+            className="relative w-full max-w-md rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl"
           >
-            <div className="flex flex-col items-center justify-center h-full p-6">
-              <div className="mb-4 transition-colors icon-plus" style={{ color: '#616875' }}>
-                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-              </div>
-              <p className="text-center font-medium transition-colors text-add" style={{ color: '#616875' }}>
-                Ajouter une banque
-              </p>
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <h3 className="text-base font-semibold text-zinc-50">
+                {editingBank ? 'Modifier le compte' : 'Nouveau compte'}
+              </h3>
+              <button
+                type="button"
+                onClick={closeForm}
+                className="h-7 w-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
             </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border-2 flex flex-col h-80 bg-white/5 backdrop-blur-xl" style={{ borderColor: '#7c3aed' }}>
-            <form onSubmit={handleSubmit} className="flex flex-col h-full">
-              {/* Section principale - même structure qu'une carte de banque */}
-              <div className="p-6 flex-1">
-                {/* Header avec logo et nom - même position que les cartes */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    {/* Logo/Image - même taille que les cartes (w-12 h-12) */}
-                    <div 
-                      className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-dashed flex-shrink-0 cursor-pointer transition-colors"
-                      style={{ borderColor: '#7c3aed', backgroundColor: '#f0f0ff' }}
-                      onClick={() => document.getElementById('imageInput-add')?.click()}
-                      title="Cliquez pour choisir une image"
-                    >
-                      {imagePreview ? (
-                        <img 
-                          src={imagePreview} 
-                          alt="Preview" 
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-lg font-bold" style={{ color: '#7c3aed' }}>
-                          {formData.shortName || '+'}
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      id="imageInput-add"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                    />
-                    
-                    {/* Nom et informations - même position */}
-                    <div className="ml-4 flex-1">
-                      {/* Nom de la banque */}
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
-                        placeholder="Nom de la banque"
-                        required
-                      />
-                      
-                      {/* Type de compte et nom court - même ligne */}
-                      <div className="flex items-center space-x-2 mb-1">
-                        <select
-                          value={formData.accountType}
-                          onChange={(e) => setFormData({...formData, accountType: e.target.value as any})}
-                          className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
-                          style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
-                        >
-                          <option value="CURRENT">Compte courant</option>
-                          <option value="SAVINGS">Livret d'épargne</option>
-                          <option value="INVESTMENT">Compte d'investissement</option>
-                        </select>
 
-                      </div>
-                      
-                      {/* IBAN - même position que sur les cartes */}
-                      <input
-                        type="text"
-                        value={formData.iban}
-                        onChange={(e) => setFormData({...formData, iban: e.target.value.replace(/\s+/g, '')})}
-                        className="text-xs text-zinc-300 font-mono border-none focus:ring-0 p-0 bg-transparent w-full placeholder-gray-400"
-                        placeholder="IBAN (ex: FR76 1234 5678 9012 3456 789)"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Boutons d'action - même position que sur les cartes */}
-                  <div className="flex space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAddForm(false);
-                          setFormData({
-                            name: '',
-                            shortName: '',
-                            iban: '',
-                            balance: 0,
-                            accountType: 'CURRENT',
-                            userIds: [],
-                            createdAt: new Date().toISOString().split('T')[0]
-                          });
-                          setImagePreview(null);
-                          setImageFile(null);
-                        }}
-                        className="text-zinc-400 hover:text-zinc-600"
-                        title="Annuler"
-                      >
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                
-                {/* Champs supplémentaires en mode compact */}
-                <div className="space-y-2 mb-4">
-                  {/* Nom court, Date et Solde sur la même ligne */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      value={formData.shortName}
-                      onChange={(e) => setFormData({...formData, shortName: e.target.value})}
-                      className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                      style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
-                      placeholder="Nom court (BNP)"
-                      maxLength={3}
-                      required
+            {/* Body */}
+            <div className="p-5 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+              {/* Logo upload */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Logo <span className="text-zinc-600">(optionnel)</span>
+                </label>
+                <div className="flex items-center gap-3">
+                  {imagePreview && (
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="h-12 w-12 rounded-lg object-cover"
                     />
-                    <input
-                      type="date"
-                      value={formData.createdAt}
-                      onChange={(e) => setFormData({...formData, createdAt: e.target.value})}
-                      className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1"
-                      style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
-                      required
-                    />
-                    <input
-                      type="number"
-                      step="1"
-                      value={formData.balance}
-                      onChange={(e) => setFormData({...formData, balance: parseFloat(e.target.value) || 0})}
-                      className="px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 font-bold"
-                      style={{ backgroundColor: '#18191c', color: 'white', borderColor: '#3a3d42', '--tw-ring-color': '#7c3aed' } as any}
-                      placeholder="Solde initial"
-                      required
-                    />
-                  </div>
-                  
-                  {/* Sélection utilisateurs - format horizontal compact */}
-                  {(
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-300 mb-1">
-                        Utilisateurs ayant accès *
-                      </label>
-                      <div className="flex flex-wrap gap-1 p-2 rounded max-h-16 overflow-y-auto custom-scrollbar" style={{ backgroundColor: '#18191c', border: '1px solid #1e2024' }}>
-                        {users.map(user => (
-                          <label key={user.id} className="flex items-center space-x-1 cursor-pointer hover:bg-white/10 px-1 py-0.5 rounded text-xs">
-                            <input
-                              type="checkbox"
-                              checked={formData.userIds.includes(user.id)}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setFormData({
-                                    ...formData,
-                                    userIds: [...formData.userIds, user.id]
-                                  });
-                                } else {
-                                  setFormData({
-                                    ...formData,
-                                    userIds: formData.userIds.filter(id => id !== user.id)
-                                  });
-                                }
-                              }}
-                              className="w-3 h-3 rounded border-zinc-700 focus:ring-2"
-                              style={{ color: '#7c3aed', accentColor: '#7c3aed' }}
-                            />
-                            <div className="flex items-center space-x-1">
-                              {user.avatar ? (
-                                <img
-                                  src={assetUrl(user.avatar)}
-                                  alt={user.name}
-                                  className="w-3 h-3 rounded-full object-cover"
-                                />
-                              ) : (
-                                <div className="w-3 h-3 rounded-full text-white text-xs flex items-center justify-center" style={{ backgroundColor: '#7c3aed' }}>
-                                  {user.name.charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                              <span className="text-xs text-zinc-300 truncate max-w-16">{user.name}</span>
-                            </div>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
                   )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="text-xs text-zinc-400 file:mr-2 file:px-2 file:py-1 file:rounded-md file:border-0 file:text-xs file:font-medium file:bg-violet-600/20 file:text-violet-300 hover:file:bg-violet-600/30 cursor-pointer"
+                  />
                 </div>
-
               </div>
-              
-              {/* Footer - même style que les cartes */}
-              <div className="px-6 py-3 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-zinc-500">
-                    Nouveau compte
-                  </div>
-                  <div className="flex space-x-2">
+
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Nom du compte
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
+                  placeholder="Crédit Agricole Courant"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              {/* Short name */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Nom court <span className="text-zinc-600">(optionnel)</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.shortName}
+                  onChange={(e) => setFormData({ ...formData, shortName: e.target.value })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
+                  placeholder="CA"
+                />
+              </div>
+
+              {/* IBAN */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  IBAN
+                </label>
+                <input
+                  type="text"
+                  value={formData.iban}
+                  onChange={(e) => setFormData({ ...formData, iban: e.target.value })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors font-mono text-xs"
+                  placeholder="FR1420041010050500013M02606"
+                  required
+                />
+              </div>
+
+              {/* Account type */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['CURRENT', 'SAVINGS', 'INVESTMENT'] as const).map((type) => {
+                    const info = getAccountTypeInfo(type);
+                    return (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, accountType: type })}
+                        className={`text-center py-2 px-3 rounded-lg border transition-colors ${
+                          formData.accountType === type
+                            ? 'bg-violet-600/20 border-violet-500/50 text-violet-300'
+                            : 'bg-white/5 border-white/10 text-zinc-400 hover:text-zinc-300'
+                        }`}
+                      >
+                        <div className="text-lg">{info.icon}</div>
+                        <div className="text-xs font-medium mt-0.5">{info.label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Balance */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Solde initial
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.balance}
+                    onChange={(e) => setFormData({ ...formData, balance: e.target.value })}
+                    className="w-full rounded-lg bg-zinc-800/60 border border-white/10 pl-3 pr-7 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors tabular-nums"
+                    placeholder="1000.00"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                    €
+                  </span>
+                </div>
+              </div>
+
+              {/* Users (multi-select simplified) */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Utilisateurs autorisés
+                </label>
+                <div className="space-y-1">
+                  {users.map((user) => (
                     <button
+                      key={user.id}
                       type="button"
                       onClick={() => {
-                        setShowAddForm(false);
-                        setFormData({
-                          name: '',
-                          shortName: '',
-                          iban: '',
-                          balance: 0,
-                          accountType: 'CURRENT',
-                          userIds: [],
-                          createdAt: new Date().toISOString().split('T')[0]
-                        });
-                        setImagePreview(null);
-                        setImageFile(null);
+                        setFormData((prev) => ({
+                          ...prev,
+                          userIds: prev.userIds.includes(user.id)
+                            ? prev.userIds.filter((id) => id !== user.id)
+                            : [...prev.userIds, user.id],
+                        }));
                       }}
-                      className="px-3 py-1 text-xs border rounded hover:opacity-80"
-                      style={{ backgroundColor: '#18191c', color: '#a0aec0', borderColor: '#3a3d42' }}
+                      className={`w-full text-left py-1.5 px-2.5 rounded-lg border text-sm transition-colors ${
+                        formData.userIds.includes(user.id)
+                          ? 'bg-violet-600/20 border-violet-500/50 text-zinc-50'
+                          : 'bg-white/5 border-white/10 text-zinc-400 hover:text-zinc-300'
+                      }`}
                     >
-                      Annuler
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={!formData.name.trim() || !formData.shortName.trim() || formData.userIds.length === 0}
-                      className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ backgroundColor: '#7c3aed' }}
-                    >
-                      Ajouter
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-        )}
-        </div>
-      )}
-
-      {/* Archived Banks Section - Moved below the main banks list */}
-      {showArchived && archivedBanks && archivedBanks.length > 0 && (
-        <div className="mt-8">
-          <h3 className="text-xl font-bold text-white mb-4">Banques archivées</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-            {archivedBanks.map((bank: Bank) => (
-              <div key={bank.id} className="rounded-2xl overflow-hidden transition-shadow flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10" style={{ opacity: '0.85' }}>
-                <div className="p-6 flex-1 flex flex-col">
-                  <div>
-                    <div className="flex items-center">
-                      {bank.image ? (
-                        <img
-                          src={assetUrl(bank.image)}
-                          alt={bank.name}
-                          className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                          style={{ opacity: '0.7' }}
-                        />
-                      ) : (
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                          style={{ backgroundColor: '#7c3aed', opacity: '0.7' }}
-                        >
-                          {bank.shortName}
-                        </div>
-                      )}
-                      <div className="ml-4">
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-lg font-medium text-white">{bank.name}</h3>
-                          <span className="text-xs text-zinc-400">
-                            Archivé le {bank.archivedAt ? new Date(bank.archivedAt).toLocaleDateString('fr-FR') : 'N/A'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-zinc-300">
-                          {getAccountTypeInfo(bank.accountType).label}
-                          {!selectedUser && bank.users && bank.users.length > 0 && (
-                            <span className="ml-2 text-violet-300">
-                              • {bank.users.map((u: {name: string}) => u.name).join(', ')}
-                            </span>
-                          )}
-                        </p>
-                        {bank.iban && (
-                          <p className="text-xs text-zinc-400 mt-1 font-mono">
-                            {formatIBAN(bank.iban)}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-auto">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-xl font-bold text-white">
-                          {formatAmount(bank.balance)}
-                        </div>
-                        <div className="text-xs text-zinc-400">
-                          Solde lors de l'archivage
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleRestore(bank.id)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-violet-700 hover:bg-violet-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500"
-                          title="Remettre cette banque en service"
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                          </svg>
-                          Restaurer
-                        </button>
-                        <button
-                          onClick={() => handlePermanentDelete(bank.id, bank.name)}
-                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-700 hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                          title="Supprimer définitivement cette banque et toutes ses données"
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Supprimer
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {/* ── Enable Banking Modal ─────────────────────────────────────────────── */}
-      {ebModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-zinc-900 rounded-2xl p-6 w-full max-w-md border border-white/10 shadow-2xl mx-4">
-
-            {ebStep === 'search' && (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-white">
-                    Connecter <span className="text-violet-400">{ebModal.bankName}</span>
-                  </h3>
-                  <button onClick={() => setEbModal(null)} className="text-zinc-400 hover:text-white">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <p className="text-sm text-zinc-400 mb-4">
-                  Sélectionnez votre banque pour autoriser l'accès à vos transactions via Enable Banking.
-                </p>
-                <div className="flex gap-2 mb-3">
-                  <input
-                    type="text"
-                    placeholder="Rechercher une banque..."
-                    value={ebSearch}
-                    onChange={(e) => setEbSearch(e.target.value)}
-                    className="flex-1 px-3 py-2 text-sm rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    style={{ backgroundColor: '#18191c', border: '1px solid #3a3d42' }}
-                    autoFocus
-                  />
-                  <select
-                    value={ebCountry}
-                    onChange={(e) => {
-                      setEbCountry(e.target.value);
-                      setEbAspsps([]);
-                      fetch(`/api/enablebanking/aspsps?country=${e.target.value}`)
-                        .then(r => r.json()).then(setEbAspsps).catch(() => {});
-                    }}
-                    className="px-2 py-2 text-sm rounded-lg text-white focus:outline-none focus:ring-1 focus:ring-violet-500"
-                    style={{ backgroundColor: '#18191c', border: '1px solid #3a3d42' }}
-                  >
-                    <option value="fr">🇫🇷 FR</option>
-                    <option value="gb">🇬🇧 UK</option>
-                    <option value="de">🇩🇪 DE</option>
-                    <option value="es">🇪🇸 ES</option>
-                    <option value="it">🇮🇹 IT</option>
-                    <option value="nl">🇳🇱 NL</option>
-                    <option value="be">🇧🇪 BE</option>
-                    <option value="pl">🇵🇱 PL</option>
-                  </select>
-                </div>
-                <div className="overflow-y-auto max-h-64 space-y-1 custom-scrollbar">
-                  {ebAspsps.length === 0 && (
-                    <div className="text-center py-8 text-zinc-500 text-sm">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-violet-500 mx-auto mb-2"></div>
-                      Chargement des banques...
-                    </div>
-                  )}
-                  {ebFilteredAspsps.map(inst => (
-                    <button
-                      key={`${inst.name}-${inst.country}`}
-                      onClick={() => handleEbLink(inst.name, inst.country)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left"
-                    >
-                      {inst.logo ? (
-                        <img src={inst.logo} alt="" className="w-8 h-8 rounded object-contain bg-white/10 p-0.5 flex-shrink-0" />
-                      ) : (
-                        <div className="w-8 h-8 rounded bg-violet-800 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
-                          {inst.name.slice(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white truncate">{inst.name}</p>
-                        <p className="text-xs text-zinc-500">{inst.country}</p>
-                      </div>
-                      <svg className="h-4 w-4 text-zinc-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+                      ✓ {user.name}
                     </button>
                   ))}
-                  {ebAspsps.length > 0 && ebFilteredAspsps.length === 0 && (
-                    <p className="text-center py-6 text-zinc-500 text-sm">Aucune banque trouvée pour "{ebSearch}"</p>
-                  )}
                 </div>
-              </>
-            )}
-
-            {ebStep === 'waiting' && (
-              <>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-white">Authentification en cours</h3>
-                  <button onClick={() => { setEbModal(null); if (ebPollRef.current) clearInterval(ebPollRef.current); }} className="text-zinc-400 hover:text-white">
-                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <div className="text-center py-6">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500 mx-auto mb-4"></div>
-                  <p className="text-white mb-2">Une fenêtre de votre navigateur a été ouverte.</p>
-                  <p className="text-zinc-400 text-sm mb-6">
-                    Connectez-vous à votre banque pour autoriser l'accès. Cette fenêtre se mettra à jour automatiquement.
+                {formData.userIds.length === 0 && (
+                  <p className="text-xs text-red-400 mt-1">
+                    Sélectionnez au moins un utilisateur
                   </p>
-                  {ebLinkUrl && (
-                    <div className="mt-2">
-                      <p className="text-xs text-zinc-500 mb-2">Si la fenêtre ne s'est pas ouverte :</p>
-                      <a
-                        href={ebLinkUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs text-violet-400 hover:text-violet-300 underline break-all"
-                      >
-                        Ouvrir le lien manuellement
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+                )}
+              </div>
 
-          </div>
+              {/* Created date */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Date de création
+                </label>
+                <input
+                  type="date"
+                  value={formData.createdAt}
+                  onChange={(e) => setFormData({ ...formData, createdAt: e.target.value })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors [color-scheme:dark]"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[0.06]">
+              <button
+                type="button"
+                onClick={closeForm}
+                className="rounded-lg border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-violet-600 hover:bg-violet-500 px-3.5 py-2 text-sm font-medium text-white transition-colors"
+              >
+                {editingBank ? 'Enregistrer' : 'Créer'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
