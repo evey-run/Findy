@@ -82,6 +82,7 @@ export default function Banks() {
   const [ebCountry, setEbCountry] = useState('FR');
   const [ebAspsps, setEbAspsps] = useState<EbAspsp[]>([]);
   const [ebLinkUrl, setEbLinkUrl] = useState('');
+  const [ebLoading, setEbLoading] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -194,17 +195,29 @@ export default function Banks() {
     }
   };
 
-  const openEbModal = async (bankId: string, bankName: string) => {
+  const openEbModal = async (bankId: string, bankName: string, country: string = ebCountry) => {
     setEbModal({ bankId, bankName });
     setEbStep('search');
     setEbSearch('');
     setEbAspsps([]);
+    setEbLoading(true);
     try {
-      const res = await fetch(`/api/enablebanking/aspsps?country=${ebCountry}`);
-      if (!res.ok) throw new Error();
-      setEbAspsps(await res.json());
-    } catch {
-      toast.error('Impossible de charger la liste Enable Banking');
+      const res = await fetch(`/api/enablebanking/aspsps?country=${country}`);
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        throw new Error(error.error || `Erreur ${res.status}`);
+      }
+      const data = await res.json();
+      if (!Array.isArray(data)) {
+        throw new Error('Format de réponse invalide');
+      }
+      setEbAspsps(data);
+    } catch (err: any) {
+      console.error('Error loading ASPSPs:', err);
+      toast.error(err.message || 'Impossible de charger la liste Enable Banking');
+      setEbModal(null);
+    } finally {
+      setEbLoading(false);
     }
   };
 
@@ -694,7 +707,11 @@ export default function Banks() {
                     />
                     <select
                       value={ebCountry}
-                      onChange={(e) => { setEbCountry(e.target.value); openEbModal(ebModal.bankId, ebModal.bankName); }}
+                      onChange={(e) => {
+                        const newCountry = e.target.value;
+                        setEbCountry(newCountry);
+                        if (ebModal) openEbModal(ebModal.bankId, ebModal.bankName, newCountry);
+                      }}
                       className="rounded-lg bg-zinc-800/60 border border-white/10 px-2 py-2 text-sm text-zinc-100 outline-none [color-scheme:dark]"
                     >
                       {['FR','DE','ES','IT','BE','NL','PT','LU'].map(c => (
@@ -703,10 +720,15 @@ export default function Banks() {
                     </select>
                   </div>
                   <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {ebAspsps.length === 0 && (
-                      <p className="text-xs text-zinc-500 text-center py-4">Chargement…</p>
+                    {ebLoading && (
+                      <div className="flex justify-center items-center py-4">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-violet-500" />
+                      </div>
                     )}
-                    {ebAspsps
+                    {!ebLoading && ebAspsps.length === 0 && (
+                      <p className="text-xs text-zinc-500 text-center py-4">Aucune banque trouvée</p>
+                    )}
+                    {!ebLoading && ebAspsps
                       .filter(a => !ebSearch || a.name.toLowerCase().includes(ebSearch.toLowerCase()))
                       .map((aspsp) => (
                         <button
