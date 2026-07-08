@@ -336,7 +336,32 @@ export default function Banks() {
                 key={bank.id}
                 className="group relative rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 transition-all duration-200 hover:border-white/[0.16] hover:bg-white/[0.06]"
               >
-                {/* Row 1 — image + name + short name + avatars + menu */}
+                {/* User avatars (bottom right) — only if multiple users */}
+                {users.length > 1 && bank.users && bank.users.length > 0 && (
+                  <div className="absolute bottom-3 right-3 flex items-center -space-x-2">
+                    {bank.users.map((user) => (
+                      <div
+                        key={user.id}
+                        title={user.name}
+                        className="h-6 w-6 rounded-full border border-zinc-800 overflow-hidden flex-shrink-0 ring-1 ring-zinc-950"
+                      >
+                        {user.avatar ? (
+                          <img
+                            src={assetUrl(user.avatar)}
+                            alt={user.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white">
+                            {user.name[0].toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Row 1 — image + name + short name + menu */}
                 <div className="flex items-center gap-2.5">
                   {/* Bank image */}
                   {bank.image ? (
@@ -358,31 +383,6 @@ export default function Banks() {
                       <span className="text-xs text-zinc-500 flex-shrink-0">{bank.shortName}</span>
                     )}
                   </div>
-
-                  {/* User avatars — only if multiple users */}
-                  {users.length > 1 && bank.users && bank.users.length > 0 && (
-                    <div className="flex items-center -space-x-2 flex-shrink-0">
-                      {bank.users.map((user) => (
-                        <div
-                          key={user.id}
-                          title={user.name}
-                          className="h-6 w-6 rounded-full border border-zinc-800 overflow-hidden flex-shrink-0 ring-1 ring-zinc-950"
-                        >
-                          {user.avatar ? (
-                            <img
-                              src={assetUrl(user.avatar)}
-                              alt={user.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white">
-                              {user.name[0].toUpperCase()}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
 
                   {/* Menu button */}
                   <div className="relative flex-shrink-0">
