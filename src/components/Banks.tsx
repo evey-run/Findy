@@ -334,7 +334,7 @@ export default function Banks() {
             return (
               <div
                 key={bank.id}
-                className="group relative rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 transition-all duration-200 hover:border-white/[0.16] hover:bg-white/[0.06]"
+                className="group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]"
               >
                 {/* User avatars (bottom right) — only if multiple users */}
                 {users.length > 1 && bank.users && bank.users.length > 0 && (
