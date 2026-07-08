@@ -37,8 +37,8 @@
     ],
     "externalBin": [],
     "resources": {
-      "binaries/libquery_engine-darwin-arm64.dylib.node": "libquery_engine-darwin-arm64.dylib.node",
-      "binaries/libquery_engine-darwin.dylib.node": "libquery_engine-darwin.dylib.node"
+      "../node_modules/.prisma/client/libquery_engine-darwin-arm64.dylib.node": "libquery_engine-darwin-arm64.dylib.node",
+      "../node_modules/.prisma/client/libquery_engine-darwin.dylib.node": "libquery_engine-darwin.dylib.node"
     },
     "macOS": {
       "minimumSystemVersion": "11.0",
