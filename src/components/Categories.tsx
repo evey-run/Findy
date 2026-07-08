@@ -1,20 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../store';
 import type { Category, Budget } from '../types';
-import { 
-  ChartBarIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon
+import {
+  PlusIcon,
+  EllipsisHorizontalIcon,
+  PencilSquareIcon,
+  TrashIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-
 
 interface EditingCategory {
   id: string;
   name: string;
   type: 'INCOME' | 'EXPENSE' | 'FIXED';
   color: string;
-  icon?: string;
   keywords?: string[];
   budget?: {
     amount: string;
@@ -29,1294 +29,725 @@ interface BudgetSpending {
   remaining: number;
   percentage: number;
   isOverBudget: boolean;
-  periodStart: string;
-  periodEnd: string;
 }
 
+// ── Helpers ──────────────────────────────────────────────────────────────
+const fmt = (n: number) =>
+  `${Math.round(n).toLocaleString('fr-FR')} €`;
+
+const fmtCompact = (n: number) => {
+  const abs = Math.abs(n);
+  if (abs >= 1000) {
+    const v = n / 1000;
+    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} k€`;
+  }
+  return fmt(n);
+};
+
+const emptyForm: EditingCategory = {
+  id: '',
+  name: '',
+  type: 'EXPENSE',
+  color: '#7c3aed',
+  keywords: [],
+  budget: {
+    amount: '',
+    period: 'MONTHLY',
+    startDate: new Date().toISOString().split('T')[0],
+  },
+};
+
+const categoryTypes = [
+  { value: 'INCOME', label: 'Revenu', icon: '📈', color: '#22c55e' },
+  { value: 'EXPENSE', label: 'Dépense', icon: '📉', color: '#ef4444' },
+  { value: 'FIXED', label: 'Fixe', icon: '📌', color: '#6b7280' },
+];
+
+const predefinedColors = [
+  '#54478c', '#2c699a', '#048ba8', '#0db39e', '#16db93',
+  '#83e377', '#b9e769', '#efea5a', '#f1c453', '#f29e4c',
+];
+
 export default function Categories() {
-  const { 
-    categories, 
+  const {
+    categories,
     budgets,
-    transactions: _transactions,
     allTransactions,
-    loadCategories, 
+    loadCategories,
     loadBudgets,
-    loadTransactions: _loadTransactions,
     loadAllTransactions,
-    loadUsers,
-    addCategory, 
-    updateCategory, 
+    addCategory,
+    updateCategory,
     removeCategory,
     addBudget,
     updateBudget,
-    removeBudget
+    removeBudget,
   } = useAppStore();
-  
+
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<EditingCategory | null>(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showPieChart, setShowPieChart] = useState(false);
-  const [chartMonth, setChartMonth] = useState<Date>(new Date());
+  const [formData, setFormData] = useState(emptyForm);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [budgetSpending, setBudgetSpending] = useState<{ [key: string]: BudgetSpending }>({});
-  const [keywordInput, setKeywordInput] = useState('');
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  
-  // Couleurs prédéfinies
-  const predefinedColors = [
-    '#54478c', // ultra-violet
-    '#2c699a', // lapis-lazuli
-    '#048ba8', // blue-munsell
-    '#0db39e', // keppel
-    '#16db93', // emerald
-    '#83e377', // light-green
-    '#b9e769', // mindaro
-    '#efea5a', // maize
-    '#f1c453', // saffron
-    '#f29e4c'  // sandy-brown
-  ];
-  
-  // Types de catégories
-  const categoryTypes = [
-    { value: 'INCOME', label: 'Revenus', color: '#22c55e' },
-    { value: 'EXPENSE', label: 'Dépenses', color: '#ef4444' },
-    { value: 'FIXED', label: 'Fixe', color: '#6b7280' }
-  ];
 
   useEffect(() => {
-    const initializeData = async () => {
+    const load = async () => {
       setLoading(true);
       try {
         await loadCategories();
-        // Charger tous les budgets, indépendamment de la banque sélectionnée
         await loadBudgets(true);
-        // Charger toutes les allTransactions (toute l'historique), en ignorant la banque sélectionnée et la plage de dates
         await loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
-        await loadUsers();
-      } catch (error) {
-        console.error('Error loading data:', error);
+      } catch (e) {
+        console.error('Error loading:', e);
       } finally {
         setLoading(false);
       }
     };
-    
-    initializeData();
-  }, [loadCategories, loadBudgets, loadAllTransactions, loadUsers]);
+    load();
+  }, [loadCategories, loadBudgets, loadAllTransactions]);
 
-  // Calcul des dépenses pour chaque budget
-  const calculateBudgetSpending = () => {
-    console.log('📊 Calculating budget spending...');
-    console.log('📊 Budgets:', budgets.length);
-    console.log('📊 AllTransactions:', allTransactions.length);
-    
+  useEffect(() => {
+    if (!isFormOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && closeForm();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isFormOpen]);
+
+  useEffect(() => {
     const spending: { [key: string]: BudgetSpending } = {};
-    
     for (const budget of budgets) {
-      console.log(`📊 Processing budget for category ${budget.categoryId}`);
-      
-      // Calculer les dates de début et fin de période
       const startDate = new Date(budget.startDate);
-      let endDate = new Date(startDate);
-      
-      switch (budget.period) {
-        case 'WEEKLY':
-          endDate.setDate(endDate.getDate() + 7);
-          break;
-        case 'MONTHLY':
-          endDate.setMonth(endDate.getMonth() + 1);
-          break;
-        case 'QUARTERLY':
-          endDate.setMonth(endDate.getMonth() + 3);
-          break;
-        case 'YEARLY':
-          endDate.setFullYear(endDate.getFullYear() + 1);
-          break;
-      }
-      
-      console.log(`📊 Date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-      
-      // Filtrer les allTransactions (toute l'historique) pour ce budget
-      const relevantTransactions = allTransactions.filter(t => {
-        const transactionDate = new Date(t.date);
-        const isInCategory = t.categoryId === budget.categoryId;
-        const isExpense = t.amount < 0; // Seulement les dépenses
-        const isInDateRange = transactionDate >= startDate && transactionDate <= endDate;
-        const isInBank = !budget.bankId || t.bankId === budget.bankId;
-        
-        return isInCategory && isExpense && isInDateRange && isInBank;
-      });
-      
-      console.log(`📊 Found ${relevantTransactions.length} relevant allTransactions`);
-      
-      const totalSpent = Math.abs(relevantTransactions.reduce((sum, t) => sum + t.amount, 0));
+      const endDate = new Date(startDate);
+
+      const periods: Record<string, () => void> = {
+        WEEKLY: () => endDate.setDate(endDate.getDate() + 7),
+        MONTHLY: () => endDate.setMonth(endDate.getMonth() + 1),
+        QUARTERLY: () => endDate.setMonth(endDate.getMonth() + 3),
+        YEARLY: () => endDate.setFullYear(endDate.getFullYear() + 1),
+      };
+      periods[budget.period]?.();
+
+      const txns = allTransactions.filter((t: any) =>
+        t.categoryId === budget.categoryId &&
+        t.amount < 0 &&
+        new Date(t.date) >= startDate &&
+        new Date(t.date) <= endDate &&
+        (!budget.bankId || t.bankId === budget.bankId)
+      );
+
+      const totalSpent = Math.abs(txns.reduce((sum, t) => sum + t.amount, 0));
       const remaining = Math.max(0, budget.amount - totalSpent);
       const percentage = budget.amount > 0 ? (totalSpent / budget.amount) * 100 : 0;
-      
-      console.log(`📊 Budget ${budget.id}: spent ${totalSpent}, remaining ${remaining}, percentage ${percentage}%`);
-      
+
       spending[budget.id] = {
         budget,
         totalSpent,
         remaining,
-        percentage: percentage, // Suppression du Math.min pour permettre >100%
+        percentage,
         isOverBudget: totalSpent > budget.amount,
-        periodStart: startDate.toISOString().split('T')[0],
-        periodEnd: endDate.toISOString().split('T')[0]
       };
     }
-    
-    console.log('📊 Final spending object:', spending);
     setBudgetSpending(spending);
-  };
-
-  // Effet pour recalculer les budgets - ajout des dépendances manquantes
-  useEffect(() => {
-    console.log('📊 Effect triggered - budgets:', budgets.length, 'allTransactions:', allTransactions.length);
-    if (budgets.length > 0 && allTransactions.length >= 0) { // Permet les calculs même avec 0 transaction
-      calculateBudgetSpending();
-    }
-  }, [budgets, allTransactions, categories]);
-
-  // Force le recalcul périodique pour s'assurer que les données sont à jour
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (budgets.length > 0) {
-        console.log('📊 Periodic recalculation of budget spending');
-        calculateBudgetSpending();
-      }
-    }, 5000); // Recalcule toutes les 5 secondes
-
-    return () => clearInterval(interval);
   }, [budgets, allTransactions]);
 
-  // Fonction pour obtenir le budget d'une catégorie
-  const getCategoryBudget = (categoryId: string) => {
-    return budgets.find(budget => budget.categoryId === categoryId);
-  };
+  const getCategoryBudget = (categoryId: string) =>
+    budgets.find((b) => b.categoryId === categoryId);
 
-  // Fonction pour obtenir les dépenses d'une catégorie
   const getCategorySpending = (categoryId: string) => {
     const budget = getCategoryBudget(categoryId);
-    if (!budget) return null;
-    return budgetSpending[budget.id];
+    return budget ? budgetSpending[budget.id] : null;
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
+  const openCreate = () => {
+    setEditingCategory(null);
+    setFormData(emptyForm);
+    setIsFormOpen(true);
   };
 
-  // Appeler l'API backend pour appliquer les mots-clés d'une catégorie
-  const applyKeywordsToExisting = async (categoryId: string, includeAlreadyCategorized = false) => {
-    try {
-      const resp = await fetch(`/api/categories/${categoryId}/apply-keywords`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ includeAlreadyCategorized })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        toast.success(`Mots-clés appliqués: ${data.updatedCount} transaction(s) mise(s) à jour`);
-        // Recharger les allTransactions pour refléter les changements
-        await loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
-      } else {
-        const err = await resp.json();
-        toast.error(err.error || "Échec de l'application des mots-clés");
-      }
-    } catch (e) {
-      console.error('applyKeywordsToExisting failed', e);
-      toast.error("Erreur lors de l'application des mots-clés");
-    }
-  };
-
-  const handleEdit = (category: Category) => {
+  const openEdit = (category: Category) => {
+    setOpenMenuId(null);
     const categoryBudget = getCategoryBudget(category.id);
-    // Fermer le formulaire d'ajout si ouvert
-    setShowAddForm(false);
-    setEditingId(category.id);
-    setEditingCategory({
+    const data: EditingCategory = {
       id: category.id,
       name: category.name,
       type: category.type,
       color: category.color,
-      icon: category.icon,
       keywords: category.keywords || [],
-      budget: categoryBudget ? {
-        amount: categoryBudget.amount.toString(),
-        period: categoryBudget.period,
-        startDate: categoryBudget.startDate.split('T')[0]
-      } : {
-        amount: '',
-        period: 'MONTHLY',
-        startDate: new Date().toISOString().split('T')[0]
-      }
-    });
+      budget: categoryBudget
+        ? {
+            amount: categoryBudget.amount.toString(),
+            period: categoryBudget.period,
+            startDate: categoryBudget.startDate.split('T')[0],
+          }
+        : {
+            amount: '',
+            period: 'MONTHLY',
+            startDate: new Date().toISOString().split('T')[0],
+          },
+    };
+    setEditingCategory(data);
+    setFormData(data);
+    setIsFormOpen(true);
   };
 
-  const handleSave = async () => {
-    if (!editingCategory) return;
+  const closeForm = () => {
+    setIsFormOpen(false);
+    setEditingCategory(null);
+    setFormData(emptyForm);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.color) {
+      toast.error('Remplissez tous les champs requis');
+      return;
+    }
 
     try {
-      // Conserver l'état précédent pour détecter les nouveaux mots-clés
-      const previous = categories.find(c => c.id === editingCategory.id);
-      const prevKeywords = (previous?.keywords || []).map(k => k.toLowerCase().trim());
+      const isEdit = editingCategory;
+      const categoryPayload = {
+        name: formData.name,
+        type: formData.type,
+        color: formData.color,
+        keywords: (formData.keywords || []).map((k) => k.toLowerCase().trim()).filter(Boolean),
+      };
 
-      // Sauvegarder la catégorie
-      // Inclure un éventuel mot-clé saisi mais non ajouté (keywordInput)
-      const pendingKw = (keywordInput || '').trim();
-      const keywords = Array.from(new Set([
-        ...(editingCategory.keywords || []),
-        ...(pendingKw ? [pendingKw] : [])
-      ].map(k => k.trim().toLowerCase()).filter(Boolean)));
-      const categoryResponse = await fetch(`/api/categories/${editingCategory.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editingCategory.name,
-          type: editingCategory.type,
-          color: editingCategory.color,
-          icon: editingCategory.icon || null,
-          keywords
-        }),
-      });
+      const categoryRes = await fetch(
+        isEdit ? `/api/categories/${isEdit.id}` : '/api/categories',
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(categoryPayload),
+        }
+      );
 
-      if (categoryResponse.ok) {
-        const updatedCategory = await categoryResponse.json();
-        updateCategory(editingCategory.id, updatedCategory);
+      if (!categoryRes.ok) throw new Error('Category save failed');
+      const savedCategory = await categoryRes.json();
 
-        // Sauvegarder le budget si présent
-        if (editingCategory.budget && editingCategory.budget.amount && editingCategory.type === 'EXPENSE') {
-          const existingBudget = getCategoryBudget(editingCategory.id);
-          const budgetData = {
-            amount: parseFloat(editingCategory.budget.amount),
-            period: editingCategory.budget.period,
-            startDate: editingCategory.budget.startDate,
-            shared: false,
-            categoryId: editingCategory.id
-          };
+      if (isEdit) {
+        updateCategory(isEdit.id, savedCategory);
+      } else {
+        addCategory(savedCategory);
+      }
 
-          if (existingBudget) {
-            // Mettre à jour le budget existant
-            const budgetResponse = await fetch(`/api/budgets/${existingBudget.id}`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(budgetData)
-            });
+      // Handle budget
+      if (formData.budget?.amount && formData.type === 'EXPENSE') {
+        const existingBudget = getCategoryBudget(savedCategory.id);
+        const budgetPayload = {
+          amount: parseFloat(formData.budget.amount),
+          period: formData.budget.period,
+          startDate: formData.budget.startDate,
+          shared: false,
+          categoryId: savedCategory.id,
+        };
 
-            if (budgetResponse.ok) {
-              const updatedBudget = await budgetResponse.json();
-              updateBudget(existingBudget.id, updatedBudget);
-            }
-          } else {
-            // Créer un nouveau budget
-            const budgetResponse = await fetch('/api/budgets', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(budgetData)
-            });
-
-            if (budgetResponse.ok) {
-              const newBudget = await budgetResponse.json();
-              addBudget(newBudget);
-            }
+        if (existingBudget) {
+          const budgetRes = await fetch(`/api/budgets/${existingBudget.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(budgetPayload),
+          });
+          if (budgetRes.ok) {
+            updateBudget(existingBudget.id, await budgetRes.json());
           }
         } else {
-          // Supprimer le budget existant si le montant est vide
-          const existingBudget = getCategoryBudget(editingCategory.id);
-          if (existingBudget) {
-            const deleteResponse = await fetch(`/api/budgets/${existingBudget.id}`, {
-              method: 'DELETE'
-            });
-
-            if (deleteResponse.ok) {
-              removeBudget(existingBudget.id);
-            }
+          const budgetRes = await fetch('/api/budgets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(budgetPayload),
+          });
+          if (budgetRes.ok) {
+            addBudget(await budgetRes.json());
           }
         }
-
-        setEditingId(null);
-        setEditingCategory(null);
-        setKeywordInput('');
-        toast.success('Catégorie et budget sauvegardés avec succès');
-
-        // Proposer d'appliquer les nouveaux mots-clés aux allTransactions existantes
-        const newKeywords = (updatedCategory.keywords || []).map((k: string) => k.toLowerCase().trim());
-        const added = newKeywords.filter((k: string) => !prevKeywords.includes(k));
-        if (added.length > 0) {
-          const confirmApply = window.confirm(`Appliquer ${added.length} nouveau(x) mot(s)-clé(s) aux transactions existantes ?`);
-          if (confirmApply) {
-            await applyKeywordsToExisting(updatedCategory.id, false);
-          }
+      } else if (isEdit) {
+        const existingBudget = getCategoryBudget(isEdit.id);
+        if (existingBudget && !formData.budget?.amount) {
+          await fetch(`/api/budgets/${existingBudget.id}`, { method: 'DELETE' });
+          removeBudget(existingBudget.id);
         }
-
-        // Rafraîchir depuis l'API pour refléter exactement l'état DB
-        await loadCategories();
       }
+
+      toast.success(isEdit ? 'Catégorie mise à jour' : 'Catégorie créée');
+      closeForm();
+      await loadCategories();
     } catch (error) {
-      console.error('Error updating category:', error);
+      console.error('Error saving:', error);
       toast.error('Erreur lors de la sauvegarde');
     }
   };
 
-  const handleCancel = () => {
-    setEditingId(null);
-    setEditingCategory(null);
-    setShowAddForm(false);
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette catégorie et son budget ?')) return;
+  const handleDelete = async (categoryId: string) => {
+    setOpenMenuId(null);
+    if (!confirm('Supprimer cette catégorie et son budget ?')) return;
 
     try {
-      // Supprimer d'abord le budget s'il existe
-      const categoryBudget = getCategoryBudget(id);
-      if (categoryBudget) {
-        await fetch(`/api/budgets/${categoryBudget.id}`, {
-          method: 'DELETE'
-        });
-        removeBudget(categoryBudget.id);
+      const budget = getCategoryBudget(categoryId);
+      if (budget) {
+        await fetch(`/api/budgets/${budget.id}`, { method: 'DELETE' });
+        removeBudget(budget.id);
       }
 
-      // Supprimer la catégorie
-      const response = await fetch(`/api/categories/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        removeCategory(id);
-        toast.success('Catégorie et budget supprimés avec succès');
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Erreur lors de la suppression');
+      const res = await fetch(`/api/categories/${categoryId}`, { method: 'DELETE' });
+      if (res.ok) {
+        removeCategory(categoryId);
+        toast.success('Catégorie supprimée');
       }
     } catch (error) {
-      console.error('Error deleting category:', error);
+      console.error('Error deleting:', error);
       toast.error('Erreur lors de la suppression');
     }
   };
 
-  const handleAddCategory = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingCategory) return;
-
-    try {
-      // Inclure un éventuel mot-clé saisi mais non ajouté (keywordInput)
-      const pendingKw = (keywordInput || '').trim();
-      const keywords = Array.from(new Set([
-        ...(editingCategory.keywords || []),
-        ...(pendingKw ? [pendingKw] : [])
-      ].map(k => k.trim().toLowerCase()).filter(Boolean)));
-      // Créer la catégorie
-      const categoryResponse = await fetch('/api/categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: editingCategory.name,
-          type: editingCategory.type,
-          color: editingCategory.color,
-          icon: editingCategory.icon || null,
-          keywords
-        }),
-      });
-
-      if (categoryResponse.ok) {
-        const newCategory = await categoryResponse.json();
-        addCategory(newCategory);
-
-        // Créer le budget si présent et c'est une catégorie de dépense
-        if (editingCategory.budget && editingCategory.budget.amount && editingCategory.type === 'EXPENSE') {
-          const budgetData = {
-            amount: parseFloat(editingCategory.budget.amount),
-            period: editingCategory.budget.period,
-            startDate: editingCategory.budget.startDate,
-            shared: false,
-            categoryId: newCategory.id
-          };
-
-          const budgetResponse = await fetch('/api/budgets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(budgetData)
-          });
-
-          if (budgetResponse.ok) {
-            const newBudget = await budgetResponse.json();
-            addBudget(newBudget);
-          }
-        }
-
-        setShowAddForm(false);
-        setEditingCategory(null);
-        setKeywordInput('');
-        toast.success('Catégorie créée avec succès');
-
-        // Proposer d'appliquer immédiatement les mots-clés de la nouvelle catégorie
-        if ((newCategory.keywords || []).length > 0) {
-          const confirmApply = window.confirm('Appliquer ces mots-clés aux transactions existantes non catégorisées ?');
-          if (confirmApply) {
-            await applyKeywordsToExisting(newCategory.id, false);
-          }
-        }
-
-        // Rafraîchir depuis l'API pour refléter exactement l'état DB
-        await loadCategories();
-      }
-    } catch (error) {
-      console.error('Error adding category:', error);
-      toast.error('Erreur lors de la création');
-    }
+  const getTypeIcon = (type: string) => {
+    const t = categoryTypes.find((ct) => ct.value === type);
+    return t ? t.icon : '📂';
   };
 
   const getTypeLabel = (type: string) => {
-    const categoryType = categoryTypes.find(t => t.value === type);
-    return categoryType ? categoryType.label : type;
+    const t = categoryTypes.find((ct) => ct.value === type);
+    return t ? t.label : type;
   };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-violet-500"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-violet-500" />
       </div>
     );
   }
 
+  const totalByType = {
+    INCOME: categories.filter((c) => c.type === 'INCOME').length,
+    EXPENSE: categories.filter((c) => c.type === 'EXPENSE').length,
+    FIXED: categories.filter((c) => c.type === 'FIXED').length,
+  };
+
+  const stats = [
+    { label: 'Revenus', value: totalByType.INCOME.toString(), icon: '📈' },
+    { label: 'Dépenses', value: totalByType.EXPENSE.toString(), icon: '📉' },
+    { label: 'Fixes', value: totalByType.FIXED.toString(), icon: '📌' },
+    { label: 'Total', value: categories.length.toString(), icon: '📂' },
+  ];
+
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
-      {/* Header */}
-      <div className="md:flex md:items-center md:justify-between">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
-            Catégories & Budgets
-          </h2>
-          <p className="text-sm text-zinc-300 mt-1">
-            Gérez vos catégories de transactions et leurs budgets associés
-          </p>
+      {/* ── Header (compact) ── */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-baseline gap-2.5 min-w-0">
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Catégories</h2>
+          {categories.length > 0 && (
+            <span className="text-xs font-medium text-zinc-500">
+              {categories.length} cat.
+            </span>
+          )}
         </div>
-        <div className="mt-4 md:mt-0 md:ml-4 flex items-center">
-          <button
-            type="button"
-            onClick={() => setShowPieChart(prev => !prev)}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white hover:opacity-80"
-            style={{ backgroundColor: '#7c3aed' }}
-            title={showPieChart ? 'Masquer le camembert' : 'Afficher le camembert'}
-          >
-            <ChartBarIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            {showPieChart ? 'Masquer le camembert' : 'Camembert des catégories'}
-          </button>
-        </div>
+        <button
+          onClick={openCreate}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors flex-shrink-0"
+        >
+          <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+          <span className="hidden sm:inline">Nouvelle catégorie</span>
+        </button>
       </div>
 
-      {/* Pie Chart (Camembert) */}
-      {showPieChart && (
-        <div className="flex items-center justify-center min-h-[70vh]">
-          <div className="w-full max-w-5xl">
-            <div className="mb-4">
-              <div className="flex items-center justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setChartMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}
-                  className="p-2 rounded-md text-white hover:opacity-80"
-                  style={{ backgroundColor: '#18191c' }}
-                  aria-label="Mois précédent"
-                  title="Mois précédent"
-                >
-                  <ChevronLeftIcon className="h-5 w-5" />
-                </button>
-                <h3 className="text-xl sm:text-2xl font-semibold text-white select-none">
-                  {new Date(chartMonth).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setChartMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}
-                  className="p-2 rounded-md text-white hover:opacity-80"
-                  style={{ backgroundColor: '#18191c' }}
-                  aria-label="Mois suivant"
-                  title="Mois suivant"
-                >
-                  <ChevronRightIcon className="h-5 w-5" />
-                </button>
+      {/* ── KPI bar ── */}
+      {categories.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 rounded-xl bg-white/[0.04] border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden">
+          {stats.map((s) => (
+            <div key={s.label} className="px-4 py-2.5">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                {s.label}
+              </div>
+              <div className="mt-0.5 text-base font-semibold text-zinc-50 tabular-nums">
+                {s.value}
               </div>
             </div>
-            {(() => {
-              // Filtrer les allTransactions selon le mois sélectionné
-              const base = new Date(chartMonth.getFullYear(), chartMonth.getMonth(), 1);
-              const month = base.getMonth();
-              const year = base.getFullYear();
-
-              const isInCurrentMonth = (d: Date) => d.getFullYear() === year && d.getMonth() === month;
-
-              // Fonction utilitaire: budget mensuel équivalent selon la période
-              const getMonthlyBudget = (categoryId: string) => {
-                const b = budgets.find(bu => bu.categoryId === categoryId);
-                if (!b) return null;
-                switch (b.period) {
-                  case 'MONTHLY':
-                    return b.amount;
-                  case 'WEEKLY':
-                    return b.amount * 4.345; // ~52.14/12
-                  case 'QUARTERLY':
-                    return b.amount / 3;
-                  case 'YEARLY':
-                    return b.amount / 12;
-                  default:
-                    return b.amount;
-                }
-              };
-
-              // Catégories de dépenses uniquement; calculer budget mensuel et dépenses du mois
-              const data = categories
-                .filter(c => c.type === 'EXPENSE')
-                .map(c => {
-                  const monthlySpending = allTransactions
-                    .filter(t => t.categoryId === c.id)
-                    .filter(t => {
-                      const dt = new Date(t.date);
-                      return !isNaN(dt.getTime()) && isInCurrentMonth(dt);
-                    })
-                    .reduce((sum: number, t: any) => sum + Math.abs(Number(t.amount) || 0), 0);
-
-                  const monthlyBudget = getMonthlyBudget(c.id);
-                  return { label: c.name, color: c.color, spending: monthlySpending, budget: monthlyBudget ?? 0 };
-                })
-                .filter(d => (d.budget ?? 0) > 0);
-
-              const totalBudget = data.reduce((sum, d) => sum + d.budget, 0);
-
-              if (totalBudget <= 0) {
-                return (
-                  <div className="text-sm text-zinc-300 text-center">Aucune donnée disponible. Ajoutez des transactions pour afficher le camembert.</div>
-                );
-              }
-
-              const size = 520;
-              const radius = 200;
-              let angleOffset = 0; // in radians
-
-              // Ordonner par budget décroissant pour lisibilité
-              const sorted = [...data].sort((a, b) => b.budget - a.budget);
-
-              return (
-                <div className="flex flex-col items-center gap-6">
-                  <svg width={size} height={size}>
-                    <g transform={`translate(${size / 2}, ${size / 2}) rotate(-90)`}>
-                      {(() => {
-                        // Helpers to draw sector paths
-                        const polar = (r: number, a: number) => ({ x: r * Math.cos(a), y: r * Math.sin(a) });
-                        const sectorPath = (rOuter: number, rInner: number, a0: number, a1: number) => {
-                          const largeArc = a1 - a0 > Math.PI ? 1 : 0;
-                          const p0 = polar(rOuter, a0);
-                          const p1 = polar(rOuter, a1);
-                          if (rInner <= 0) {
-                            // Wedge from center
-                            return `M 0 0 L ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} Z`;
-                          }
-                          const q0 = polar(rInner, a0);
-                          const q1 = polar(rInner, a1);
-                          return `M ${p0.x} ${p0.y} A ${rOuter} ${rOuter} 0 ${largeArc} 1 ${p1.x} ${p1.y} L ${q1.x} ${q1.y} A ${rInner} ${rInner} 0 ${largeArc} 0 ${q0.x} ${q0.y} Z`;
-                        };
-
-                        return (
-                          <>
-                            {sorted.map((d, idx) => {
-                              const sliceAngle = (d.budget / totalBudget) * 2 * Math.PI;
-                              const start = angleOffset;
-                              const end = angleOffset + sliceAngle;
-                              angleOffset = end;
-
-                              const ratio = d.budget > 0 ? Math.min(d.spending / d.budget, 1) : 0;
-                              const fillOuter = radius * ratio;
-
-                              return (
-                                <g key={idx}>
-                                  {/* Fond (budget total) */}
-                                  <path d={sectorPath(radius, 0, start, end)} fill={d.color} fillOpacity={0.25} />
-                                  {/* Remplissage radial (dépenses) */}
-                                  {ratio > 0 && (
-                                    <path d={sectorPath(fillOuter, 0, start, end)} fill={d.color} />
-                                  )}
-                                  {/* Label du montant dépensé sur le camembert */}
-                                  {d.spending > 0 && (end - start) > 0.15 && (
-                                    (() => {
-                                      const mid = (start + end) / 2;
-                                      // Positionner le label vers l'intérieur du rayon rempli, avec un minimum pour lisibilité
-                                      const labelRadius = Math.max(24, Math.min(fillOuter, radius) * 0.65);
-                                      const pos = polar(labelRadius, mid);
-                                      const pct = d.budget > 0 ? Math.round((d.spending / d.budget) * 100) : 0;
-                                      return (
-                                        <text
-                                          x={pos.x}
-                                          y={pos.y}
-                                          transform={`rotate(90 ${pos.x} ${pos.y})`}
-                                          textAnchor="middle"
-                                          dominantBaseline="middle"
-                                          className="fill-white text-xs"
-                                          style={{ pointerEvents: 'none' }}
-                                        >
-                                          <tspan x={pos.x} dy="-0.35em">{formatCurrency(d.spending)}</tspan>
-                                          <tspan x={pos.x} dy="1.2em">({pct}%)</tspan>
-                                        </text>
-                                      );
-                                    })()
-                                  )}
-                                </g>
-                              );
-                            })}
-                          </>
-                        );
-                      })()}
-                    </g>
-                  </svg>
-                  <div className="w-full max-w-2xl">
-                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 gap-x-6">
-                      {sorted.map((d, idx) => (
-                        <li key={idx} className="flex items-center justify-between">
-                          <div className="flex items-center min-w-0">
-                            <span className="inline-block w-3 h-3 rounded-sm mr-2 flex-shrink-0" style={{ backgroundColor: d.color }} />
-                            <span className="text-sm text-zinc-200 truncate">{d.label}</span>
-                          </div>
-                          <div className="text-right ml-4 whitespace-nowrap">
-                            <div className="text-sm text-zinc-300">
-                              Dépenses: {formatCurrency(d.spending)}
-                              <span className="text-xs text-zinc-500 ml-2">
-                                {((d.budget ? d.spending / d.budget : 0) * 100).toFixed(0)}%
-                              </span>
-                            </div>
-                            <div className="text-xs text-zinc-500">Budget mensuel: {formatCurrency(d.budget)} ({((d.budget / totalBudget) * 100).toFixed(1)}%)</div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="mt-4 text-sm text-zinc-300 text-center">
-                      Budget total: <span className="font-medium text-white">{formatCurrency(totalBudget)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-          </div>
+          ))}
         </div>
       )}
 
-      {/* Categories List */}
-      {!showPieChart && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr">{categories.map((category) => {
-          const categorySpending = getCategorySpending(category.id);
-          const categoryBudget = getCategoryBudget(category.id);
-          
-          return (
-            <div key={category.id} className="rounded-2xl overflow-hidden transition-shadow flex flex-col h-80 bg-white/5 backdrop-blur-xl border border-white/10">
-              {editingId === category.id ? (
-                /* Edit Form Card - appears in place of the category being edited */
-                <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="flex flex-col h-full">
-                  <div className="p-4 flex-1">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <div 
-                          className="relative w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                          style={{ backgroundColor: editingCategory?.color || '#7c3aed', color: 'white' }}
-                          title="Changer la couleur (cliquer)"
-                          onClick={() => setShowColorPicker(prev => !prev)}
-                        >
-                          <span className="text-lg font-bold">
-                            {editingCategory?.icon || editingCategory?.name?.charAt(0).toUpperCase() || ''}
-                          </span>
-                          {showColorPicker && (
-                            <div
-                              className="absolute z-50 top-14 left-0 p-2 rounded-lg shadow-lg flex flex-row flex-wrap gap-2"
-                              style={{ backgroundColor: '#18191c', border: '1px solid #374151', width: 420 }}
-                            >
-                              {predefinedColors.slice(0, 16).map(color => (
-                                <button
-                                  key={color}
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); setEditingCategory(prev => prev ? { ...prev, color } : null); setShowColorPicker(false); }}
-                                  className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-zinc-700'}`}
-                                  style={{ backgroundColor: color }}
-                                  title={color}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                        
-                        <div className="ml-4 flex-1">
-                          <input
-                            type="text"
-                            value={editingCategory?.name || ''}
-                            onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
-                            className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
-                            placeholder="Nom de la catégorie"
-                            required
-                          />
-                          
-                          <div className="flex items-center space-x-2">
-                            <input
-                              type="text"
-                              value={editingCategory?.icon || ''}
-                              onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                              className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-16"
-                              placeholder="🛒"
-                            />
-                            
-                            <select
-                              value={editingCategory?.type || ''}
-                              onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                              className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
-                              style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
-                              required
-                            >
-                              {categoryTypes.map(type => (
-                                <option key={type.value} value={type.value} style={{ backgroundColor: '#18191c' }}>{type.label}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    
+      {/* ── Empty state ── */}
+      {categories.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-16 text-center">
+          <div className="h-11 w-11 rounded-xl bg-violet-500/10 flex items-center justify-center text-lg">
+            📂
+          </div>
+          <p className="mt-4 text-sm font-medium text-zinc-300">
+            Aucune catégorie pour le moment
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Créez votre première catégorie pour organiser vos transactions.
+          </p>
+          <button
+            onClick={openCreate}
+            className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3.5 py-2 transition-colors"
+          >
+            <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+            Nouvelle catégorie
+          </button>
+        </div>
+      ) : (
+        /* ── Grid of compact category cards ── */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+          {categories.map((category) => {
+            const spending = getCategorySpending(category.id);
+            const budget = getCategoryBudget(category.id);
+            const hasOverBudget = spending?.isOverBudget ?? false;
+            const percentage = spending?.percentage ?? 0;
 
-                    {/* Keywords section */}
-                    <div className="mb-4">
-                      <label className="block text-sm text-zinc-300 mb-2">Mots-clés (séparez par Entrée)</label>
-                      <div className="flex items-center gap-2 mb-2">
-                        <input
-                          type="text"
-                          value={keywordInput}
-                          onChange={(e) => setKeywordInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const value = keywordInput.trim().toLowerCase();
-                              if (!value) return;
-                              setEditingCategory(prev => prev ? {
-                                ...prev,
-                                keywords: Array.from(new Set([...(prev.keywords || []), value]))
-                              } : null);
-                              setKeywordInput('');
-                            }
-                          }}
-                          className="text-sm text-white border-none focus:ring-0 p-2 bg-zinc-900/80 rounded-md w-full"
-                          placeholder="Ex: amazon, uber, loyer"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const value = keywordInput.trim().toLowerCase();
-                            if (!value) return;
-                            setEditingCategory(prev => prev ? {
-                              ...prev,
-                              keywords: Array.from(new Set([...(prev.keywords || []), value]))
-                            } : null);
-                            setKeywordInput('');
-                          }}
-                          className="px-3 py-2 text-xs border border-transparent rounded text-white hover:opacity-80"
-                          style={{ backgroundColor: '#7c3aed' }}
-                        >
-                          Ajouter
-                        </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {(editingCategory?.keywords || []).map((kw, idx) => (
-                          <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#18191c', color: '#e5e7eb', border: '1px solid #374151' }}>
-                            {kw}
-                            <button
-                              type="button"
-                              onClick={() => setEditingCategory(prev => prev ? {
-                                ...prev,
-                                keywords: (prev.keywords || []).filter(k => k !== kw)
-                              } : null)}
-                              className="ml-1 text-zinc-400 hover:text-white"
-                              aria-label={`Supprimer le mot-clé ${kw}`}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Budget section - Only for EXPENSE categories */}
-                    {editingCategory?.type === 'EXPENSE' && (
-                      <div className="mt-4">
-                        <div className="text-sm text-zinc-300 mb-2">
-                          Budget (optionnel)
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <input
-                            type="number"
-                            step="1"
-                            value={editingCategory?.budget?.amount || ''}
-                            onChange={(e) => setEditingCategory(prev => prev ? {
-                              ...prev,
-                              budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
-                                amount: e.target.value,
-                                period: 'MONTHLY',
-                                startDate: new Date().toISOString().split('T')[0]
-                              }
-                            } : null)}
-                            className="text-lg font-bold text-white border-none focus:ring-0 p-0 bg-transparent"
-                            placeholder="0 €"
-                          />
-                          
-                          <select
-                            value={editingCategory?.budget?.period || 'MONTHLY'}
-                            onChange={(e) => setEditingCategory(prev => prev ? {
-                              ...prev,
-                              budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
-                                amount: '',
-                                period: e.target.value as any,
-                                startDate: new Date().toISOString().split('T')[0]
-                              }
-                            } : null)}
-                            className="text-xs border-none focus:ring-0 bg-transparent rounded-md"
-                            style={{ backgroundColor: '#18191c', color: 'white', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
-                          >
-                            <option value="MONTHLY" style={{ backgroundColor: '#18191c' }}>Mensuel</option>
-                            <option value="WEEKLY" style={{ backgroundColor: '#18191c' }}>Hebdo</option>
-                            <option value="QUARTERLY" style={{ backgroundColor: '#18191c' }}>Trimestre</option>
-                            <option value="YEARLY" style={{ backgroundColor: '#18191c' }}>Annuel</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
+            return (
+              <div
+                key={category.id}
+                className="group relative rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 transition-all duration-200 hover:border-white/[0.16] hover:bg-white/[0.06]"
+              >
+                {/* Row 1 — icon + name + actions */}
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs"
+                    style={{ backgroundColor: `${category.color}20` }}
+                  >
+                    {getTypeIcon(category.type)}
                   </div>
-                  
-                  <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-zinc-500">
-                        Modifier la catégorie
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          type="button"
-                          onClick={handleCancel}
-                          className="px-3 py-1 text-xs border border-zinc-700 rounded text-white hover:text-zinc-100 hover:bg-zinc-800"
-                        >
-                          Annuler
-                        </button>
-                        <button
-                          type="submit"
-                          className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                          style={{ backgroundColor: '#7c3aed' }}
-                        >
-                          Sauvegarder
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  <div className="p-6 flex-1 flex flex-col">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div 
-                          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold flex-shrink-0"
-                          style={{ backgroundColor: category.color }}
-                        >
-                          {category.icon || category.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="ml-4">
-                          <h3 className="text-lg font-medium text-white">{category.name}</h3>
-                          <p className="text-sm text-zinc-300">
-                            {getTypeLabel(category.type)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(category)}
-                          className="transition-colors"
-                          style={{ color: '#616875' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#7c3aed'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
-                          title="Modifier"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(category.id)}
-                          className="transition-colors"
-                          style={{ color: '#616875' }}
-                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-                          onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
-                          title="Supprimer"
-                        >
-                          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
+                  <h3 className="text-sm font-semibold text-zinc-50 truncate flex-1">
+                    {category.name}
+                  </h3>
 
-                    <div className="mt-4">
-                      {/* Budget progress for EXPENSE categories */}
-                      {category.type === 'EXPENSE' && categoryBudget && categorySpending && (
-                        <div>
-                          <div className="flex justify-between items-center mb-3">
-                            <span className="text-sm font-medium text-zinc-300">
-                              Budget {categoryBudget.period === 'MONTHLY' ? 'Mensuel' : 
-                             categoryBudget.period === 'WEEKLY' ? 'Hebdomadaire' :
-                             categoryBudget.period === 'QUARTERLY' ? 'Trimestriel' : 'Annuel'}
-                            </span>
-                            <span 
-                              className="text-xl font-bold"
-                              style={{ color: categorySpending.isOverBudget ? '#ef4444' : '#7c3aed' }}
-                            >
-                              {Math.round(categorySpending.percentage)}%
-                            </span>
-                          </div>
-                          
-                          <div className="w-full rounded-full h-3" style={{ backgroundColor: '#18191c' }}>
-                            <div
-                              className="h-3 rounded-full transition-all duration-300"
-                              style={{ 
-                                width: `${Math.min(categorySpending.percentage, 100)}%`,
-                                backgroundColor: categorySpending.isOverBudget ? '#ef4444' : '#7c3aed'
-                              }}
-                            />
-                          </div>
-                          
-                          <div className="flex justify-between text-sm text-zinc-400 mt-2">
-                            <span></span>
-                            <span className={categorySpending.isOverBudget ? 'text-red-400' : 'text-zinc-400'}>
-                              {formatCurrency(categorySpending.totalSpent)}/{formatCurrency(categoryBudget.amount)}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* No budget message for EXPENSE categories */}
-                      {category.type === 'EXPENSE' && !categoryBudget && (
-                        <div className="p-3 rounded-md" style={{ backgroundColor: '#18191c' }}>
-                          <div className="flex items-center justify-center text-zinc-400 mb-2">
-                            <ChartBarIcon className="h-4 w-4 mr-1" />
-                            <span className="text-sm">Pas de budget défini</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="px-6 py-4" style={{ backgroundColor: '#18191c' }}>
-                    {/* Section des transactions - identique à Banks */}
-                    {allTransactions.filter(t => t.categoryId === category.id).length > 0 ? (
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-medium text-zinc-300">
-                            Dernières transactions
-                          </p>
-                          <span className="text-zinc-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                            &gt;
-                          </span>
-                        </div>
-                        <div className="space-y-2 mb-4">
-                          {allTransactions
-                            .filter(t => t.categoryId === category.id)
-                            .slice(0, 3)
-                            .map((transaction) => (
-                              <div 
-                                key={transaction.id} 
-                                className="flex justify-between items-center text-sm"
-                              >
-                                <span className="text-zinc-400 truncate flex-1 mr-2 text-xs">
-                                  {transaction.description}
-                                </span>
-                                <div className="flex items-center space-x-2">
-                                  <span className={`font-semibold text-xs ${
-                                    transaction.amount > 0 ? 'text-green-400' : 'text-red-400'
-                                  }`}>
-                                    {transaction.amount > 0 ? '+' : ''}{transaction.amount.toLocaleString('fr-FR')} €
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="text-sm font-medium text-zinc-300">
-                            Transactions
-                          </p>
-                          <span className="text-zinc-500" style={{ fontSize: '14px', fontWeight: 'bold' }}>
-                            &gt;
-                          </span>
-                        </div>
-                        <div className="text-sm text-zinc-400 mb-4">
-                          Aucune transaction récente
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Add Category Form Card */}
-        {showAddForm ? (
-          <div className="rounded-2xl border-2 flex flex-col h-80 bg-white/5 backdrop-blur-xl" style={{ borderColor: '#7c3aed' }}>
-            <form onSubmit={handleAddCategory} className="flex flex-col h-full">
-              <div className="p-4 flex-1">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center">
-                    <div 
-                      className="relative w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 cursor-pointer transition-colors"
-                      style={{ backgroundColor: editingCategory?.color || '#7c3aed', color: 'white' }}
-                      title="Changer la couleur (cliquer)"
-                      onClick={() => setShowColorPicker(prev => !prev)}
+                  {/* Actions menu */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === category.id ? null : category.id);
+                      }}
+                      className={`h-6 w-6 -mr-1 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
+                        openMenuId === category.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      title="Actions"
                     >
-                      <span className="text-lg font-bold">
-                        {editingCategory?.icon || editingCategory?.name?.charAt(0).toUpperCase() || ''}
-                      </span>
-                      {showColorPicker && (
-                        <div
-                          className="absolute z-50 top-14 left-0 p-2 rounded-lg shadow-lg flex flex-row flex-wrap gap-2"
-                          style={{ backgroundColor: '#18191c', border: '1px solid #374151', width: 420 }}
-                        >
-                          {predefinedColors.slice(0, 16).map(color => (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); setEditingCategory(prev => prev ? { ...prev, color } : null); setShowColorPicker(false); }}
-                              className={`w-6 h-6 rounded-full border-2 ${editingCategory?.color === color ? 'border-white' : 'border-zinc-700'}`}
-                              style={{ backgroundColor: color }}
-                              title={color}
-                            />
-                          ))}
+                      <EllipsisHorizontalIcon className="h-5 w-5" />
+                    </button>
+
+                    {openMenuId === category.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                        <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                          <button
+                            onClick={() => openEdit(category)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
+                            Modifier
+                          </button>
+                          <button
+                            onClick={() => handleDelete(category.id)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                            Supprimer
+                          </button>
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="ml-4 flex-1">
-                      <input
-                        type="text"
-                        value={editingCategory?.name || ''}
-                        onChange={(e) => setEditingCategory(prev => prev ? {...prev, name: e.target.value} : null)}
-                        className="text-lg font-medium text-white border-none focus:ring-0 p-0 bg-transparent w-full mb-1"
-                        placeholder="Nom de la catégorie"
-                        required
-                      />
-                      
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="text"
-                          value={editingCategory?.icon || ''}
-                          onChange={(e) => setEditingCategory(prev => prev ? {...prev, icon: e.target.value} : null)}
-                          className="text-sm text-zinc-300 border-none focus:ring-0 p-0 bg-transparent w-16"
-                          placeholder="🛒"
-                        />
-                        
-                        <select
-                          value={editingCategory?.type || ''}
-                          onChange={(e) => setEditingCategory(prev => prev ? {...prev, type: e.target.value as any} : null)}
-                          className="text-xs text-white border-none focus:ring-0 bg-transparent rounded-md"
-                          style={{ backgroundColor: '#18191c', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
-                          required
-                        >
-                          {categoryTypes.map(type => (
-                            <option key={type.value} value={type.value} style={{ backgroundColor: '#18191c' }}>{type.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
+                      </>
+                    )}
                   </div>
                 </div>
-                
-                
 
-                {/* Keywords section */}
-                <div className="mb-4">
-                  <label className="block text-sm text-zinc-300 mb-2">Mots-clés (séparez par Entrée)</label>
-                  <div className="flex items-center gap-2 mb-2">
-                    <input
-                      type="text"
-                      value={keywordInput}
-                      onChange={(e) => setKeywordInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          const value = keywordInput.trim().toLowerCase();
-                          if (!value) return;
-                          setEditingCategory(prev => prev ? {
-                            ...prev,
-                            keywords: Array.from(new Set([...(prev.keywords || []), value]))
-                          } : null);
-                          setKeywordInput('');
-                        }
-                      }}
-                      className="text-sm text-white border-none focus:ring-0 p-2 bg-zinc-900/80 rounded-md w-full"
-                      placeholder="Ex: amazon, uber, loyer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const value = keywordInput.trim().toLowerCase();
-                        if (!value) return;
-                        setEditingCategory(prev => prev ? {
-                          ...prev,
-                          keywords: Array.from(new Set([...(prev.keywords || []), value]))
-                        } : null);
-                        setKeywordInput('');
-                      }}
-                      className="px-3 py-2 text-xs border border-transparent rounded text-white hover:opacity-80"
-                      style={{ backgroundColor: '#7c3aed' }}
+                {/* Row 2 — type badge */}
+                <div className="mt-3 flex items-center justify-between">
+                  <span className="text-xs font-medium px-2 py-1 rounded-md" style={{ backgroundColor: `${category.color}20`, color: category.color }}>
+                    {getTypeLabel(category.type)}
+                  </span>
+                  {spending && (
+                    <span
+                      className="text-xs font-semibold tabular-nums"
+                      style={{ color: hasOverBudget ? '#ef4444' : '#a78bfa' }}
                     >
-                      Ajouter
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {(editingCategory?.keywords || []).map((kw, idx) => (
-                      <span key={`${kw}-${idx}`} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full" style={{ backgroundColor: '#18191c', color: '#e5e7eb', border: '1px solid #374151' }}>
+                      {Math.round(percentage)}%
+                    </span>
+                  )}
+                </div>
+
+                {/* Row 3 — budget info (if applicable) */}
+                {budget && spending && (
+                  <>
+                    <div className="mt-2.5 text-xs tabular-nums">
+                      <span className="font-semibold text-zinc-50">
+                        {fmtCompact(spending.totalSpent)}
+                      </span>
+                      <span className="text-zinc-500"> / {fmtCompact(budget.amount)}</span>
+                    </div>
+
+                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(percentage, 100)}%`,
+                          backgroundColor: hasOverBudget ? '#ef4444' : '#a78bfa',
+                        }}
+                      />
+                    </div>
+
+                    <div className="mt-2 text-xs text-zinc-500">
+                      {hasOverBudget ? (
+                        <span className="text-red-400 font-medium">
+                          Dépassé de {fmtCompact(spending.totalSpent - budget.amount)}
+                        </span>
+                      ) : (
+                        <span>{fmtCompact(spending.remaining)} restant</span>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Row 4 — keywords (if any) */}
+                {category.keywords && category.keywords.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {category.keywords.slice(0, 2).map((kw) => (
+                      <span
+                        key={kw}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-400"
+                      >
                         {kw}
-                        <button
-                          type="button"
-                          onClick={() => setEditingCategory(prev => prev ? {
-                            ...prev,
-                            keywords: (prev.keywords || []).filter(k => k !== kw)
-                          } : null)}
-                          className="ml-1 text-zinc-400 hover:text-white"
-                          aria-label={`Supprimer le mot-clé ${kw}`}
-                        >
-                          ×
-                        </button>
                       </span>
                     ))}
-                  </div>
-                </div>
-
-                {/* Budget section - Only for EXPENSE categories */}
-                {editingCategory?.type === 'EXPENSE' && (
-                  <div className="mt-4">
-                    <div className="text-sm text-zinc-300 mb-2">
-                      Budget (optionnel)
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="number"
-                        step="1"
-                        value={editingCategory?.budget?.amount || ''}
-                        onChange={(e) => setEditingCategory(prev => prev ? {
-                          ...prev,
-                          budget: prev.budget ? {...prev.budget, amount: e.target.value} : {
-                            amount: e.target.value,
-                            period: 'MONTHLY',
-                            startDate: new Date().toISOString().split('T')[0]
-                          }
-                        } : null)}
-                        className="text-lg font-bold text-white border-none focus:ring-0 p-0 bg-transparent"
-                        placeholder="0 €"
-                      />
-                      
-                      <select
-                        value={editingCategory?.budget?.period || 'MONTHLY'}
-                        onChange={(e) => setEditingCategory(prev => prev ? {
-                          ...prev,
-                          budget: prev.budget ? {...prev.budget, period: e.target.value as any} : {
-                            amount: '',
-                            period: e.target.value as any,
-                            startDate: new Date().toISOString().split('T')[0]
-                          }
-                        } : null)}
-                        className="text-xs text-white border-none focus:ring-0 bg-transparent rounded-md"
-                        style={{ backgroundColor: '#18191c', border: 'none', padding: '0.25rem 0.5rem', height: '1.75rem' }}
-                      >
-                        <option value="MONTHLY" style={{ backgroundColor: '#18191c' }}>Mensuel</option>
-                        <option value="WEEKLY" style={{ backgroundColor: '#18191c' }}>Hebdo</option>
-                        <option value="QUARTERLY" style={{ backgroundColor: '#18191c' }}>Trimestre</option>
-                        <option value="YEARLY" style={{ backgroundColor: '#18191c' }}>Annuel</option>
-                      </select>
-                    </div>
+                    {category.keywords.length > 2 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded text-zinc-500">
+                        +{category.keywords.length - 2}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
-              
-              <div className="px-4 py-2 rounded-b-lg" style={{ backgroundColor: '#18191c' }}>
-                <div className="flex justify-between items-center">
-                  <div className="text-sm text-zinc-500">
-                    Nouvelle catégorie
-                  </div>
-                  <div className="flex space-x-2">
+            );
+          })}
+        </div>
+      )}
+
+      {/* ── Create / Edit modal ── */}
+      {isFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeForm} />
+          <form
+            onSubmit={handleSubmit}
+            className="relative w-full max-w-md rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <h3 className="text-base font-semibold text-zinc-50">
+                {editingCategory ? 'Modifier la catégorie' : 'Nouvelle catégorie'}
+              </h3>
+              <button
+                type="button"
+                onClick={closeForm}
+                className="h-7 w-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4 max-h-[calc(100vh-200px)] overflow-y-auto">
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Nom de la catégorie
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
+                  placeholder="Alimentation, Maison, etc."
+                  autoFocus
+                  required
+                />
+              </div>
+
+              {/* Type */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Type</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {categoryTypes.map((t) => (
                     <button
+                      key={t.value}
                       type="button"
-                      onClick={handleCancel}
-                      className="px-3 py-1 text-xs border border-zinc-700 rounded text-white hover:text-zinc-100 hover:bg-zinc-800"
+                      onClick={() => setFormData({ ...formData, type: t.value as 'INCOME' | 'EXPENSE' | 'FIXED' })}
+                      className={`text-center py-2 px-3 rounded-lg border transition-colors ${
+                        formData.type === t.value
+                          ? 'bg-violet-600/20 border-violet-500/50 text-violet-300'
+                          : 'bg-white/5 border-white/10 text-zinc-400 hover:text-zinc-300'
+                      }`}
                     >
-                      Annuler
+                      <div className="text-lg">{t.icon}</div>
+                      <div className="text-xs font-medium mt-0.5">{t.label}</div>
                     </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-1 text-xs border border-transparent rounded text-white hover:opacity-80"
-                      style={{ backgroundColor: '#7c3aed' }}
-                    >
-                      Ajouter
-                    </button>
-                  </div>
+                  ))}
                 </div>
               </div>
-            </form>
-          </div>
-        ) : (
-          <div
-            className="rounded-2xl border-2 border-dashed transition-colors flex flex-col h-80 cursor-pointer group"
-            style={{ 
-              borderColor: '#616875' // couleur intermédiaire
-            } as React.CSSProperties}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = '#7c3aed';
-              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
-              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#7c3aed';
-              if (text) text.style.color = '#7c3aed';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = '#616875';
-              const icon = e.currentTarget.querySelector('.icon-plus') as HTMLElement;
-              const text = e.currentTarget.querySelector('.text-add') as HTMLElement;
-              if (icon) icon.style.color = '#616875';
-              if (text) text.style.color = '#616875';
-            }}
-            onClick={() => {
-              setEditingId(null);
-              setShowAddForm(true);
-              setEditingCategory({
-                id: '',
-                name: '',
-                type: 'EXPENSE',
-                color: predefinedColors[0],
-                icon: '',
-                keywords: [],
-                budget: {
-                  amount: '',
-                  period: 'MONTHLY',
-                  startDate: new Date().toISOString().split('T')[0]
-                }
-              });
-            }}
-          >
-            <div className="flex flex-col items-center justify-center h-full p-6">
-              <div className="mb-4 transition-colors icon-plus" style={{ color: '#616875' }}>
-                <svg className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+
+              {/* Color */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Couleur</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {predefinedColors.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, color })}
+                      className={`h-8 rounded-lg border-2 transition-all ${
+                        formData.color === color
+                          ? 'border-white/60 shadow-lg'
+                          : 'border-transparent hover:border-white/20'
+                      }`}
+                      style={{ backgroundColor: color }}
+                      title={color}
+                    />
+                  ))}
+                </div>
               </div>
-              <p className="text-center font-medium transition-colors text-add" style={{ color: '#616875' }}>
-                Ajouter une catégorie
-              </p>
+
+              {/* Budget (only for EXPENSE) */}
+              {formData.type === 'EXPENSE' && (
+                <>
+                  <div className="pt-2 border-t border-white/[0.06]">
+                    <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                      Budget <span className="text-zinc-600">(optionnel)</span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Montant</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="1"
+                          value={formData.budget?.amount || ''}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              budget: {
+                                ...formData.budget!,
+                                amount: e.target.value,
+                              },
+                            })
+                          }
+                          className="w-full rounded-lg bg-zinc-800/60 border border-white/10 pl-3 pr-7 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors tabular-nums"
+                          placeholder="500"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+                          €
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Période</label>
+                      <select
+                        value={formData.budget?.period || 'MONTHLY'}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            budget: {
+                              ...formData.budget!,
+                              period: e.target.value as 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY',
+                            },
+                          })
+                        }
+                        className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors [color-scheme:dark]"
+                      >
+                        <option value="WEEKLY">Hebdo</option>
+                        <option value="MONTHLY">Mensuel</option>
+                        <option value="QUARTERLY">Trim.</option>
+                        <option value="YEARLY">Annuel</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-zinc-500 mb-1">Date de début</label>
+                    <input
+                      type="date"
+                      value={formData.budget?.startDate || ''}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          budget: {
+                            ...formData.budget!,
+                            startDate: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors [color-scheme:dark]"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Keywords */}
+              <div className="pt-2 border-t border-white/[0.06]">
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Mots-clés <span className="text-zinc-600">(optionnel)</span>
+                </label>
+                {formData.keywords && formData.keywords.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {formData.keywords.map((kw) => (
+                      <button
+                        key={kw}
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            keywords: formData.keywords!.filter((k) => k !== kw),
+                          })
+                        }
+                        className="text-xs px-2 py-1 rounded-md bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition-colors"
+                      >
+                        {kw} ×
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  placeholder="Ajouter un mot-clé puis Entrée"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const kw = (e.target as HTMLInputElement).value.trim().toLowerCase();
+                      if (kw && !formData.keywords?.includes(kw)) {
+                        setFormData({
+                          ...formData,
+                          keywords: [...(formData.keywords || []), kw],
+                        });
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }
+                  }}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
+                />
+              </div>
             </div>
-          </div>
-        )}
-      </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[0.06]">
+              <button
+                type="button"
+                onClick={closeForm}
+                className="rounded-lg border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                className="rounded-lg bg-violet-600 hover:bg-violet-500 px-3.5 py-2 text-sm font-medium text-white transition-colors"
+              >
+                {editingCategory ? 'Enregistrer' : 'Créer'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

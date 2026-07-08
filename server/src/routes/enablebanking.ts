@@ -10,8 +10,16 @@ let jwtCache: { token: string; expiresAt: number } | null = null;
 
 function buildJWT(): string {
   const appId = process.env.ENABLE_BANKING_APP_ID;
-  const privateKey = process.env.ENABLE_BANKING_RSA_KEY;
-  if (!appId || !privateKey) throw new Error('Enable Banking credentials not configured (ENABLE_BANKING_APP_ID / ENABLE_BANKING_RSA_KEY)');
+  const privateKeyStr = process.env.ENABLE_BANKING_RSA_KEY;
+  if (!appId || !privateKeyStr) throw new Error('Enable Banking credentials not configured (ENABLE_BANKING_APP_ID / ENABLE_BANKING_RSA_KEY)');
+
+  // The key might be in different formats, let's check and format appropriately
+  let privateKey = privateKeyStr.trim();
+  if (!privateKey.includes('-----BEGIN')) {
+    // It's base64 encoded, wrap it in PEM headers
+    privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`;
+  }
+
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 3599;
 
@@ -55,11 +63,19 @@ router.get('/configured', (_req, res) => {
 // GET /api/enablebanking/aspsps?country=fr
 router.get('/aspsps', async (req, res) => {
   try {
-    const country = ((req.query.country as string) || 'fr').toUpperCase();
+    const country = ((req.query.country as string) || 'fr').toLowerCase();
     const data = await ebFetch(`/aspsps?country=${country}`);
     // Enable Banking returns { aspsps: [...] } or an array directly
-    res.json(data.aspsps ?? data);
+    const aspsps = data.aspsps ?? data;
+    // Ensure we always return an array with name, country, logo fields
+    const formatted = Array.isArray(aspsps) ? aspsps.map((a: any) => ({
+      name: a.name || a.aspsp_name || '',
+      country: a.country || country.toUpperCase(),
+      logo: a.logo || a.logoUrl || '',
+    })) : [];
+    res.json(formatted);
   } catch (err: any) {
+    console.error('Enable Banking fetch error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
