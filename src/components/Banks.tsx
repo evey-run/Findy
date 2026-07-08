@@ -336,62 +336,42 @@ export default function Banks() {
                 key={bank.id}
                 className="group relative rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 transition-all duration-200 hover:border-white/[0.16] hover:bg-white/[0.06]"
               >
-                {/* User avatars (top right) — only if multiple users */}
-                {users.length > 1 && bank.users && bank.users.length > 0 && (
-                  <div className="absolute top-3 right-3 flex items-center -space-x-2 z-30">
-                    {bank.users.map((user) => (
-                      <div
-                        key={user.id}
-                        title={user.name}
-                        className="h-6 w-6 rounded-full border border-zinc-800 overflow-hidden flex-shrink-0 ring-1 ring-zinc-950"
-                      >
-                        {user.avatar ? (
-                          <img
-                            src={assetUrl(user.avatar)}
-                            alt={user.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white">
-                            {user.name[0].toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Row 1 — image + name + short name + menu */}
-                <div className="flex items-center gap-2.5">
-                  {bank.image ? (
-                    <img
-                      src={assetUrl(bank.image)}
-                      alt={bank.name}
-                      className="h-8 w-8 rounded-lg object-cover flex-shrink-0"
-                    />
-                  ) : (
-                    <div className="h-8 w-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0 text-sm">
-                      🏦
+                {/* User avatars + menu (top right) */}
+                <div className="absolute top-3 right-3 flex items-center gap-2 z-30">
+                  {/* User avatars — only if multiple users */}
+                  {users.length > 1 && bank.users && bank.users.length > 0 && (
+                    <div className="flex items-center -space-x-2">
+                      {bank.users.map((user) => (
+                        <div
+                          key={user.id}
+                          title={user.name}
+                          className="h-6 w-6 rounded-full border border-zinc-800 overflow-hidden flex-shrink-0 ring-1 ring-zinc-950"
+                        >
+                          {user.avatar ? (
+                            <img
+                              src={assetUrl(user.avatar)}
+                              alt={user.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-violet-600 flex items-center justify-center text-[10px] font-bold text-white">
+                              {user.name[0].toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
-                  <div className="flex-1 min-w-0 flex items-baseline gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-50 truncate">
-                      {bank.name}
-                    </h3>
-                    {bank.shortName && (
-                      <span className="text-xs text-zinc-500 flex-shrink-0">{bank.shortName}</span>
-                    )}
-                  </div>
 
-                  {/* Actions menu */}
-                  <div className="relative flex-shrink-0">
+                  {/* Menu button */}
+                  <div className="relative">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setOpenMenuId(openMenuId === bank.id ? null : bank.id);
                       }}
-                      className={`h-6 w-6 -mr-1 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
-                        openMenuId === bank.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      className={`h-6 w-6 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
+                        openMenuId === bank.id ? 'opacity-100 bg-white/10 text-zinc-100' : 'opacity-100 group-hover:opacity-100'
                       }`}
                       title="Actions"
                     >
@@ -431,6 +411,29 @@ export default function Banks() {
                           </button>
                         </div>
                       </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Row 1 — image + name + short name + menu */}
+                <div className="flex items-center gap-2.5">
+                  {bank.image ? (
+                    <img
+                      src={assetUrl(bank.image)}
+                      alt={bank.name}
+                      className="h-8 w-8 rounded-lg object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="h-8 w-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0 text-sm">
+                      🏦
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 flex items-baseline gap-2">
+                    <h3 className="text-sm font-semibold text-zinc-50 truncate">
+                      {bank.name}
+                    </h3>
+                    {bank.shortName && (
+                      <span className="text-xs text-zinc-500 flex-shrink-0">{bank.shortName}</span>
                     )}
                   </div>
                 </div>
