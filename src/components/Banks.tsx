@@ -270,7 +270,7 @@ export default function Banks() {
   ];
 
   return (
-    <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
+    <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2 bg-white/[0.03]">
       {/* ── Header (compact) ── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-2.5 min-w-0">
