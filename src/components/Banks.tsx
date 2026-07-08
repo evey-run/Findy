@@ -382,12 +382,12 @@ export default function Banks() {
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
                           >
                             <LinkIcon className="h-4 w-4 text-violet-400" />
-                            <span>Connecter Enable Banking</span>
+                            <span>Lier</span>
                             {bank.ebStatus === 'LINKED' && (
-                              <span className="ml-auto text-[10px] text-green-400 font-medium">Lié</span>
+                              <span className="ml-auto text-[10px] text-green-400 font-medium">✓</span>
                             )}
                             {bank.ebStatus === 'PENDING' && (
-                              <span className="ml-auto text-[10px] text-amber-400 font-medium">En attente</span>
+                              <span className="ml-auto text-[10px] text-amber-400 font-medium">⏳</span>
                             )}
                           </button>
                           <button
