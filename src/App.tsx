@@ -8,7 +8,6 @@ import Investissement from './components/Investissement';
 import Categories from './components/Categories';
 import Budgets from './components/Budgets';
 import Banks from './components/Banks';
-import Users from './components/Users';
 import Settings from './components/Settings';
 import { Toaster } from 'react-hot-toast';
 
@@ -52,7 +51,7 @@ function App() {
             <Route path="/categories" element={<Categories />} />
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/banks" element={<Banks />} />
-            <Route path="/users" element={<Users />} />
+            <Route path="/users" element={<Navigate to="/banks" replace />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </Layout>

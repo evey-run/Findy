@@ -10,7 +10,6 @@ import {
   TagIcon,
   ChartBarIcon,
   WalletIcon,
-  UserIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   FlagIcon,
@@ -28,7 +27,6 @@ const navigation = [
   { name: 'Catégories',      href: '/categories', icon: TagIcon },
   { name: 'Objectifs',       href: '/budgets', icon: FlagIcon },
   { name: 'Portefeuille',    href: '/banks', icon: WalletIcon },
-  { name: 'Utilisateurs',    href: '/users', icon: UserIcon },
 ];
 
 // Mobile bottom nav — 5 items most-used
