@@ -100,7 +100,7 @@ export default function Layout({ children }: LayoutProps) {
           {/* Logo */}
           <div className="px-6 pt-7 pb-2 flex-shrink-0">
             <div className="flex items-center gap-2.5">
-              <img src="/assets/brand-logo.png" alt="Findy" className="h-5 w-auto flex-shrink-0" />
+              <img src="/assets/findy-logo.png" alt="Findy" className="h-5 w-auto flex-shrink-0" />
               <span className="text-zinc-50 font-semibold text-lg tracking-tight">Findy</span>
             </div>
           </div>
