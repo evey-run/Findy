@@ -1,14 +1,13 @@
 {
   "name": "finance",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:server\"",
     "dev:frontend": "vite",
     "dev:server": "tsx watch server/src/index.ts",
     "build": "tsc -b && vite build",
-    "build:server": "tsc server/src/index.ts --outDir server/dist --target es2020 --module commonjs",
     "start:server": "node server/dist/index.js",
     "lint": "eslint .",
     "preview": "vite preview",

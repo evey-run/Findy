@@ -8,14 +8,16 @@ const prisma = new PrismaClient();
 router.get('/overview', async (req, res) => {
   try {
     const { userId, startDate, endDate } = req.query;
-    
+
     const dateFilter: any = {};
     if (startDate || endDate) {
       if (startDate) dateFilter.gte = new Date(startDate as string);
       if (endDate) dateFilter.lte = new Date(endDate as string);
     }
-    
-    const userFilter = userId ? { userId: userId as string } : {};
+
+    const userFilter = userId
+      ? { bank: { userBanks: { some: { userId: userId as string } } } }
+      : {};
     const transactionWhere = {
       ...userFilter,
       ...(Object.keys(dateFilter).length > 0 && { date: dateFilter })
@@ -71,8 +73,7 @@ router.get('/overview', async (req, res) => {
       prisma.transaction.aggregate({
         where: { 
           amount: { gt: 0 },
-          bank: { accountType: 'CURRENT' },
-          ...userFilter,
+          bank: { accountType: 'CURRENT', ...(userFilter.bank || {}) },
           date: {
             gte: periodStart,
             lte: periodEnd
@@ -84,8 +85,7 @@ router.get('/overview', async (req, res) => {
       prisma.transaction.aggregate({
         where: { 
           amount: { lt: 0 },
-          bank: { accountType: 'CURRENT' },
-          ...userFilter,
+          bank: { accountType: 'CURRENT', ...(userFilter.bank || {}) },
           date: {
             gte: periodStart,
             lte: periodEnd
@@ -97,8 +97,7 @@ router.get('/overview', async (req, res) => {
       prisma.transaction.aggregate({
         where: { 
           amount: { gt: 0 },
-          bank: { accountType: 'SAVINGS' },
-          ...userFilter,
+          bank: { accountType: 'SAVINGS', ...(userFilter.bank || {}) },
           date: {
             gte: periodStart,
             lte: periodEnd
@@ -110,8 +109,7 @@ router.get('/overview', async (req, res) => {
       prisma.transaction.aggregate({
         where: { 
           amount: { lt: 0 },
-          bank: { accountType: 'INVESTMENT' },
-          ...userFilter,
+          bank: { accountType: 'INVESTMENT', ...(userFilter.bank || {}) },
           date: {
             gte: periodStart,
             lte: periodEnd
@@ -147,7 +145,7 @@ router.get('/overview', async (req, res) => {
         }) : null;
         return {
           categoryId: item.categoryId,
-          categoryName: category?.name || 'Unknown',
+          categoryName: category?.name || 'Non catégorisé',
           categoryColor: category?.color || '#6b7280',
           categoryIcon: category?.icon,
           amount: Math.abs(item._sum.amount || 0)

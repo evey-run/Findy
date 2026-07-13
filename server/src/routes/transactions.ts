@@ -7,17 +7,26 @@ const prisma = new PrismaClient();
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
   try {
-    const { bankId, categoryId, shared, startDate, endDate, limit, offset, search, accountType, checked } = req.query;
+    const { bankId, categoryId, shared, startDate, endDate, limit, offset, search, accountType, checked, userId } = req.query;
     const where: any = {};
-    
+
     // Filtre par ID de banque
     if (bankId) where.bankId = bankId;
-    
+
     // Filtre par type de compte (INVESTMENT, CHECKING, etc.)
     if (accountType) {
       // Joindre la table bank pour filtrer par accountType
       where.bank = {
+        ...(where.bank || {}),
         accountType: accountType as string
+      };
+    }
+
+    // Filtre par utilisateur (via les banques liées)
+    if (userId) {
+      where.bank = {
+        ...(where.bank || {}),
+        userBanks: { some: { userId: userId as string } }
       };
     }
     
@@ -113,10 +122,13 @@ router.get('/', async (req, res) => {
 // GET /api/transactions/stats/summary - Statistiques résumées
 router.get('/stats/summary', async (req, res) => {
   try {
-    const { bankId, startDate, endDate } = req.query;
-    
+    const { bankId, startDate, endDate, userId } = req.query;
+
     const where: any = {};
     if (bankId) where.bankId = bankId;
+    if (userId) {
+      where.bank = { ...(where.bank || {}), userBanks: { some: { userId: userId as string } } };
+    }
     if (startDate || endDate) {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate as string);
@@ -193,7 +205,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/transactions - Créer une nouvelle transaction
 router.post('/', async (req, res) => {
   try {
-    const { amount, description, date, bankId, categoryId, unitPrice, quantity } = req.body;
+    const { amount, description, date, bankId, categoryId, unitPrice, quantity, ticker, assetType } = req.body;
     
     // Logs de debug pour voir les valeurs reçues
     console.log('🔍 DEBUG - POST /api/transactions - Données reçues:');
@@ -204,9 +216,9 @@ router.post('/', async (req, res) => {
     console.log('unitPrice:', unitPrice, typeof unitPrice);
     console.log('quantity:', quantity, typeof quantity);
     
-    if (!amount || !description || !bankId) {
-      return res.status(400).json({ 
-        error: 'Amount, description, and bankId are required' 
+    if (amount === undefined || amount === null || !description || !bankId) {
+      return res.status(400).json({
+        error: 'Amount, description, and bankId are required'
       });
     }
     
@@ -238,7 +250,9 @@ router.post('/', async (req, res) => {
       bankId,
       categoryId: assignedCategoryId,
       unitPrice: unitPrice ? parseFloat(unitPrice) : null,
-      quantity: quantity ? parseFloat(quantity) : null
+      quantity: quantity ? parseFloat(quantity) : null,
+      ticker: ticker || null,
+      assetType: assetType || null
     };
     
     // Log des données qui seront envoyées à Prisma
@@ -282,7 +296,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, description, date, shared, categoryId, bankId, unitPrice, quantity } = req.body;
+    const { amount, description, date, shared, categoryId, bankId, unitPrice, quantity, ticker, assetType } = req.body;
     
     // Vérifier que la banque existe si elle est fournie
     if (bankId) {
@@ -310,7 +324,9 @@ router.put('/:id', async (req, res) => {
         ...(categoryId !== undefined && { categoryId }),
         ...(bankId !== undefined && { bankId }),
         ...(unitPrice !== undefined && { unitPrice: unitPrice ? parseFloat(unitPrice) : null }),
-        ...(quantity !== undefined && { quantity: quantity ? parseFloat(quantity) : null })
+        ...(quantity !== undefined && { quantity: quantity ? parseFloat(quantity) : null }),
+        ...(ticker !== undefined && { ticker: ticker || null }),
+        ...(assetType !== undefined && { assetType: assetType || null })
       },
       include: {
         bank: {

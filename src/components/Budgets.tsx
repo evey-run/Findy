@@ -11,6 +11,7 @@ import {
   XMarkIcon,
   ArrowUpRightIcon,
   CheckCircleIcon,
+  ArchiveBoxIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -65,6 +66,7 @@ export default function Budgets() {
 
   // Per-card actions menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     loadObjectives();
@@ -194,19 +196,36 @@ export default function Budgets() {
     }
   };
 
+  const handleArchive = async (objective: Objective) => {
+    setOpenMenuId(null);
+    try {
+      const response = await fetch(`/api/objectives/${objective.id}/archive`, { method: 'PATCH' });
+      if (!response.ok) throw new Error("Erreur lors de l'archivage");
+      const updated = await response.json();
+      setObjectives((prev) => prev.map((o) => (o.id === objective.id ? updated : o)));
+      toast.success(objective.archived ? 'Objectif désarchivé' : 'Objectif archivé');
+    } catch (error) {
+      console.error('Error archiving objective:', error);
+      toast.error("Erreur lors de l'archivage de l'objectif");
+    }
+  };
+
   const viewTransactions = (objective: Objective) => {
     setOpenMenuId(null);
     navigate(`/transactions?search=${encodeURIComponent(`Économie ${objective.title}`)}`);
   };
 
+  // ── Filter objectives by archived status ──────────────────────────────
+  const visibleObjectives = objectives.filter((o) => showArchived ? o.archived : !o.archived);
+
   // ── Aggregate stats ──────────────────────────────────────────────────
-  const totalObjectives = objectives.length;
-  const completedObjectives = objectives.filter((o) => {
+  const totalObjectives = visibleObjectives.length;
+  const completedObjectives = visibleObjectives.filter((o) => {
     const p = objectiveProgress[o.id];
     return p ? p.isCompleted : o.isCompleted;
   }).length;
-  const totalTargetAmount = objectives.reduce((sum, o) => sum + o.targetAmount, 0);
-  const totalSaved = objectives.reduce(
+  const totalTargetAmount = visibleObjectives.reduce((sum, o) => sum + o.targetAmount, 0);
+  const totalSaved = visibleObjectives.reduce(
     (sum, o) => sum + (objectiveProgress[o.id]?.totalSaved ?? 0),
     0
   );
@@ -239,13 +258,26 @@ export default function Budgets() {
             </span>
           )}
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors flex-shrink-0"
-        >
-          <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
-          <span className="hidden sm:inline">Nouvel objectif</span>
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`inline-flex items-center gap-1.5 rounded-lg text-sm font-medium px-3 py-1.5 transition-colors ${
+              showArchived
+                ? 'bg-zinc-700 text-zinc-200 hover:bg-zinc-600'
+                : 'bg-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:bg-white/10'
+            }`}
+          >
+            <ArchiveBoxIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">{showArchived ? 'Archivés' : 'Archiver'}</span>
+          </button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors"
+          >
+            <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+            <span className="hidden sm:inline">Nouvel objectif</span>
+          </button>
+        </div>
       </div>
 
       {/* ── KPI bar (single card, divided) ── */}
@@ -283,7 +315,7 @@ export default function Budgets() {
       ) : (
         /* ── Dense grid of compact cards ── */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
-          {objectives.map((objective) => {
+          {visibleObjectives.map((objective) => {
             const progress = objectiveProgress[objective.id];
             const percentage = progress ? progress.percentage : 0;
             const isCompleted = progress ? progress.isCompleted : objective.isCompleted;
@@ -296,7 +328,7 @@ export default function Budgets() {
             return (
               <div
                 key={objective.id}
-                className="group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]"
+                className={`group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05] ${objective.archived ? 'opacity-50' : ''}`}
               >
                 {/* Row 1 — icon + title + actions */}
                 <div className="flex items-center gap-2.5">
@@ -345,7 +377,14 @@ export default function Budgets() {
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
                           >
                             <ArrowUpRightIcon className="h-4 w-4 text-zinc-500" />
-                            Voir les transactions
+                            Transactions
+                          </button>
+                          <button
+                            onClick={() => handleArchive(objective)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <ArchiveBoxIcon className="h-4 w-4 text-zinc-500" />
+                            {objective.archived ? 'Désarchiver' : 'Archiver'}
                           </button>
                           <button
                             onClick={() => handleDelete(objective.id)}

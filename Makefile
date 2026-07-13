@@ -1,7 +1,7 @@
 # Makefile pour Finance Duo
 # Projet de gestion financière pour couple
 
-.PHONY: help install dev build clean test start-backend start-frontend stop db-reset db-seed
+.PHONY: help install dev build clean test start-backend start-frontend stop db-reset db-seed version release
 
 # Variables
 NODE_BIN = npm
@@ -22,6 +22,8 @@ help:
 	@echo "  make db-reset     - Réinitialiser la base de données"
 	@echo "  make db-seed      - Peupler la base avec des données de test"
 	@echo "  make stop         - Arrêter tous les processus"
+	@echo "  make version b=patch - Incrémenter la version (patch/minor/major/x.y.z)"
+	@echo "  make release b=patch - Release via GitHub Actions"
 	@echo ""
 
 # Installation des dépendances
@@ -82,6 +84,15 @@ db-seed:
 	@echo "🌱 Peuplement de la base avec des données de test..."
 	cd $(SERVER_DIR) && npx prisma db seed
 	@echo "✅ Données de test ajoutées"
+
+# Version bump (ex: make version b=patch)
+version:
+	@node scripts/version-bump.mjs $(b)
+
+# Release via GitHub Actions (ex: make release b=patch)
+release:
+	@gh workflow run release.yml -f bump_type=$(b)
+	@echo "🚀 Release déclenchée via GitHub Actions"
 
 # Commande par défaut
 .DEFAULT_GOAL := help

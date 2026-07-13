@@ -139,6 +139,11 @@ export const useAppStore = create<AppState>()(
               params.append('bankId', state.selectedBank.id);
             }
 
+            // Filtrer par utilisateur sélectionné (via ses banques)
+            if (state.selectedUser) {
+              params.append('userId', state.selectedUser.id);
+            }
+
             if (options?.accountType) params.append('accountType', options.accountType);
 
             const resp = await fetch(`/api/transactions?${params}`);
@@ -516,6 +521,9 @@ export const useAppStore = create<AppState>()(
           }
           if (state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
+          }
+          if (state.selectedUser) {
+            params.append('userId', state.selectedUser.id);
           }
           console.log(`Fetching dashboard data from: /api/dashboard/overview?${params}`);
           const response = await fetch(`/api/dashboard/overview?${params}`);

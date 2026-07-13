@@ -9,6 +9,7 @@ import Categories from './components/Categories';
 import Budgets from './components/Budgets';
 import Banks from './components/Banks';
 import Users from './components/Users';
+import Settings from './components/Settings';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -52,6 +53,7 @@ function App() {
             <Route path="/budgets" element={<Budgets />} />
             <Route path="/banks" element={<Banks />} />
             <Route path="/users" element={<Users />} />
+            <Route path="/settings" element={<Settings />} />
           </Routes>
         </Layout>
         <Toaster

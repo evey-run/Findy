@@ -2,19 +2,19 @@
 
 ## Product
 
-**Name:** Tally
-**Domain:** usetally.app (fictitious example)
+**Name:** Findy
+**Domain:** usefindy.app (fictitious example)
 **Category:** Personal finance / Privacy software (local-first)
 **Tagline:** All your finances. None of the cloud.
 **Sub-tagline:** A local-first, self-hostable dashboard for your accounts, budgets, and investments — your data never leaves your machine.
 
 ## Positioning
 
-Tally fills the gap between cloud budgeting apps that monetize your financial data (the Mint lineage, YNAB, Copilot) and the lonely spreadsheet that's private but tedious to maintain. The decisive differentiator: **it's local-first and fully self-hostable**. No bank passwords, no third-party aggregators (Plaid, GoCardless), no call-home telemetry. You import a CSV, Tally categorizes it, and everything lives on a machine you control. A managed cloud option exists for people who'd rather not run a server.
+Findy fills the gap between cloud budgeting apps that monetize your financial data (the Mint lineage, YNAB, Copilot) and the lonely spreadsheet that's private but tedious to maintain. The decisive differentiator: **it's local-first and fully self-hostable**. No bank passwords, no third-party aggregators (Plaid, GoCardless), no call-home telemetry. You import a CSV, Findy categorizes it, and everything lives on a machine you control. A managed cloud option exists for people who'd rather not run a server.
 
 **Target personas:**
 
-| Persona | Pain | How Tally solves it |
+| Persona | Pain | How Findy solves it |
 |---|---|---|
 | Privacy-conscious individual | Budget apps harvest and resell financial data; linking a bank login feels invasive | 100% local, CSV import, no bank credentials ever leave your device |
 | Solopreneur / freelancer | Personal and business money scattered across banks; stacking SaaS subscriptions | One private dashboard, self-host for free, own your books in open files |
@@ -51,7 +51,7 @@ Violet drives the brand and all UI chrome. Green/red/amber are reserved strictly
 
 ### Logo
 
-Wordmark "tally" in lowercase, Inter font, semibold. A small violet tally-mark glyph (four vertical strokes crossed by a diagonal — the universal counting mark) sits just before the wordmark as the logo mark. No tagline in the logo lockup — the tagline lives in page copy only.
+Wordmark "findy" in lowercase, Inter font, semibold. A small violet tally-mark glyph (four vertical strokes crossed by a diagonal — the universal counting mark) sits just before the wordmark as the logo mark. No tagline in the logo lockup — the tagline lives in page copy only.
 
 ### Glassmorphism signature
 
@@ -63,7 +63,7 @@ Glow signature: `shadow-[0_0_60px_rgba(124,58,237,0.3)]`
 
 ### Photography / visuals
 
-- Dark UI dashboard mockups framed in glass cards with **window chrome showing a local URL** (`localhost:5757`, `tally.local`) to reinforce the local-first story.
+- Dark UI dashboard mockups framed in glass cards with **window chrome showing a local URL** (`localhost:5757`, `findy.local`) to reinforce the local-first story.
 - No stock photography of people.
 - Abstract violet gradient blobs as background decorations.
 - Net-worth line/area charts, account rows with balances, budget rings, and **count-up animated numbers** to make the dashboard feel alive.

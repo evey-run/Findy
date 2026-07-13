@@ -3,14 +3,19 @@ import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 const prisma = new PrismaClient();
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 // Configuration multer pour upload d'avatar
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadsDir = path.join(process.cwd(), 'public/uploads/avatars');
+    const uploadsDir = path.join(PROJECT_ROOT, 'public/uploads/avatars');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
@@ -141,7 +146,7 @@ router.put('/:id', upload.single('avatar'), async (req, res) => {
       });
       
       if (existingUser?.avatar) {
-        const oldAvatarPath = path.join(process.cwd(), 'public', existingUser.avatar);
+        const oldAvatarPath = path.join(PROJECT_ROOT, 'public', existingUser.avatar);
         if (fs.existsSync(oldAvatarPath)) {
           fs.unlinkSync(oldAvatarPath);
         }
@@ -179,7 +184,7 @@ router.delete('/:id', async (req, res) => {
     });
     
     if (existingUser?.avatar) {
-      const avatarPath = path.join(process.cwd(), 'public', existingUser.avatar);
+      const avatarPath = path.join(PROJECT_ROOT, 'public', existingUser.avatar);
       if (fs.existsSync(avatarPath)) {
         fs.unlinkSync(avatarPath);
       }

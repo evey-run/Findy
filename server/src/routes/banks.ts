@@ -4,13 +4,17 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const router = express.Router();
 const prisma = new PrismaClient();
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 // Configuration multer pour l'upload d'images
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, process.env.UPLOADS_DIR || path.join(process.cwd(), 'public/uploads'));
+    cb(null, process.env.UPLOADS_DIR || path.join(PROJECT_ROOT, 'public/uploads'));
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);

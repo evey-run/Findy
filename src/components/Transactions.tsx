@@ -1060,7 +1060,7 @@ export default function Transactions({
         <div className="flex gap-3 md:mt-0">
           <button
             onClick={() => setShowBulkEditModal(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
+            className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
             style={{ backgroundColor: '#7c3aed' }}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1070,7 +1070,7 @@ export default function Transactions({
           </button>
           <button
             onClick={handleOpenImportModal}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
+            className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-80"
             style={{ backgroundColor: '#7c3aed' }}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1081,7 +1081,7 @@ export default function Transactions({
           <button
             onClick={handleDeleteSelected}
             disabled={selectedTransactions.length === 0 || isDeleting}
-            className={`inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${selectedTransactions.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
+            className={`inline-flex items-center px-3 py-1.5 border border-transparent rounded-md shadow-sm text-sm font-medium text-white ${selectedTransactions.length === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-80'}`}
             style={{ backgroundColor: '#dc2626' }}
           >
             <svg className="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1092,127 +1092,93 @@ export default function Transactions({
         </div>
       </div>
 
-      <style>{`
-        /* Forcer le style du selecteur de banque dans la section filtre */
-        select[name="bank-filter-select"] {
-          background-color: #18191c !important;
-          color: #fff !important;
-          min-height: 2.5rem !important;
-          border: none !important;
-          padding: 0.5rem 0.75rem !important;
-          font-weight: 500 !important;
-          appearance: none !important;
-          -webkit-appearance: none !important;
-          -moz-appearance: none !important;
-        }
-      `}</style>
-
       {/* Filters */}
-      <div className="rounded-2xl p-6 bg-white/5 backdrop-blur-xl border border-white/10">
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-zinc-300">Banque</label>
-            <select
-              name="bank-filter-select"
-              value={selectedBank?.id || ''}
-              onChange={(e) => {
-                const bank = banks.find(b => b.id === e.target.value);
-                setSelectedBank(bank || null);
-                // Recharger avec la nouvelle banque sélectionnée
-                applyFilters({ ...filters });
-              }}
-              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-            >
-              <option value="" style={{ backgroundColor: '#18191c' }}>Toutes les banques</option>
-              {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
-                // Récupérer les utilisateurs associés à cette banque
-                const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
-                const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
-                
-                return (
-                  <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
-                    {bank.name}{bankUsersText}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-300">Recherche</label>
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSearch();
-                }
-              }}
-              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-300">Catégorie</label>
-            <select
-              value={filters.categoryId}
-              onChange={(e) => {
-                const newFilters = { ...filters, categoryId: e.target.value };
-                applyFilters(newFilters);
-              }}
-              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
-            >
-              <option value="" style={{ backgroundColor: '#18191c' }}>Toutes</option>
-              <option value="undefined" style={{ backgroundColor: '#18191c' }}>Non défini</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-300">Date début</label>
-            <input
-              type="date"
-              value={filters.startDate}
-              onChange={(e) => {
-                const newFilters = { ...filters, startDate: e.target.value };
-                applyFilters(newFilters);
-              }}
-              className="mt-1 block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#18191c', color: 'white', minHeight: '2.5rem', border: 'none', padding: '0.5rem 0.75rem' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-300">Date fin</label>
-            <input
-              type="date"
-              value={filters.endDate}
-              onChange={(e) => {
-                const newFilters = { ...filters, endDate: e.target.value };
-                applyFilters(newFilters);
-              }}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#18191c' }}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-zinc-300">Pointé</label>
-            <select
-              value={filters.checked}
-              onChange={(e) => {
-                const newFilters = { ...filters, checked: e.target.value };
-                applyFilters(newFilters);
-              }}
-              className="mt-1 block w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent py-2 px-3 h-10 min-h-[2.5rem]"
-              style={{ backgroundColor: '#18191c' }}
-            >
-              <option value="" style={{ backgroundColor: '#18191c' }}>Tous</option>
-              <option value="true" style={{ backgroundColor: '#18191c' }}>Oui</option>
-              <option value="false" style={{ backgroundColor: '#18191c' }}>Non</option>
-            </select>
-          </div>
+      <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10">
+        <div className="flex flex-wrap items-center gap-2 p-3">
+          <select
+            name="bank-filter-select"
+            value={selectedBank?.id || ''}
+            onChange={(e) => {
+              const bank = banks.find(b => b.id === e.target.value);
+              setSelectedBank(bank || null);
+              applyFilters({ ...filters });
+            }}
+            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none appearance-none min-w-0"
+          >
+            <option value="" style={{ backgroundColor: '#18191c' }}>Banque</option>
+            {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
+              const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
+              const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+              return (
+                <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
+                  {bank.name}{bankUsersText}
+                </option>
+              );
+            })}
+          </select>
+
+          <input
+            type="text"
+            placeholder="Recherche..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 min-w-0 w-40"
+          />
+
+          <select
+            value={filters.categoryId}
+            onChange={(e) => {
+              const newFilters = { ...filters, categoryId: e.target.value };
+              applyFilters(newFilters);
+            }}
+            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none appearance-none min-w-0"
+          >
+            <option value="" style={{ backgroundColor: '#18191c' }}>Catégorie</option>
+            <option value="undefined" style={{ backgroundColor: '#18191c' }}>Non défini</option>
+            {categories.map(category => (
+              <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            placeholder="Début"
+            value={filters.startDate}
+            onFocus={(e) => e.target.type = 'date'}
+            onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+            onChange={(e) => {
+              const newFilters = { ...filters, startDate: e.target.value };
+              applyFilters(newFilters);
+            }}
+            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 min-w-0 w-32"
+          />
+
+          <input
+            type="text"
+            placeholder="Fin"
+            value={filters.endDate}
+            onFocus={(e) => e.target.type = 'date'}
+            onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
+            onChange={(e) => {
+              const newFilters = { ...filters, endDate: e.target.value };
+              applyFilters(newFilters);
+            }}
+            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 min-w-0 w-32"
+          />
+
+          <select
+            value={filters.checked}
+            onChange={(e) => {
+              const newFilters = { ...filters, checked: e.target.value };
+              applyFilters(newFilters);
+            }}
+            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none appearance-none min-w-0"
+          >
+            <option value="" style={{ backgroundColor: '#18191c' }}>Pointé</option>
+            <option value="true" style={{ backgroundColor: '#18191c' }}>Oui</option>
+            <option value="false" style={{ backgroundColor: '#18191c' }}>Non</option>
+          </select>
         </div>
       </div>
 
@@ -1225,7 +1191,7 @@ export default function Transactions({
           <table className="w-full divide-y divide-zinc-800">
           <thead className="sticky top-0 z-10 bg-zinc-900/60">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-8">
+              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-8">
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -1233,25 +1199,25 @@ export default function Transactions({
                   className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                 />
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
+              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-24">
                 Date
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-64">
+              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-64">
                 Description
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-32">
+              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-32">
                 Catégorie
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-56">
+              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-56">
                 Banque
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-24">
+              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-24">
                 Montant
               </th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
+              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-16">
                 Pointé
               </th>
-              <th className="px-4 py-2 text-center text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
+              <th className="px-3 py-1.5 text-center text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
                 Actions
               </th>
             </tr>
@@ -1260,31 +1226,31 @@ export default function Transactions({
             {/* Add form row - always visible as first row */}
             <tr className="border-l-4 bg-zinc-900/60" style={{ borderLeftColor: '#7c3aed' }}>
               {/* Cellule vide pour aligner avec la colonne de checkbox */}
-              <td className="px-4 py-2"></td>
-              <td className="px-4 py-2">
+              <td className="px-3 py-1.5"></td>
+              <td className="px-3 py-1.5">
                 <input
                   type="date"
                   value={editingTransaction?.date || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
                   required
                 />
               </td>
-              <td className="px-4 py-2">
+              <td className="px-3 py-1.5">
                 <input
                   type="text"
                   value={editingTransaction?.description || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
                   placeholder="Description de la transaction"
                   required
                 />
               </td>
-              <td className="px-4 py-2">
+              <td className="px-3 py-1.5">
                 <select
                   value={editingTransaction?.categoryId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
                 >
                   <option value="" style={{ backgroundColor: '#1e2024' }}>Non défini</option>
                   {categories.map(category => (
@@ -1292,11 +1258,11 @@ export default function Transactions({
                   ))}
                 </select>
               </td>
-              <td className="px-4 py-2">
+              <td className="px-3 py-1.5">
                 <select
                   value={editingTransaction?.bankId || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
                   required
                 >
                   <option value="" style={{ backgroundColor: '#1e2024' }}>Sélectionnez une banque</option>
@@ -1312,19 +1278,19 @@ export default function Transactions({
                   })}
                 </select>
               </td>
-              <td className="px-4 py-2">
+              <td className="px-3 py-1.5">
                 <input
                   type="number"
                   step="1"
                   value={editingTransaction?.amount || ''}
                   onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
-                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm"
+                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                   style={{ backgroundColor: '#1e2024' }}
                   placeholder="0.00"
                   required
                 />
               </td>
-              <td className="px-4 py-2">
+              <td className="px-3 py-1.5">
                 <label className="flex items-center text-xs text-zinc-300">
                   <input
                     type="checkbox"
@@ -1336,7 +1302,7 @@ export default function Transactions({
                   <span className="ml-1 text-zinc-300">Pointé</span>
                 </label>
               </td>
-              <td className="px-4 py-2">
+              <td className="px-3 py-1.5">
                 <div className="flex justify-center">
                   <button
                     type="button"
@@ -1364,7 +1330,7 @@ export default function Transactions({
                 onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #7c3aed'}
                 onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
               >
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
                   <input
                     type="checkbox"
                     checked={selectedTransactions.includes(transaction.id)}
@@ -1373,13 +1339,13 @@ export default function Transactions({
                     onClick={(e) => e.stopPropagation()}
                   />
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="date"
                       value={editingTransaction?.date || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent py-2 px-3" style={{ backgroundColor: '#18191c' }}
+              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2" style={{ backgroundColor: '#18191c' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'date' ? (
                     <input
@@ -1388,7 +1354,7 @@ export default function Transactions({
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     />
@@ -1402,13 +1368,13 @@ export default function Transactions({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="text"
                       value={editingTransaction?.description || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'description' ? (
@@ -1418,7 +1384,7 @@ export default function Transactions({
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     />
@@ -1432,12 +1398,12 @@ export default function Transactions({
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
                   {editingId === transaction.id ? (
                     <select
                       value={editingTransaction?.categoryId || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-              className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-sm py-2 px-3" style={{ backgroundColor: '#18191c' }}
+              className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
                     >
                       {categories.map(category => (
                         <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
@@ -1449,7 +1415,7 @@ export default function Transactions({
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     >
@@ -1461,7 +1427,7 @@ export default function Transactions({
                   ) : (
                     <span 
                       onClick={() => handleInlineEdit(transaction.id, 'category')}
-                      className="cursor-pointer editable-cell inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium"
+                      className="cursor-pointer editable-cell inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
                       style={
                         transaction.category
                           ? {
@@ -1486,21 +1452,20 @@ export default function Transactions({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
                   {inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'bank' ? (
                     <select
                       value={inlineEditValue}
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     >
                       {banks
                         .filter((bank: Bank) => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')
                         .map((bank: Bank) => {
-                          // Vérifier si la banque a des utilisateurs
                           const bankWithUsers = bank as Bank & { userBanks?: Array<{ user?: { name: string } }> };
                           const userNames = bankWithUsers.userBanks?.map(ub => ub.user?.name).filter(Boolean).join(', ') || '';
                           const displayText = userNames ? `${bank.name} (${userNames})` : bank.name;
@@ -1530,7 +1495,7 @@ export default function Transactions({
                         </div>
                       )}
                       <div className="ml-2">
-                        <div className="font-medium text-white">
+                        <div className="font-medium text-white text-xs">
                           {transaction.bank.name}
                           {transaction.bank.users && transaction.bank.users.length > 0 && (
                             <span className="text-xs text-zinc-400 ml-2">
@@ -1542,14 +1507,14 @@ export default function Transactions({
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="number"
                       step="1"
                       value={editingTransaction?.amount || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value)} : null)}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                     />
                   ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
@@ -1560,7 +1525,7 @@ export default function Transactions({
                       onChange={(e) => setInlineEditValue(e.target.value)}
                       onBlur={handleInlineSave}
                       onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent"
+                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                       autoFocus
                     />
@@ -1574,7 +1539,7 @@ export default function Transactions({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm text-white">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
                   {editingId === transaction.id ? (
                     <label className="flex items-center text-xs text-zinc-300">
                       <input
@@ -1599,7 +1564,7 @@ export default function Transactions({
                     </label>
                   )}
                 </td>
-                <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">
+                <td className="px-3 py-1.5 whitespace-nowrap text-xs font-medium">
                   {editingId === transaction.id ? (
                     <div className="flex space-x-2">
                       <button
@@ -1756,14 +1721,14 @@ export default function Transactions({
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowImportModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="px-3 py-1.5 text-sm font-medium text-zinc-300 bg-zinc-900/60 border border-zinc-800 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleImportCSV}
                   disabled={!csvFile || !importBankId || importProgress.isImporting}
-                  className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: '#7c3aed' }}
                 >
                   {importProgress.isImporting ? 'Import en cours...' : 'Importer'}
@@ -2127,14 +2092,14 @@ export default function Transactions({
               <div className="flex justify-end space-x-3 mt-6 pt-4">
                 <button
                   onClick={() => setShowBulkEditModal(false)}
-                  className="px-4 py-2 text-sm font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                  className="px-3 py-1.5 text-sm font-medium text-zinc-300 bg-zinc-800 border border-zinc-700 rounded-md hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleBulkEdit}
                   disabled={bulkEditProgress.isProcessing}
-                  className="px-4 py-2 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-3 py-1.5 text-sm font-medium text-white border border-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{ background: '#7c3aed' }}
                 >
                   {bulkEditProgress.isProcessing ? 'Modification en cours...' : 'Appliquer les modifications'}

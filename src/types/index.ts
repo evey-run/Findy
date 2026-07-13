@@ -59,6 +59,8 @@ export interface Transaction {
   checked: boolean;
   unitPrice?: number;
   quantity?: number;
+  ticker?: string;
+  assetType?: 'CRYPTO' | 'ETF' | 'ACTION';
   createdAt: string;
   updatedAt: string;
   bankId: string;
@@ -167,6 +169,7 @@ export interface Objective {
   deadline?: string;
   icon?: string;
   isCompleted: boolean;
+  archived: boolean;
   createdAt: string;
   updatedAt: string;
 }
