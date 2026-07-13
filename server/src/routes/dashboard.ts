@@ -1,8 +1,7 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET /api/dashboard/overview - Vue d'ensemble pour le tableau de bord
 router.get('/overview', async (req, res) => {
@@ -212,9 +211,11 @@ router.get('/monthly-trends', async (req, res) => {
         SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) as expenses,
         COUNT(*) as transactionCount
       FROM transactions 
-      WHERE date >= ${startDate}
-        ${userId ? `AND userId = '${userId}'` : ''}
-      GROUP BY strftime('%Y-%m', date)
+      JOIN banks ON transactions.bankId = banks.id
+      JOIN user_banks ON banks.id = user_banks.bankId
+      WHERE transactions.date >= ${startDate}
+        ${userId ? `AND user_banks.userId = ${userId}` : ''}
+      GROUP BY strftime('%Y-%m', transactions.date)
       ORDER BY month ASC
     `;
     

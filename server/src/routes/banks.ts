@@ -1,14 +1,13 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import prisma from '../prisma';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 // Configuration multer pour l'upload d'images

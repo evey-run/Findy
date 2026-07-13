@@ -4,8 +4,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
 import { cleanupUnusedImages } from './utils/cleanupImages';
+import { prisma } from './prisma';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,7 +35,6 @@ fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 process.env.UPLOADS_DIR = UPLOADS_DIR;
 
 const app = express();
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 36321;
 
 // CORS: accepte dev local ET Tauri webview (tauri://localhost)

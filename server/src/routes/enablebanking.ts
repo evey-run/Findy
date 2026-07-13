@@ -1,9 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
 import crypto from 'node:crypto';
+import prisma from '../prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 const EB_BASE = 'https://api.enablebanking.com';
 
 let jwtCache: { token: string; expiresAt: number } | null = null;
@@ -89,7 +88,8 @@ router.post('/link', async (req, res) => {
     }
 
     const state = crypto.randomUUID();
-    const callbackUrl = `http://localhost:${process.env.PORT || 36321}/api/enablebanking/callback`;
+    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 36321}`;
+    const callbackUrl = `${baseUrl}/api/enablebanking/callback`;
     const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
     const authData = await ebFetch('/auth', {
@@ -119,7 +119,6 @@ router.post('/link', async (req, res) => {
 
     // Use Vercel edge function for redirect handling if running on Vercel
     // Falls back to direct link if not deployed to Vercel
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 36321}`;
     const redirectLink = `${baseUrl}/api/enablebanking-redirect?${new URLSearchParams({
       bankId,
       aspspName: aspspName.toUpperCase(),
