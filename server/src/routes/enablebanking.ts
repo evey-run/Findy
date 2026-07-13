@@ -145,7 +145,7 @@ router.get('/callback', async (req, res) => {
 
   try {
     const bank = await prisma.bank.findFirst({ where: { ebState: state } });
-    if (!bank) return res.send(html('<h2>Erreur</h2><p>Banque introuvable pour cette connexion.</p>'));
+    if (!bank) return res.send(html('<h2>Erreur</h2><p>Portefeuille introuvable pour cette connexion.</p>'));
 
     const sessionData = await ebFetch('/sessions', {
       method: 'POST',

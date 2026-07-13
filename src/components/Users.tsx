@@ -122,7 +122,7 @@ export default function Users() {
             Gestion des utilisateurs
           </h2>
           <p className="text-sm text-zinc-400 mt-1">
-            Gérez les utilisateurs et leurs banques associées
+            Gérez les utilisateurs et leurs portefeuilles associés
           </p>
         </div>
       </div>

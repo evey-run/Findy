@@ -421,7 +421,7 @@ export default function Transactions({
       // S'assurer qu'une banque est sélectionnée
       const bankId = editingTransaction.bankId || banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id;
       if (!bankId) {
-        console.error('Aucune banque sélectionnée ou disponible');
+        console.error('Aucun portefeuille sélectionné ou disponible');
         return;
       }
 
@@ -591,7 +591,7 @@ export default function Transactions({
   
   const handleImportCSV = async () => {
     if (!csvFile || !importBankId) {
-      alert('Veuillez sélectionner un fichier CSV et une banque');
+      alert('Veuillez sélectionner un fichier CSV et un portefeuille');
       return;
     }
     
@@ -1105,7 +1105,7 @@ export default function Transactions({
             }}
             className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none appearance-none min-w-0"
           >
-            <option value="" style={{ backgroundColor: '#18191c' }}>Banque</option>
+            <option value="" style={{ backgroundColor: '#18191c' }}>Portefeuille</option>
             {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
               const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
               const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
@@ -1209,7 +1209,7 @@ export default function Transactions({
                 Catégorie
               </th>
               <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-56">
-                Banque
+                Portefeuille
               </th>
               <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-24">
                 Montant
@@ -1265,7 +1265,7 @@ export default function Transactions({
               className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
                   required
                 >
-                  <option value="" style={{ backgroundColor: '#1e2024' }}>Sélectionnez une banque</option>
+                  <option value="" style={{ backgroundColor: '#1e2024' }}>Sélectionnez un portefeuille</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
                     const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                     const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
@@ -1650,10 +1650,10 @@ export default function Transactions({
             </div>
             <div className="px-6 py-6">
 
-              {/* Sélection de la banque */}
+              {/* Sélection du portefeuille */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Banque de destination *
+                  Portefeuille de destination *
                 </label>
                 <select
                   value={importBankId}
@@ -1664,7 +1664,7 @@ export default function Transactions({
                   style={{ backgroundColor: '#18191c' }}
                   required
                 >
-                  <option value="">Sélectionnez une banque...</option>
+                  <option value="">Sélectionnez un portefeuille...</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
                     const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
                     const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
@@ -1675,7 +1675,7 @@ export default function Transactions({
                 </select>
                 {!importBankId && (
                   <p className="mt-1 text-sm text-red-600">
-                    Veuillez sélectionner une banque avant d'importer
+                    Veuillez sélectionner un portefeuille avant d'importer
                   </p>
                 )}
               </div>
@@ -1822,14 +1822,14 @@ export default function Transactions({
                       </select>
                     </div>
                     <div className="flex-1 min-w-[180px]">
-                      <label className="block text-sm font-medium text-zinc-300 mb-2">Banque</label>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">Portefeuille</label>
                       <select
                         value={bulkEditFilters.bankId}
                         onChange={(e) => setBulkEditFilters({...bulkEditFilters, bankId: e.target.value})}
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#18191c' }}
                       >
-                        <option value="">Toutes les banques</option>
+                        <option value="">Tous les portefeuilles</option>
                         {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => (
                           <option key={bank.id} value={bank.id}>{bank.name}</option>
                         ))}
@@ -2051,7 +2051,7 @@ export default function Transactions({
                     )}
                   </div>
 
-                  {/* Changement de banque */}
+                  {/* Changement de portefeuille */}
                   <div className="rounded-md p-4" style={{ background: '#18191c' }}>
                     <div className="flex items-center mb-3">
                       <input
@@ -2065,7 +2065,7 @@ export default function Transactions({
                         className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                       />
                       <label htmlFor="changeBank" className="ml-2 text-sm font-medium text-white">
-                        Changer de banque
+                        Changer de portefeuille
                       </label>
                     </div>
                     {bulkEditActions.changeBank.enabled && (
@@ -2078,7 +2078,7 @@ export default function Transactions({
                         className="block w-full rounded-md border-none focus:ring-0 bg-transparent py-2 px-3 text-white h-10 min-h-[2.5rem]"
                         style={{ backgroundColor: '#18191c' }}
                       >
-                        <option value="">Sélectionner une banque</option>
+                        <option value="">Sélectionner un portefeuille</option>
                         {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => (
                           <option key={bank.id} value={bank.id}>{bank.name}</option>
                         ))}

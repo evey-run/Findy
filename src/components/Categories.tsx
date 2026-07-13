@@ -68,6 +68,57 @@ const predefinedColors = [
   '#83e377', '#b9e769', '#efea5a', '#f1c453', '#f29e4c',
 ];
 
+// ── DonutChart (camembert) ──────────────────────────────────────────────
+function DonutChart({ data, centerLabel, centerValue }: {
+  data: { label: string; value: number; color: string }[];
+  centerLabel: string; centerValue: string;
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0);
+  const size = 180, cx = size / 2, cy = size / 2, radius = 78, inner = 52;
+  const polar = (r: number, a: number) => ({ x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) });
+
+  let angle = -Math.PI / 2;
+  const arcs = data.map((d, i) => {
+    let slice = total > 0 ? (d.value / total) * 2 * Math.PI : 0;
+    if (slice >= 2 * Math.PI) slice = 2 * Math.PI - 0.001;
+    const a0 = angle, a1 = angle + slice;
+    angle = a1;
+    const large = slice > Math.PI ? 1 : 0;
+    const p0 = polar(radius, a0), p1 = polar(radius, a1);
+    const q1 = polar(inner, a1), q0 = polar(inner, a0);
+    const path = `M ${p0.x} ${p0.y} A ${radius} ${radius} 0 ${large} 1 ${p1.x} ${p1.y} L ${q1.x} ${q1.y} A ${inner} ${inner} 0 ${large} 0 ${q0.x} ${q0.y} Z`;
+    return { path, color: d.color, key: i, label: d.label, value: d.value };
+  });
+
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+        <svg width={size} height={size}>
+          {total > 0
+            ? arcs.map(a => <path key={a.key} d={a.path} fill={a.color} />)
+            : <circle cx={cx} cy={cy} r={(radius + inner) / 2} fill="none" stroke="#27272a" strokeWidth={radius - inner} />}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[10px] uppercase tracking-widest text-zinc-500">{centerLabel}</span>
+          <span className="text-sm font-bold text-zinc-50">{total > 0 ? fmtCompact(total) : '—'}</span>
+        </div>
+      </div>
+      {/* Legend */}
+      {data.length > 0 && (
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+          {data.map((d, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: d.color }} />
+              <span className="text-xs text-zinc-400">{d.label}</span>
+              <span className="text-xs font-semibold text-zinc-300 tabular-nums">{fmtCompact(d.value)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Categories() {
   const {
     categories,
@@ -318,22 +369,41 @@ export default function Categories() {
     );
   }
 
-  const totalByType = {
-    INCOME: categories.filter((c) => c.type === 'INCOME').length,
-    EXPENSE: categories.filter((c) => c.type === 'EXPENSE').length,
-    FIXED: categories.filter((c) => c.type === 'FIXED').length,
-  };
+  // ── Compute sorted expense categories ──
+  const expenseCategories = categories.filter((c) => c.type === 'EXPENSE');
+  const otherCategories = categories.filter((c) => c.type !== 'EXPENSE');
 
-  const stats = [
-    { label: 'Revenus', value: totalByType.INCOME.toString(), icon: '📈' },
-    { label: 'Dépenses', value: totalByType.EXPENSE.toString(), icon: '📉' },
-    { label: 'Fixes', value: totalByType.FIXED.toString(), icon: '📌' },
-    { label: 'Total', value: categories.length.toString(), icon: '📂' },
-  ];
+  // Expense cats with budgets, sorted by percentage desc (closest to limit first)
+  const withBudget = expenseCategories
+    .filter((c) => getCategoryBudget(c.id))
+    .sort((a, b) => {
+      const aSp = getCategorySpending(a.id);
+      const bSp = getCategorySpending(b.id);
+      return (bSp?.percentage ?? 0) - (aSp?.percentage ?? 0);
+    });
+
+  // Expense cats without budgets
+  const withoutBudget = expenseCategories.filter((c) => !getCategoryBudget(c.id));
+
+  // All remaining (non-expense)
+  const noLimitCategories = [...withoutBudget, ...otherCategories];
+
+  // Donut data: expenses by category (ignoring limits)
+  const donutData = expenseCategories
+    .map((c) => {
+      const totalSpent = allTransactions
+        .filter((t: any) => t.categoryId === c.id && t.amount < 0)
+        .reduce((sum: number, t: any) => sum + Math.abs(t.amount), 0);
+      return { label: c.name, value: totalSpent, color: c.color };
+    })
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+
+  const totalExpenses = donutData.reduce((s, d) => s + d.value, 0);
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
-      {/* ── Header (compact) ── */}
+      {/* ── Header ── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-2.5 min-w-0">
           <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Catégories</h2>
@@ -351,22 +421,6 @@ export default function Categories() {
           <span className="hidden sm:inline">Nouvelle catégorie</span>
         </button>
       </div>
-
-      {/* ── KPI bar ── */}
-      {categories.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 rounded-xl bg-white/[0.04] border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden">
-          {stats.map((s) => (
-            <div key={s.label} className="px-4 py-2.5">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                {s.label}
-              </div>
-              <div className="mt-0.5 text-base font-semibold text-zinc-50 tabular-nums">
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* ── Empty state ── */}
       {categories.length === 0 ? (
@@ -389,96 +443,69 @@ export default function Categories() {
           </button>
         </div>
       ) : (
-        /* ── Grid of compact category cards ── */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
-          {categories.map((category) => {
-            const spending = getCategorySpending(category.id);
-            const budget = getCategoryBudget(category.id);
-            const hasOverBudget = spending?.isOverBudget ?? false;
-            const percentage = spending?.percentage ?? 0;
+        /* ── Two-column layout ── */
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 min-h-0">
 
-            return (
-              <div
-                key={category.id}
-                className="group relative rounded-2xl bg-white/[0.04] border border-white/[0.08] p-4 transition-all duration-200 hover:border-white/[0.16] hover:bg-white/[0.06]"
-              >
-                {/* Row 1 — icon + name + actions */}
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0 text-xs"
-                    style={{ backgroundColor: `${category.color}20` }}
-                  >
-                    {getTypeIcon(category.type)}
-                  </div>
-                  <h3 className="text-sm font-semibold text-zinc-50 truncate flex-1">
-                    {category.name}
-                  </h3>
+          {/* ── LEFT: category list ── */}
+          <div className="flex flex-col gap-0 min-h-0 overflow-y-auto custom-scrollbar">
+            {/* Budget categories — sorted by limit proximity */}
+            {withBudget.map((category) => {
+              const spending = getCategorySpending(category.id)!;
+              const budget = getCategoryBudget(category.id)!;
+              const hasOverBudget = spending.isOverBudget;
+              const percentage = spending.percentage;
 
-                  {/* Actions menu */}
-                  <div className="relative flex-shrink-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(openMenuId === category.id ? null : category.id);
-                      }}
-                      className={`h-6 w-6 -mr-1 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
-                        openMenuId === category.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-                      }`}
-                      title="Actions"
-                    >
-                      <EllipsisHorizontalIcon className="h-5 w-5" />
-                    </button>
-
-                    {openMenuId === category.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                        <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
-                          <button
-                            onClick={() => openEdit(category)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
-                          >
-                            <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
-                            Modifier
-                          </button>
-                          <button
-                            onClick={() => handleDelete(category.id)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                            Supprimer
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Row 2 — type badge */}
-                <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs font-medium px-2 py-1 rounded-md" style={{ backgroundColor: `${category.color}20`, color: category.color }}>
-                    {getTypeLabel(category.type)}
-                  </span>
-                  {spending && (
-                    <span
-                      className="text-xs font-semibold tabular-nums"
-                      style={{ color: hasOverBudget ? '#ef4444' : '#a78bfa' }}
-                    >
-                      {Math.round(percentage)}%
-                    </span>
-                  )}
-                </div>
-
-                {/* Row 3 — budget info (if applicable) */}
-                {budget && spending && (
-                  <>
-                    <div className="mt-2.5 text-xs tabular-nums">
-                      <span className="font-semibold text-zinc-50">
-                        {fmtCompact(spending.totalSpent)}
-                      </span>
-                      <span className="text-zinc-500"> / {fmtCompact(budget.amount)}</span>
+              return (
+                <div
+                  key={category.id}
+                  className="group px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors"
+                >
+                  {/* Top row: dot + name + actions */}
+                  <div className="flex items-center gap-2.5">
+                    <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-zinc-100 truncate">{category.name}</div>
                     </div>
+                    <div className="relative flex-shrink-0">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === category.id ? null : category.id);
+                        }}
+                        className={`h-6 w-6 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
+                          openMenuId === category.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                        }`}
+                        title="Actions"
+                      >
+                        <EllipsisHorizontalIcon className="h-5 w-5" />
+                      </button>
+                      {openMenuId === category.id && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                          <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                            <button onClick={() => openEdit(category)} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors">
+                              <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
+                              Modifier
+                            </button>
+                            <button onClick={() => handleDelete(category.id)} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
+                              <TrashIcon className="h-4 w-4" />
+                              Supprimer
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
 
-                    <div className="mt-1.5 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+                  {/* Bottom row: full-width progress bar */}
+                  <div className="mt-1.5 ml-[18px]">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[10px] text-zinc-500 tabular-nums">{fmtCompact(spending.totalSpent)} / {fmtCompact(budget.amount)}</span>
+                      <span className="text-[10px] font-semibold tabular-nums" style={{ color: hasOverBudget ? '#ef4444' : '#a78bfa' }}>
+                        {Math.round(percentage)}%
+                      </span>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
@@ -487,40 +514,96 @@ export default function Categories() {
                         }}
                       />
                     </div>
+                    <div className="mt-0.5 text-[10px] text-zinc-500">
+                      {hasOverBudget
+                        ? <span className="text-red-400">Dépassé de {fmtCompact(spending.totalSpent - budget.amount)}</span>
+                        : <>{fmtCompact(spending.remaining)} restant</>
+                      }
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
 
-                    <div className="mt-2 text-xs text-zinc-500">
-                      {hasOverBudget ? (
-                        <span className="text-red-400 font-medium">
-                          Dépassé de {fmtCompact(spending.totalSpent - budget.amount)}
-                        </span>
-                      ) : (
-                        <span>{fmtCompact(spending.remaining)} restant</span>
+            {/* ── Separator ── */}
+            {withBudget.length > 0 && noLimitCategories.length > 0 && (
+              <div className="my-1 mx-3 border-t border-white/[0.06]" />
+            )}
+
+            {/* Categories without limits */}
+            {noLimitCategories.map((category) => {
+              const spending = getCategorySpending(category.id);
+              const budget = getCategoryBudget(category.id);
+              const hasOverBudget = spending?.isOverBudget ?? false;
+              const percentage = spending?.percentage ?? 0;
+
+              return (
+                <div
+                  key={category.id}
+                  className="group flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.04] transition-colors"
+                >
+                  <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-zinc-100 truncate">{category.name}</div>
+                    <div className="text-[11px] text-zinc-500">{getTypeLabel(category.type)}</div>
+                  </div>
+
+                  {/* Keywords */}
+                  {category.keywords && category.keywords.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mr-2">
+                      {category.keywords.slice(0, 2).map((kw) => (
+                        <span key={kw} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-400">{kw}</span>
+                      ))}
+                      {category.keywords.length > 2 && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded text-zinc-500">+{category.keywords.length - 2}</span>
                       )}
                     </div>
-                  </>
-                )}
+                  )}
 
-                {/* Row 4 — keywords (if any) */}
-                {category.keywords && category.keywords.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1">
-                    {category.keywords.slice(0, 2).map((kw) => (
-                      <span
-                        key={kw}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-400"
-                      >
-                        {kw}
-                      </span>
-                    ))}
-                    {category.keywords.length > 2 && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded text-zinc-500">
-                        +{category.keywords.length - 2}
-                      </span>
+                  {/* Actions */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === category.id ? null : category.id);
+                      }}
+                      className={`h-6 w-6 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
+                        openMenuId === category.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                      }`}
+                      title="Actions"
+                    >
+                      <EllipsisHorizontalIcon className="h-5 w-5" />
+                    </button>
+                    {openMenuId === category.id && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                        <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                          <button onClick={() => openEdit(category)} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors">
+                            <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
+                            Modifier
+                          </button>
+                          <button onClick={() => handleDelete(category.id)} className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors">
+                            <TrashIcon className="h-4 w-4" />
+                            Supprimer
+                          </button>
+                        </div>
+                      </>
                     )}
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── RIGHT: donut chart ── */}
+          <div className="rounded-2xl bg-white/[0.04] border border-white/[0.08] p-5 flex flex-col items-center justify-center gap-2">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500 mb-2">Dépenses par catégorie</h3>
+            <DonutChart
+              data={donutData}
+              centerLabel="Total"
+              centerValue={totalExpenses > 0 ? fmtCompact(totalExpenses) : '—'}
+            />
+          </div>
         </div>
       )}
 

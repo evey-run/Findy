@@ -17,7 +17,7 @@ const SYNC_PROVIDERS: SyncProvider[] = [
   {
     id: 'enablebanking',
     name: 'Enable Banking',
-    description: 'Open Banking API pour l\'Europe. Supporte +300 banques dans 20+ pays.',
+    description: 'Open Banking API pour l\'Europe. Supporte +300 portefeuilles dans 20+ pays.',
     url: 'https://enablebanking.com',
     logo: '🏦',
   },
@@ -177,7 +177,7 @@ export default function Settings() {
       <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 max-w-2xl">
         <h3 className="text-base font-semibold text-white mb-0.5">Synchronisation bancaire</h3>
         <p className="text-sm text-zinc-400 mb-5">
-          Connectez vos banques pour synchroniser automatiquement vos transactions.
+          Connectez vos portefeuilles pour synchroniser automatiquement vos transactions.
         </p>
 
         <div className="space-y-3">
@@ -295,7 +295,7 @@ export default function Settings() {
       <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 max-w-2xl">
         <h3 className="text-base font-semibold text-white mb-0.5">Sauvegarde des données</h3>
         <p className="text-sm text-zinc-400 mb-6">
-          Exportez ou importez l'intégralité de vos données (transactions, banques, catégories, budgets…).
+          Exportez ou importez l'intégralité de vos données (transactions, portefeuilles, catégories, budgets…).
         </p>
 
         <div className="space-y-3">

@@ -9,7 +9,7 @@ import {
   CreditCardIcon,
   TagIcon,
   ChartBarIcon,
-  BuildingLibraryIcon,
+  WalletIcon,
   UserIcon,
   ChevronDownIcon,
   ChevronUpIcon,
@@ -27,7 +27,7 @@ const navigation = [
   { name: 'Investissements', href: '/investissement', icon: ChartBarIcon },
   { name: 'Catégories',      href: '/categories', icon: TagIcon },
   { name: 'Objectifs',       href: '/budgets', icon: FlagIcon },
-  { name: 'Banques',         href: '/banks', icon: BuildingLibraryIcon },
+  { name: 'Portefeuille',    href: '/banks', icon: WalletIcon },
   { name: 'Utilisateurs',    href: '/users', icon: UserIcon },
 ];
 
@@ -36,7 +36,7 @@ const mobileNav = [
   { name: 'Accueil',      href: '/dashboard',      icon: HomeIcon },
   { name: 'Transactions', href: '/transactions',    icon: CreditCardIcon },
   { name: 'Objectifs',    href: '/budgets',         icon: FlagIcon },
-  { name: 'Banques',      href: '/banks',           icon: BuildingLibraryIcon },
+  { name: 'Portefeuille', href: '/banks',           icon: WalletIcon },
   { name: 'Paramètres',   href: '/settings',        icon: Cog6ToothIcon },
 ];
 

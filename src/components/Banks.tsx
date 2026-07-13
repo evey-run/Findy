@@ -183,7 +183,7 @@ export default function Banks() {
       const res = await fetch(url, { method, body: fd });
       if (res.ok) {
         await loadBanks();
-        toast.success(isEdit ? 'Banque mise à jour' : 'Banque créée');
+        toast.success(isEdit ? 'Portefeuille mis à jour' : 'Portefeuille créé');
         closeForm();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -254,13 +254,13 @@ export default function Banks() {
 
   const handleDelete = async (bankId: string) => {
     setOpenMenuId(null);
-    if (!confirm('Supprimer cette banque ?')) return;
+    if (!confirm('Supprimer ce portefeuille ?')) return;
 
     try {
       const res = await fetch(`/api/banks/${bankId}`, { method: 'DELETE' });
       if (res.ok) {
         await loadBanks();
-        toast.success('Banque supprimée');
+        toast.success('Portefeuille supprimé');
       }
     } catch (error) {
       console.error('Error deleting:', error);
@@ -287,7 +287,7 @@ export default function Banks() {
       {/* ── Header (compact) ── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-2.5 min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Banques</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Portefeuille</h2>
           {banks.length > 0 && (
             <span className="text-xs font-medium text-zinc-500">
               {banks.length} compte{banks.length > 1 ? 's' : ''}
@@ -327,7 +327,7 @@ export default function Banks() {
           </div>
           <p className="mt-4 text-sm font-medium text-zinc-300">Aucun compte bancaire</p>
           <p className="mt-1 text-xs text-zinc-500">
-            Connectez votre première banque pour commencer à tracker vos finances.
+            Connectez votre premier portefeuille pour commencer à tracker vos finances.
           </p>
           <button
             onClick={openCreate}
@@ -701,7 +701,7 @@ export default function Banks() {
                       type="text"
                       value={ebSearch}
                       onChange={(e) => setEbSearch(e.target.value)}
-                      placeholder="Rechercher une banque…"
+                      placeholder="Rechercher un portefeuille…"
                       className="flex-1 rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none"
                       autoFocus
                     />
@@ -726,7 +726,7 @@ export default function Banks() {
                       </div>
                     )}
                     {!ebLoading && ebAspsps.length === 0 && (
-                      <p className="text-xs text-zinc-500 text-center py-4">Aucune banque trouvée</p>
+                      <p className="text-xs text-zinc-500 text-center py-4">Aucun portefeuille trouvé</p>
                     )}
                     {!ebLoading && ebAspsps
                       .filter(a => !ebSearch || a.name.toLowerCase().includes(ebSearch.toLowerCase()))
