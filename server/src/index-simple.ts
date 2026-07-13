@@ -3,18 +3,23 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import multer from 'multer';
+import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 36321;
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
 
 // Configuration multer pour l'upload d'images
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(process.cwd(), 'public/uploads'));
+    cb(null, path.join(PROJECT_ROOT, 'public/uploads'));
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -43,7 +48,7 @@ const upload = multer({
 // Configuration multer pour l'upload d'avatars
 const avatarStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadsDir = path.join(process.cwd(), 'public/uploads/avatars');
+    const uploadsDir = path.join(PROJECT_ROOT, 'public/uploads/avatars');
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
@@ -85,7 +90,7 @@ app.use((req, res, next) => {
 });
 
 // Serve static files (images)
-app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+app.use('/uploads', express.static(path.join(PROJECT_ROOT, 'public/uploads')));
 
 // API Routes simples pour tester
 

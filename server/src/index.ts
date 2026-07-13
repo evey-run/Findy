@@ -3,8 +3,12 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
 import { cleanupUnusedImages } from './utils/cleanupImages';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Routes
 import userRoutes from './routes/users';
@@ -16,11 +20,15 @@ import recurrenceRoutes from './routes/recurrences';
 import dashboardRoutes from './routes/dashboard';
 import objectiveRoutes from './routes/objectives';
 import enablebankingRoutes from './routes/enablebanking';
+import marketRoutes from './routes/market';
+import settingsRoutes from './routes/settings';
 
 dotenv.config();
 
 // Dossier uploads: configurable via env (mode packagé) ou fallback local
-const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(process.cwd(), 'public/uploads');
+// Utilise __dirname pour remonter à la racine du projet quel que soit le cwd
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(PROJECT_ROOT, 'public/uploads');
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Expose aux routes via env pour éviter de refactorer chaque route
@@ -57,6 +65,8 @@ app.use('/api/recurrences', recurrenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/objectives', objectiveRoutes);
 app.use('/api/enablebanking', enablebankingRoutes);
+app.use('/api/market', marketRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

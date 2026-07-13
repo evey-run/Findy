@@ -166,6 +166,26 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+// Archiver / désarchiver un objectif
+router.patch('/:id/archive', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const objective = await prisma.objective.findUnique({ where: { id } });
+    if (!objective) {
+      return res.status(404).json({ error: 'Objective not found' });
+    }
+
+    const updated = await prisma.objective.update({
+      where: { id },
+      data: { archived: !objective.archived, updatedAt: new Date() },
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error archiving objective:', error);
+    res.status(500).json({ error: 'Failed to archive objective' });
+  }
+});
+
 // Supprimer un objectif
 router.delete('/:id', async (req, res) => {
   try {

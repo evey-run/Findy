@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Nettoie les images non utilisées du dossier uploads
@@ -9,7 +13,8 @@ import { PrismaClient } from '@prisma/client';
  */
 export async function cleanupUnusedImages() {
   const prisma = new PrismaClient();
-  const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'public/uploads');
+  const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
+  const uploadsDir = process.env.UPLOADS_DIR || path.join(PROJECT_ROOT, 'public/uploads');
   
   try {
     // Vérifier si le dossier uploads existe

@@ -64,7 +64,8 @@ function DonutChart({ data, centerLabel, centerValue }: {
 
   let angle = -Math.PI / 2;
   const arcs = data.map((d, i) => {
-    const slice = total > 0 ? (d.value / total) * 2 * Math.PI : 0;
+    let slice = total > 0 ? (d.value / total) * 2 * Math.PI : 0;
+    if (slice >= 2 * Math.PI) slice = 2 * Math.PI - 0.001;
     const a0 = angle, a1 = angle + slice;
     angle = a1;
     const large = slice > Math.PI ? 1 : 0;
@@ -156,6 +157,7 @@ export default function Dashboard() {
     loadAllTransactions,
     categories,
     budgets,
+    banks,
     isLoading,
     setDateRange,
   } = useAppStore();
@@ -231,7 +233,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!prevStart) return;
-    fetch(`/api/dashboard/overview?startDate=${prevStart}&endDate=${prevEnd}`)
+    const prevParams = new URLSearchParams({ startDate: prevStart, endDate: prevEnd });
+    if (selectedUser) prevParams.append('userId', selectedUser.id);
+    fetch(`/api/dashboard/overview?${prevParams}`)
       .then(r => r.json())
       .then(data => setPreviousData({
         income:     data.summary?.currentMonthIncome     ?? 0,
@@ -242,35 +246,62 @@ export default function Dashboard() {
       .catch(() => {});
   }, [prevStart, prevEnd, selectedUser]);
 
-  // 6-month income/expense flux — independent fetch (cross-period data)
+  // Income/expense flux over the last 6 periods — reacts to periodType & selectedDate
   useEffect(() => {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
-    const end   = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const ref = new Date(selectedDate);
+    let buckets: { key: string; label: string; start: Date; end: Date; income: number; expense: number }[] = [];
+
+    if (periodType === 'week') {
+      const dow = ref.getDay() || 7;
+      const curStart = new Date(ref); curStart.setDate(curStart.getDate() - dow + 1);
+      buckets = Array.from({ length: 6 }, (_, i) => {
+        const s = new Date(curStart); s.setDate(s.getDate() - (5 - i) * 7);
+        const e = new Date(s); e.setDate(e.getDate() + 6);
+        return {
+          key: `${s.getFullYear()}-W${s.getTime()}`,
+          label: s.toLocaleString('fr-FR', { day: 'numeric', month: 'short' }),
+          start: s, end: e, income: 0, expense: 0,
+        };
+      });
+    } else if (periodType === 'year') {
+      const y = ref.getFullYear();
+      buckets = Array.from({ length: 6 }, (_, i) => {
+        const yr = y - (5 - i);
+        const s = new Date(yr, 0, 1); const e = new Date(yr, 11, 31);
+        return { key: `${yr}`, label: `${yr}`, start: s, end: e, income: 0, expense: 0 };
+      });
+    } else {
+      buckets = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(ref.getFullYear(), ref.getMonth() - (5 - i), 1);
+        const s = new Date(d.getFullYear(), d.getMonth(), 1);
+        const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('fr-FR', { month: 'short' }), start: s, end: e, income: 0, expense: 0 };
+      });
+    }
+
+    const start = buckets[0].start;
+    const end   = buckets[buckets.length - 1].end;
     const params = new URLSearchParams({
       limit: '5000', offset: '0',
       startDate: start.toISOString(), endDate: end.toISOString(),
     });
+    if (selectedUser) params.append('userId', selectedUser.id);
     fetch(`/api/transactions?${params}`)
       .then(r => r.json())
       .then(data => {
         const txns = Array.isArray(data) ? data : (data?.transactions ?? []);
-        const months = Array.from({ length: 6 }, (_, i) => {
-          const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-          return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('fr-FR', { month: 'short' }), income: 0, expense: 0 };
-        });
         txns.forEach((t: any) => {
           const d = new Date(t.date);
-          const m = months.find(mm => mm.key === `${d.getFullYear()}-${d.getMonth()}`);
-          if (m) {
-            if (t.amount > 0) m.income += t.amount;
-            else m.expense += Math.abs(t.amount);
+          const b = buckets.find(mm => d >= mm.start && d <= mm.end);
+          if (b) {
+            if (t.amount > 0) b.income += t.amount;
+            else b.expense += Math.abs(t.amount);
           }
         });
-        setFluxData(months.map(({ label, income, expense }) => ({ label, income, expense })));
+        setFluxData(buckets.map(({ label, income, expense }) => ({ label, income, expense })));
       })
       .catch(() => {});
-  }, [selectedUser]);
+  }, [selectedUser, periodType, selectedDate]);
 
   // ── derived data ───────────────────────────────────────────────────────────
 
@@ -317,6 +348,7 @@ export default function Dashboard() {
       .map(c => {
         const budget = budgets.find(b => b.categoryId === c.id);
         if (!budget) return null;
+        if (!budget.shared && !banks.some(bk => bk.id === budget.bankId)) return null;
         const periodBudget = toPeriodBudget(budget);
         const spent = allTransactions
           .filter(t => t.categoryId === c.id && periodFilter(new Date(t.date)))
@@ -325,7 +357,7 @@ export default function Dashboard() {
       })
       .filter(Boolean)
       .sort((a, b) => b!.budget - a!.budget) as Array<{ id: string; name: string; color: string; budget: number; spent: number }>;
-  }, [categories, budgets, allTransactions, periodFilter, periodType]);
+  }, [categories, budgets, banks, allTransactions, periodFilter, periodType]);
 
   // Recent transactions split
   const recentExpenses = useMemo(() =>
@@ -440,7 +472,9 @@ export default function Dashboard() {
         {/* ── Flux mensuel (col 7) ── */}
         <div className="lg:col-span-7 flex flex-col min-h-0 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 overflow-hidden">
           <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
-            <span className="text-xs font-medium uppercase tracking-widest text-violet-400">Flux sur 6 mois</span>
+            <span className="text-xs font-medium uppercase tracking-widest text-violet-400">
+              Flux sur 6 {periodType === 'week' ? 'semaines' : periodType === 'year' ? 'ans' : 'mois'}
+            </span>
             <div className="flex items-center gap-3 text-xs">
               <span className="flex items-center gap-1.5 text-zinc-400">
                 <span className="inline-block h-2 w-2 rounded-full bg-green-500/80" /> Revenus

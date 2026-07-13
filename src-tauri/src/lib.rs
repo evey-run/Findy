@@ -38,17 +38,8 @@ pub fn run() {
             log::info!("Prisma engine: {}", engine_path.display());
 
             // Démarrer le sidecar Express
-            let arch = std::env::consts::ARCH;
-            let os = std::env::consts::OS;
-            
-            let sidecar_name = match (arch, os) {
-                ("aarch64", "macos") => "finance-server-aarch64-apple-darwin",
-                ("x86_64", "macos") => "finance-server-x86_64-apple-darwin",
-                _ => "finance-server",
-            };
-            
             let (_, child) = app.shell()
-                .sidecar(sidecar_name)?
+                .sidecar("finance-server")?
                 .env("DATABASE_URL", &database_url)
                 .env("UPLOADS_DIR", uploads_dir.to_string_lossy().as_ref())
                 .env("PRISMA_QUERY_ENGINE_LIBRARY", engine_path.to_string_lossy().as_ref())
