@@ -1,13 +1,12 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
   try {
-    const { bankId, categoryId, shared, startDate, endDate, limit, offset, search, accountType, checked, userId } = req.query;
+    const { bankId, categoryId, startDate, endDate, limit, offset, search, accountType, checked, userId } = req.query;
     const where: any = {};
 
     // Filtre par ID de banque
@@ -31,7 +30,6 @@ router.get('/', async (req, res) => {
     }
     
     if (categoryId) where.categoryId = categoryId;
-    if (shared !== undefined) where.shared = shared === 'true';
     if (checked !== undefined && checked !== '') {
       where.checked = checked === 'true';
     }
@@ -296,7 +294,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, description, date, shared, categoryId, bankId, unitPrice, quantity, ticker, assetType } = req.body;
+    const { amount, description, date, categoryId, bankId, unitPrice, quantity, ticker, assetType } = req.body;
     
     // Vérifier que la banque existe si elle est fournie
     if (bankId) {
@@ -320,7 +318,6 @@ router.put('/:id', async (req, res) => {
         ...(amount && { amount: parseFloat(amount) }),
         ...(description && { description }),
         ...(date && { date: new Date(date) }),
-        ...(shared !== undefined && { shared }),
         ...(categoryId !== undefined && { categoryId }),
         ...(bankId !== undefined && { bankId }),
         ...(unitPrice !== undefined && { unitPrice: unitPrice ? parseFloat(unitPrice) : null }),

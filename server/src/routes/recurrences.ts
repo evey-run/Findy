@@ -1,8 +1,7 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../prisma';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // GET /api/recurrences - Récupérer toutes les récurrences
 router.get('/', async (req, res) => {

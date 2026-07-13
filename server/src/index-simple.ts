@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
 import { PrismaClient } from '@prisma/client';
@@ -1271,8 +1272,8 @@ app.put('/api/users/:id', uploadAvatar.single('avatar'), async (req, res) => {
       if (existingUser?.avatar) {
         const oldAvatarPath = path.join(process.cwd(), 'public', existingUser.avatar);
         try {
-          if (require('fs').existsSync(oldAvatarPath)) {
-            require('fs').unlinkSync(oldAvatarPath);
+          if (fs.existsSync(oldAvatarPath)) {
+            fs.unlinkSync(oldAvatarPath);
           }
         } catch (error) {
           console.error('Error deleting old avatar:', error);
