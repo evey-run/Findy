@@ -10,7 +10,7 @@ import {
   TagIcon,
   ChartBarIcon,
   BuildingLibraryIcon,
-  UserIcon,
+  WalletIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   FlagIcon,
@@ -27,8 +27,7 @@ const navigation = [
   { name: 'Investissements', href: '/investissement', icon: ChartBarIcon },
   { name: 'Catégories',      href: '/categories', icon: TagIcon },
   { name: 'Objectifs',       href: '/budgets', icon: FlagIcon },
-  { name: 'Banques',         href: '/banks', icon: BuildingLibraryIcon },
-  { name: 'Utilisateurs',    href: '/users', icon: UserIcon },
+  { name: 'Portefeuille',    href: '/banks', icon: WalletIcon },
 ];
 
 // Mobile bottom nav — 5 items most-used
@@ -36,7 +35,7 @@ const mobileNav = [
   { name: 'Accueil',      href: '/dashboard',      icon: HomeIcon },
   { name: 'Transactions', href: '/transactions',    icon: CreditCardIcon },
   { name: 'Objectifs',    href: '/budgets',         icon: FlagIcon },
-  { name: 'Banques',      href: '/banks',           icon: BuildingLibraryIcon },
+  { name: 'Portefeuille', href: '/banks',           icon: WalletIcon },
   { name: 'Paramètres',   href: '/settings',        icon: Cog6ToothIcon },
 ];
 
