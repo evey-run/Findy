@@ -775,7 +775,7 @@ export default function Banks() {
                       type="text"
                       value={ebSearch}
                       onChange={(e) => setEbSearch(e.target.value)}
-                      placeholder="Rechercher une banque…"
+                      placeholder="Rechercher un portefeuille…"
                       className="flex-1 rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none"
                       autoFocus
                     />
@@ -800,7 +800,7 @@ export default function Banks() {
                       </div>
                     )}
                     {!ebLoading && ebAspsps.length === 0 && (
-                      <p className="text-xs text-zinc-500 text-center py-4">Aucune banque trouvée</p>
+                      <p className="text-xs text-zinc-500 text-center py-4">Aucun portefeuille trouvé</p>
                     )}
                     {!ebLoading && ebAspsps
                       .filter(a => !ebSearch || a.name.toLowerCase().includes(ebSearch.toLowerCase()))

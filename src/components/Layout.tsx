@@ -9,7 +9,6 @@ import {
   CreditCardIcon,
   TagIcon,
   ChartBarIcon,
-  BuildingLibraryIcon,
   WalletIcon,
   ChevronDownIcon,
   ChevronUpIcon,
