@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { useState, useEffect, useRef } from 'react';
 import { assetUrl } from '../lib/url';
-import { getAutoUpdateEnabled, checkForUpdates, fetchVersionInfo, type VersionInfo } from '../utils/updates';
+import { getAutoUpdateEnabled, checkForUpdates, type VersionInfo } from '../utils/updates';
 import {
   HomeIcon,
   CreditCardIcon,
@@ -50,7 +50,7 @@ export default function Layout({ children }: LayoutProps) {
   const { users, selectedUser, setSelectedUser } = useAppStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [versionInfo, setVersionInfo] = useState<(VersionInfo & { updateAvailable: boolean }) | null>(null);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -64,9 +64,6 @@ export default function Layout({ children }: LayoutProps) {
 
   // Vérification automatique des mises à jour si l'option est activée
   useEffect(() => {
-    fetchVersionInfo()
-      .then((info) => setVersionInfo({ ...info, updateAvailable: false }))
-      .catch(() => {});
     if (getAutoUpdateEnabled()) {
       checkForUpdates().then((info) => info && setVersionInfo(info));
     }
