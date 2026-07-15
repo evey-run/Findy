@@ -19,10 +19,16 @@ permissions:
 jobs:
   release:
     runs-on: macos-latest
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - uses: actions/setup-node@v4
         with:
@@ -49,6 +55,11 @@ jobs:
           git push origin HEAD --tags
 
       # ── Build Tauri app ───────────────────────────────────────────
+      - name: Prisma generate
+        run: npx prisma generate
+        env:
+          DATABASE_URL: "file:/tmp/build.db"
+
       - name: Build server binary
         run: bash scripts/build-server.sh
 
@@ -68,5 +79,46 @@ jobs:
           prerelease: false
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/dmg/*.sig
             src-tauri/target/release/bundle/macos/*.app
           generate_release_notes: true
+
+      # ── Generate latest.json for updater ─────────────────────────
+      - name: Generate latest.json
+        run: |
+          VERSION="${{ steps.bump.outputs.version }}"
+          REPO="avialleguerin/Findy"
+          TAG="v${VERSION}"
+
+          DMG_FILE=$(ls src-tauri/target/release/bundle/dmg/*.dmg 2>/dev/null | head -1)
+          SIG_FILE=$(ls src-tauri/target/release/bundle/dmg/*.sig 2>/dev/null | head -1)
+
+          if [ -n "$DMG_FILE" ] && [ -n "$SIG_FILE" ]; then
+            DMG_NAME=$(basename "$DMG_FILE")
+            SIG_CONTENT=$(cat "$SIG_FILE")
+            DMG_URL="https://github.com/${REPO}/releases/download/${TAG}/${DMG_NAME}"
+            PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+            cat > latest.json << EOF
+          {
+            "version": "${VERSION}",
+            "notes": "Mise à jour vers la version ${VERSION}",
+            "pub_date": "${PUB_DATE}",
+            "platforms": {
+              "darwin-aarch64": {
+                "url": "${DMG_URL}",
+                "signature": "${SIG_CONTENT}"
+              }
+            }
+          }
+          EOF
+
+            echo "=== latest.json ==="
+            cat latest.json
+          fi
+
+      - name: Upload latest.json
+        if: hashFiles('latest.json') != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          files: latest.json
