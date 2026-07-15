@@ -30,3 +30,6 @@ dist-ssr
 # Binaires compilés (générés par scripts/build-server.sh)
 /src-tauri/binaries/finance-server-*
 /src-tauri/binaries/libquery_engine-*
+
+# Clés de signature des mises à jour (JAMAIS en git)
+keys/
