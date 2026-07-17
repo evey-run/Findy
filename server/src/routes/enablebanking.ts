@@ -1,34 +1,78 @@
 import express from 'express';
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import prisma from '../prisma';
+import { getPublicBaseUrl } from '../publicUrl';
 
 const router = express.Router();
 const EB_BASE = 'https://api.enablebanking.com';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SYNC_SETTINGS_PATH = path.resolve(__dirname, '..', '..', '..', 'data', 'sync-settings.json');
+
+// ─── Credential resolution: env vars → sync-settings.json ──
+function readSyncSettings(): Record<string, any> {
+  try {
+    if (!fs.existsSync(SYNC_SETTINGS_PATH)) return {};
+    return JSON.parse(fs.readFileSync(SYNC_SETTINGS_PATH, 'utf-8'));
+  } catch { return {}; }
+}
+
+function getEBCredentials(): { appId: string; privateKey: string } {
+  // 1. Try env vars first
+  const envAppId = process.env.ENABLE_BANKING_APP_ID;
+  const envKey = process.env.ENABLE_BANKING_RSA_KEY;
+  if (envAppId && envKey) return { appId: envAppId, privateKey: envKey };
+
+  // 2. Fallback to sync-settings.json
+  const settings = readSyncSettings();
+  const eb = settings.enablebanking;
+  if (eb?.appId && eb?.privateKey) {
+    return { appId: eb.appId, privateKey: eb.privateKey };
+  }
+
+  throw new Error('Enable Banking credentials not configured. Configure them in Settings or set ENABLE_BANKING_APP_ID / ENABLE_BANKING_RSA_KEY');
+}
+
+const MANUAL_SYNC_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes
+const AUTO_SYNC_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+// ─── JWT Auth ──────────────────────────────────────────────
 let jwtCache: { token: string; expiresAt: number } | null = null;
 
 function buildJWT(): string {
-  const appId = process.env.ENABLE_BANKING_APP_ID;
-  const privateKeyStr = process.env.ENABLE_BANKING_RSA_KEY;
-  if (!appId || !privateKeyStr) throw new Error('Enable Banking credentials not configured (ENABLE_BANKING_APP_ID / ENABLE_BANKING_RSA_KEY)');
+  const { appId, privateKey: privateKeyStr } = getEBCredentials();
 
-  // The key might be in different formats, let's check and format appropriately
-  let privateKey = privateKeyStr.trim();
-  if (!privateKey.includes('-----BEGIN')) {
-    // It's base64 encoded, wrap it in PEM headers
-    privateKey = `-----BEGIN PRIVATE KEY-----\n${privateKey.match(/.{1,64}/g)?.join('\n')}\n-----END PRIVATE KEY-----`;
+  // Normalize PEM key: handle single-line, escaped newlines, spaces between markers
+  let privateKey = privateKeyStr
+    .replace(/\\n/g, '\n')        // unescape \n
+    .replace(/\r/g, '')           // remove \r
+    .trim();
+
+  // Extract key body between BEGIN/END markers
+  const beginMatch = privateKey.match(/-----BEGIN [A-Z ]+-----/);
+  const endMatch = privateKey.match(/-----END [A-Z ]+-----/);
+  if (beginMatch && endMatch) {
+    const begin = beginMatch[0];
+    const end = endMatch[0];
+    const body = privateKey
+      .slice(privateKey.indexOf(begin) + begin.length, privateKey.indexOf(end))
+      .replace(/\s+/g, ''); // strip all whitespace from body
+    // Re-wrap to 64-char lines
+    const wrapped = body.match(/.{1,64}/g)?.join('\n') || body;
+    privateKey = `${begin}\n${wrapped}\n${end}`;
   }
 
   const now = Math.floor(Date.now() / 1000);
   const exp = now + 3599;
-
   const header = Buffer.from(JSON.stringify({ typ: 'JWT', alg: 'RS256', kid: appId })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({ iss: 'enablebanking.com', aud: 'api.enablebanking.com', iat: now, exp })).toString('base64url');
-
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(`${header}.${payload}`);
   const signature = sign.sign(privateKey, 'base64url');
-
   return `${header}.${payload}.${signature}`;
 }
 
@@ -53,20 +97,347 @@ async function ebFetch(path: string, options: RequestInit = {}): Promise<any> {
   return res.json();
 }
 
+// ─── Helpers ───────────────────────────────────────────────
+
+function hashTransactionFallback(date: string, amount: number, description: string): string {
+  return crypto.createHash('sha256').update(`${date}|${amount}|${description}`).digest('hex').slice(0, 32);
+}
+
+interface NormalizedTransaction {
+  externalId: string;
+  amount: number;
+  date: Date;
+  description: string;
+  currency: string | null;
+  balanceAfterTransaction: number | null;
+  status: 'BOOK' | 'PENDING';
+}
+
+function normalizeTransaction(t: any): NormalizedTransaction | null {
+  const rawId = t.entry_reference ?? t.transaction_id;
+  const rawAmount = parseFloat(t.transaction_amount?.amount ?? t.amount ?? '0');
+  const amount = t.credit_debit_indicator === 'CRDT' ? rawAmount : -rawAmount;
+  const date = new Date(t.booking_date ?? t.transaction_date ?? t.value_date ?? new Date());
+  const description =
+    (Array.isArray(t.remittance_information) ? t.remittance_information.join(' ') : t.remittance_information) ??
+    t.creditor?.name ??
+    t.debtor?.name ??
+    'Transaction';
+
+  // PSD2: transactions can be BOOK (settled) or PENDING (not yet settled)
+  const status: 'BOOK' | 'PENDING' = t.booking_date ? 'BOOK' : 'PENDING';
+
+  // Build externalId: use API id if available, otherwise hash fallback
+  const externalId = rawId || hashTransactionFallback(date.toISOString(), amount, description);
+  if (!externalId) return null;
+
+  const currency = t.transaction_amount?.currency ?? null;
+
+  const balAfter = t.balance_after_transaction?.amount;
+  const balanceAfterTransaction = balAfter != null ? parseFloat(balAfter) : null;
+
+  return { externalId, amount, date, description, currency, balanceAfterTransaction, status };
+}
+
+async function fetchAllTransactions(accountUid: string, dateFrom?: string): Promise<any[]> {
+  let allTransactions: any[] = [];
+  let continuationKey: string | null = null;
+
+  do {
+    const params = new URLSearchParams();
+    if (continuationKey) params.set('continuation_key', continuationKey);
+    if (dateFrom) params.set('date_from', dateFrom);
+
+    const qs = params.toString();
+    const url = `/accounts/${accountUid}/transactions${qs ? `?${qs}` : ''}`;
+    const data = await ebFetch(url);
+    allTransactions = allTransactions.concat(data.transactions || []);
+    continuationKey = data.continuation_key ?? null;
+  } while (continuationKey);
+
+  console.log(`[EB] Total transactions fetched: ${allTransactions.length}`);
+  return allTransactions;
+}
+
+// ─── Error helpers ─────────────────────────────────────────
+
+function isAccountError(err: any): boolean {
+  const msg = err?.message || '';
+  return msg.includes('ACCOUNT_DOES_NOT_EXIST') || msg.includes('404');
+}
+
+async function markBankExpired(bankId: string): Promise<void> {
+  console.log(`[Sync] Marking bank ${bankId} as EXPIRED (session/account invalid)`);
+  await prisma.bank.update({
+    where: { id: bankId },
+    data: { ebStatus: 'EXPIRED', ebSessionId: null, ebAccountUid: null },
+  });
+}
+
+// ─── Sync Core ─────────────────────────────────────────────
+
+export interface SyncResult {
+  imported: number;
+  updated: number;
+  skipped: number;
+  pendingReconciled: number;
+  total: number;
+  consentWarning: string | null;
+}
+
+/**
+ * Backfill: fetch all available history (typically 90 days PSD2).
+ * Called once when the user first links a bank account.
+ */
+export async function syncBackfill(bankId: string): Promise<SyncResult> {
+  const bank = await prisma.bank.findUnique({ where: { id: bankId } });
+  if (!bank?.ebAccountUid) throw new Error('Bank not linked');
+
+  console.log(`[EB] Backfill start for ${bank.name} (accountUid: ${bank.ebAccountUid})`);
+
+  try {
+    // Fetch real account balance from EB (only during backfill)
+    let ebBalance: number | null = null;
+    try {
+      const balancesData = await ebFetch(`/accounts/${bank.ebAccountUid}/balances`);
+      const balances = balancesData.balances || [];
+      const closing = balances.find((b: any) => b.balance_type === 'CLBD') || balances[0];
+      if (closing?.balance_amount) {
+        ebBalance = parseFloat(closing.balance_amount.amount);
+        console.log(`[EB] Real balance from API: ${ebBalance}`);
+      }
+    } catch (e: any) {
+      console.error(`[EB] Balance fetch failed:`, e.message);
+    }
+
+    // Fetch transactions with explicit date range (PSD2 allows up to 90 days)
+    const dateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    console.log(`[EB] Fetching transactions from ${dateFrom}`);
+    const rawTransactions = await fetchAllTransactions(bank.ebAccountUid, dateFrom);
+    console.log(`[EB] Backfill: ${rawTransactions.length} raw transactions`);
+    const result = await upsertTransactions(bankId, rawTransactions);
+
+    // Calibrate bank.balance so that bank.balance + sum(transactions) = realBalance
+    // This way the balance calculation works for all banks uniformly
+    if (ebBalance != null) {
+      const txSum = await prisma.transaction.aggregate({
+        where: { bankId },
+        _sum: { amount: true },
+      });
+      const transactionsTotal = txSum._sum.amount ?? 0;
+      const initialBalance = ebBalance - transactionsTotal;
+      await prisma.bank.update({ where: { id: bankId }, data: { balance: initialBalance } });
+      console.log(`[EB] Calibrated: ebBalance=${ebBalance} - txSum=${transactionsTotal} = initialBalance=${initialBalance}`);
+    }
+
+    return result;
+  } catch (err: any) {
+    console.error(`[EB] Backfill error for ${bank.name}:`, err.message);
+    if (isAccountError(err)) {
+      await markBankExpired(bankId);
+      throw new Error('SESSION_EXPIRED');
+    }
+    throw err;
+  }
+}
+
+/**
+ * Incremental sync: fetch only the delta since last known transaction.
+ * Called by cron, app launch, and manual refresh.
+ */
+export async function syncIncremental(bankId: string): Promise<SyncResult> {
+  const bank = await prisma.bank.findUnique({ where: { id: bankId } });
+  if (!bank?.ebAccountUid) throw new Error('Bank not linked');
+
+  // Find the most recent transaction date for this bank to use as date_from
+  const lastTx = await prisma.transaction.findFirst({
+    where: { bankId, externalId: { not: null } },
+    orderBy: { date: 'desc' },
+    select: { date: true },
+  });
+
+  // Request transactions from 1 day before last known (overlap for PENDING→BOOK reconciliation)
+  const dateFrom = lastTx
+    ? new Date(lastTx.date.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    : undefined;
+
+  let rawTransactions: any[];
+  try {
+    rawTransactions = await fetchAllTransactions(bank.ebAccountUid, dateFrom);
+  } catch (err: any) {
+    if (isAccountError(err)) {
+      await markBankExpired(bankId);
+      throw new Error('SESSION_EXPIRED');
+    }
+    throw err;
+  }
+
+  const result = await upsertTransactions(bankId, rawTransactions);
+
+  // Update last sync timestamp
+  await prisma.bank.update({
+    where: { id: bankId },
+    data: { ebLastSyncAt: new Date() },
+  });
+
+  // Check consent expiration
+  result.consentWarning = checkConsentExpiration(bank);
+
+  return result;
+}
+
+/**
+ * Shared upsert logic: deduplicate, insert new txs, reconcile PENDING→BOOK.
+ */
+async function upsertTransactions(bankId: string, rawTransactions: any[]): Promise<SyncResult> {
+  let imported = 0;
+  let updated = 0;
+  let skipped = 0;
+  let pendingReconciled = 0;
+
+  // Pre-fetch existing transactions for this bank for batch dedup
+  const existingTxs = await prisma.transaction.findMany({
+    where: { bankId, externalId: { not: null } },
+    select: { id: true, externalId: true, status: true, balanceAfterTransaction: true },
+  });
+  const existingByExternalId = new Map(existingTxs.map((t) => [t.externalId!, t]));
+
+  // Batch inserts for performance
+  const toCreate: Array<{
+    bankId: string;
+    amount: number;
+    description: string;
+    date: Date;
+    externalId: string;
+    currency: string | null;
+    balanceAfterTransaction: number | null;
+    status: string;
+  }> = [];
+  const toUpdate: Array<{ id: string; status?: string; balanceAfterTransaction?: number | null }> = [];
+
+  for (const raw of rawTransactions) {
+    const normalized = normalizeTransaction(raw);
+    if (!normalized) continue;
+
+    const existing = existingByExternalId.get(normalized.externalId);
+
+    if (existing) {
+      // Reconcile: PENDING → BOOK transition
+      if (existing.status === 'PENDING' && normalized.status === 'BOOK') {
+        toUpdate.push({ id: existing.id, status: 'BOOK' });
+        pendingReconciled++;
+      }
+      // Backfill balanceAfterTransaction if missing
+      if (existing.balanceAfterTransaction == null && normalized.balanceAfterTransaction != null) {
+        toUpdate.push({ id: existing.id, balanceAfterTransaction: normalized.balanceAfterTransaction });
+      }
+      skipped++;
+      continue;
+    }
+
+    toCreate.push({
+      bankId,
+      amount: normalized.amount,
+      description: normalized.description,
+      date: normalized.date,
+      externalId: normalized.externalId,
+      currency: normalized.currency,
+      balanceAfterTransaction: normalized.balanceAfterTransaction,
+      status: normalized.status,
+    });
+  }
+
+  // Execute batch create
+  if (toCreate.length > 0) {
+    try {
+      await prisma.transaction.createMany({ data: toCreate });
+    } catch (err: any) {
+      // If batch fails (e.g. unique constraint), insert one by one
+      if (err.code === 'P2002' || err.message?.includes('Unique constraint')) {
+        for (const tx of toCreate) {
+          try {
+            await prisma.transaction.create({ data: tx });
+          } catch { /* skip duplicate */ }
+        }
+      } else throw err;
+    }
+    imported = toCreate.length;
+  }
+
+  // Execute batch status updates (PENDING → BOOK, balanceAfterTransaction backfill)
+  for (const u of toUpdate) {
+    const data: any = {};
+    if (u.status) data.status = u.status;
+    if (u.balanceAfterTransaction != null) data.balanceAfterTransaction = u.balanceAfterTransaction;
+    await prisma.transaction.update({ where: { id: u.id }, data });
+  }
+
+  return {
+    imported,
+    updated,
+    skipped,
+    pendingReconciled,
+    total: rawTransactions.length,
+    consentWarning: null,
+  };
+}
+
+/**
+ * Check if consent is expiring soon (within 7 days).
+ */
+function checkConsentExpiration(bank: {
+  ebExpiresAt: Date | null;
+  ebStatus: string | null;
+  name: string;
+}): string | null {
+  if (bank.ebStatus !== 'LINKED' || !bank.ebExpiresAt) return null;
+
+  const daysUntilExpiry = Math.ceil(
+    (bank.ebExpiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
+  );
+
+  if (daysUntilExpiry <= 0) {
+    return `Le consentement de ${bank.name} a expiré. Veuillez réauthentifier.`;
+  }
+  if (daysUntilExpiry <= 7) {
+    return `Le consentement de ${bank.name} expire dans ${daysUntilExpiry} jour(s). Réauthentifiez bientôt.`;
+  }
+  return null;
+}
+
+// ─── Manual Sync Cooldown ──────────────────────────────────
+const manualSyncTimestamps = new Map<string, number>();
+
+function canManualSync(bankId: string): { allowed: boolean; retryAfterMs?: number } {
+  const lastSync = manualSyncTimestamps.get(bankId);
+  if (!lastSync) return { allowed: true };
+  const elapsed = Date.now() - lastSync;
+  if (elapsed >= MANUAL_SYNC_COOLDOWN_MS) return { allowed: true };
+  return { allowed: false, retryAfterMs: MANUAL_SYNC_COOLDOWN_MS - elapsed };
+}
+
+function recordManualSync(bankId: string): void {
+  manualSyncTimestamps.set(bankId, Date.now());
+}
+
+// ─── Routes ────────────────────────────────────────────────
+
 // GET /api/enablebanking/configured
 router.get('/configured', (_req, res) => {
-  const configured = !!(process.env.ENABLE_BANKING_APP_ID && process.env.ENABLE_BANKING_RSA_KEY);
-  res.json({ configured });
+  try {
+    getEBCredentials();
+    res.json({ configured: true });
+  } catch {
+    res.json({ configured: false });
+  }
 });
 
 // GET /api/enablebanking/aspsps?country=fr
 router.get('/aspsps', async (req, res) => {
   try {
-    const country = ((req.query.country as string) || 'fr').toLowerCase();
+    const country = ((req.query.country as string) || 'FR').toUpperCase();
     const data = await ebFetch(`/aspsps?country=${country}`);
-    // Enable Banking returns { aspsps: [...] } or an array directly
     const aspsps = data.aspsps ?? data;
-    // Ensure we always return an array with name, country, logo fields
     const formatted = Array.isArray(aspsps) ? aspsps.map((a: any) => ({
       name: a.name || a.aspsp_name || '',
       country: a.country || country.toUpperCase(),
@@ -88,7 +459,7 @@ router.post('/link', async (req, res) => {
     }
 
     const state = crypto.randomUUID();
-    const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : `http://localhost:${process.env.PORT || 36321}`;
+    const baseUrl = getPublicBaseUrl();
     const callbackUrl = `${baseUrl}/api/enablebanking/callback`;
     const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -117,8 +488,6 @@ router.post('/link', async (req, res) => {
       },
     });
 
-    // Use Vercel edge function for redirect handling if running on Vercel
-    // Falls back to direct link if not deployed to Vercel
     const redirectLink = `${baseUrl}/api/enablebanking-redirect?${new URLSearchParams({
       bankId,
       aspspName: aspspName.toUpperCase(),
@@ -126,10 +495,7 @@ router.post('/link', async (req, res) => {
       redirectUrl: authData.url,
     }).toString()}`;
 
-    res.json({
-      link: authData.url,
-      redirectLink, // Edge function redirect URL for analytics
-    });
+    res.json({ link: authData.url, redirectLink });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -153,7 +519,6 @@ router.get('/callback', async (req, res) => {
     });
 
     const sessionId: string = sessionData.session_id;
-    // accounts may be [{uid: string}] or [string]
     const firstAccount = sessionData.accounts?.[0];
     const accountUid: string = firstAccount?.uid ?? firstAccount;
 
@@ -169,12 +534,21 @@ router.get('/callback', async (req, res) => {
       },
     });
 
+    // Trigger backfill immediately after successful link (background, don't block response)
+    syncBackfill(bank.id)
+      .then((result) => {
+        console.log(`[EB] Backfill completed for ${bank.name}: ${result.imported} imported, ${result.skipped} skipped`);
+      })
+      .catch((err) => {
+        console.error(`[EB] Backfill failed for ${bank.name}:`, err.message);
+      });
+
     res.send(html(`
       <div style="max-width:420px;margin:0 auto">
         <div style="font-size:56px;margin-bottom:16px">✅</div>
         <h2>Compte lié avec succès !</h2>
         <p style="color:#a0aec0"><strong style="color:#fff">${bank.name}</strong> est maintenant connecté à Enable Banking.</p>
-        <p style="color:#a0aec0">Vous pouvez fermer cette fenêtre et revenir dans l'application pour synchroniser vos transactions.</p>
+        <p style="color:#a0aec0">Les transactions sont synchronisées automatiquement.</p>
         <script>setTimeout(()=>window.close(),4000)</script>
       </div>
     `));
@@ -188,62 +562,109 @@ router.get('/banks/:bankId/status', async (req, res) => {
   try {
     const bank = await prisma.bank.findUnique({
       where: { id: req.params.bankId },
-      select: { ebStatus: true, ebLinkedAt: true, ebExpiresAt: true },
+      select: {
+        ebStatus: true,
+        ebLinkedAt: true,
+        ebExpiresAt: true,
+        ebLastSyncAt: true,
+        ebAspspName: true,
+        name: true,
+      },
     });
     if (!bank) return res.status(404).json({ error: 'Bank not found' });
-    res.json(bank);
+
+    const consentWarning = checkConsentExpiration(bank);
+    const isExpired = bank.ebExpiresAt && bank.ebExpiresAt.getTime() < Date.now();
+
+    res.json({
+      ebStatus: bank.ebStatus,
+      ebLinkedAt: bank.ebLinkedAt,
+      ebExpiresAt: bank.ebExpiresAt,
+      ebLastSyncAt: bank.ebLastSyncAt,
+      ebAspspName: bank.ebAspspName,
+      consentWarning,
+      isExpired,
+      consentDaysRemaining: bank.ebExpiresAt
+        ? Math.max(0, Math.ceil((bank.ebExpiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+        : null,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// POST /api/enablebanking/banks/:bankId/sync
+// POST /api/enablebanking/banks/:bankId/sync — Smart sync (incremental)
 router.post('/banks/:bankId/sync', async (req, res) => {
   try {
     const bank = await prisma.bank.findUnique({ where: { id: req.params.bankId } });
     if (!bank) return res.status(404).json({ error: 'Bank not found' });
     if (!bank.ebAccountUid) return res.status(400).json({ error: 'Bank not linked to Enable Banking' });
+    if (bank.ebStatus !== 'LINKED') return res.status(400).json({ error: 'Consent not active' });
 
-    let allTransactions: any[] = [];
-    let continuationKey: string | null = null;
-
-    do {
-      const url = continuationKey
-        ? `/accounts/${bank.ebAccountUid}/transactions?continuation_key=${encodeURIComponent(continuationKey)}`
-        : `/accounts/${bank.ebAccountUid}/transactions`;
-      const data = await ebFetch(url);
-      allTransactions = allTransactions.concat(data.transactions || []);
-      continuationKey = data.continuation_key ?? null;
-    } while (continuationKey);
-
-    let imported = 0;
-    let skipped = 0;
-
-    for (const t of allTransactions) {
-      const externalId = t.entry_reference ?? t.transaction_id;
-      if (!externalId) continue;
-
-      const exists = await prisma.transaction.findFirst({ where: { externalId, bankId: bank.id } });
-      if (exists) { skipped++; continue; }
-
-      const rawAmount = parseFloat(t.transaction_amount?.amount ?? t.amount ?? '0');
-      // Enable Banking amounts are always positive; sign is set by credit_debit_indicator
-      const amount = t.credit_debit_indicator === 'CRDT' ? rawAmount : -rawAmount;
-
-      const date = new Date(t.booking_date ?? t.transaction_date ?? t.value_date ?? new Date());
-      const description =
-        (Array.isArray(t.remittance_information) ? t.remittance_information.join(' ') : t.remittance_information) ??
-        t.creditor?.name ??
-        t.debtor?.name ??
-        'Transaction';
-
-      await prisma.transaction.create({
-        data: { bankId: bank.id, amount, description, date, externalId },
-      });
-      imported++;
+    // Check consent expiration
+    if (bank.ebExpiresAt && bank.ebExpiresAt.getTime() < Date.now()) {
+      return res.status(403).json({ error: 'CONSENT_EXPIRED', message: 'Le consentement a expiré. Réauthentifiez votre compte bancaire.' });
     }
 
-    res.json({ imported, skipped, total: allTransactions.length });
+    // Determine if this is a backfill (no transactions yet) or incremental
+    const txCount = await prisma.transaction.count({ where: { bankId: bank.id } });
+    let result;
+    try {
+      result = txCount === 0
+        ? await syncBackfill(bank.id)
+        : await syncIncremental(bank.id);
+    } catch (err: any) {
+      if (err.message === 'SESSION_EXPIRED') {
+        return res.status(403).json({ error: 'SESSION_EXPIRED', message: 'Session expirée. Réauthentifiez votre compte bancaire via « Lier ».' });
+      }
+      throw err;
+    }
+
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/enablebanking/banks/:bankId/sync-manual — Manual refresh with cooldown
+router.post('/banks/:bankId/sync-manual', async (req, res) => {
+  try {
+    const bank = await prisma.bank.findUnique({ where: { id: req.params.bankId } });
+    if (!bank) return res.status(404).json({ error: 'Bank not found' });
+    if (!bank.ebAccountUid) return res.status(400).json({ error: 'Bank not linked' });
+    if (bank.ebStatus !== 'LINKED') return res.status(400).json({ error: 'Consent not active' });
+
+    // Check consent expiration
+    if (bank.ebExpiresAt && bank.ebExpiresAt.getTime() < Date.now()) {
+      return res.status(403).json({ error: 'CONSENT_EXPIRED', message: 'Le consentement a expiré. Réauthentifiez votre compte bancaire.' });
+    }
+
+    // Check cooldown
+    const cooldown = canManualSync(bank.id);
+    if (!cooldown.allowed) {
+      return res.status(429).json({
+        error: 'COOLDOWN',
+        message: `Patientez ${Math.ceil(cooldown.retryAfterMs! / 1000)}s avant de resynchroniser.`,
+        retryAfterMs: cooldown.retryAfterMs,
+      });
+    }
+
+    recordManualSync(bank.id);
+
+    const txCount = await prisma.transaction.count({ where: { bankId: bank.id } });
+    let result;
+    try {
+      result = txCount === 0
+        ? await syncBackfill(bank.id)
+        : await syncIncremental(bank.id);
+    } catch (err: any) {
+      if (err.message === 'SESSION_EXPIRED') {
+        return res.status(403).json({ error: 'SESSION_EXPIRED', message: 'Session expirée. Réauthentifiez votre compte bancaire via « Lier ».' });
+      }
+      throw err;
+    }
+
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -263,6 +684,7 @@ router.delete('/banks/:bankId/unlink', async (req, res) => {
         ebStatus: null,
         ebLinkedAt: null,
         ebExpiresAt: null,
+        ebLastSyncAt: null,
       },
     });
     res.json({ success: true });
@@ -270,5 +692,59 @@ router.delete('/banks/:bankId/unlink', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ─── Background Sync (exported for cron) ───────────────────
+
+/**
+ * Sync all LINKED banks. Called by the background scheduler.
+ * Returns summary of all sync results.
+ */
+export async function syncAllBanks(): Promise<Array<{ bankId: string; bankName: string; result: SyncResult | null; error: string | null }>> {
+  const linkedBanks = await prisma.bank.findMany({
+    where: { ebStatus: 'LINKED', ebAccountUid: { not: null } },
+    select: { id: true, name: true, ebExpiresAt: true },
+  });
+
+  const results: Array<{ bankId: string; bankName: string; result: SyncResult | null; error: string | null }> = [];
+
+  for (const bank of linkedBanks) {
+    // Skip banks with expired consent
+    if (bank.ebExpiresAt && bank.ebExpiresAt.getTime() < Date.now()) {
+      results.push({ bankId: bank.id, bankName: bank.name, result: null, error: 'CONSENT_EXPIRED' });
+      continue;
+    }
+
+    try {
+      const txCount = await prisma.transaction.count({ where: { bankId: bank.id } });
+      const result = txCount === 0
+        ? await syncBackfill(bank.id)
+        : await syncIncremental(bank.id);
+      results.push({ bankId: bank.id, bankName: bank.name, result, error: null });
+    } catch (err: any) {
+      results.push({ bankId: bank.id, bankName: bank.name, result: null, error: err.message });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Get all consent expiring soon (within 7 days) for proactive warning.
+ */
+export async function getExpiringConsents(): Promise<Array<{ bankId: string; bankName: string; daysRemaining: number }>> {
+  const linkedBanks = await prisma.bank.findMany({
+    where: { ebStatus: 'LINKED', ebExpiresAt: { not: null } },
+    select: { id: true, name: true, ebExpiresAt: true },
+  });
+
+  return linkedBanks
+    .filter((b) => b.ebExpiresAt !== null)
+    .map((b) => ({
+      bankId: b.id,
+      bankName: b.name,
+      daysRemaining: Math.ceil((b.ebExpiresAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000)),
+    }))
+    .filter((c) => c.daysRemaining <= 7 && c.daysRemaining > 0);
+}
 
 export default router;

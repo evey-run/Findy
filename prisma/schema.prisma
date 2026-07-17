@@ -51,6 +51,7 @@ model Bank {
   ebStatus       String?
   ebLinkedAt     DateTime?
   ebExpiresAt    DateTime?
+  ebLastSyncAt   DateTime?
   budgets      Budget[]
   recurrences  Recurrence[]
   transactions Transaction[]
@@ -97,6 +98,9 @@ model Transaction {
   ticker      String?
   assetType   String?
   externalId  String?   // For deduplication (e.g. GoCardless transaction ID)
+  currency    String?   // ISO 4217 currency code (e.g. "EUR", "USD")
+  balanceAfterTransaction Float? // Real account balance after this transaction (from EB API)
+  status      String    @default("BOOK") // BOOK (comptabilisée) ou PENDING (en attente)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   bankId      String

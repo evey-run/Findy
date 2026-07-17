@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { assetUrl } from '../lib/url';
@@ -9,6 +9,8 @@ import {
   TrashIcon,
   XMarkIcon,
   LinkIcon,
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
@@ -89,6 +91,25 @@ export default function Banks() {
   const [ebAspsps, setEbAspsps] = useState<EbAspsp[]>([]);
   const [ebLinkUrl, setEbLinkUrl] = useState('');
   const [ebLoading, setEbLoading] = useState(false);
+  const [ebTunnelUrl, setEbTunnelUrl] = useState('');
+  const ebPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ebPollBankIdRef = useRef<string | null>(null);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (ebPollRef.current) clearInterval(ebPollRef.current);
+    };
+  }, []);
+
+  // Sync state
+  const [syncingBankId, setSyncingBankId] = useState<string | null>(null);
+  const [autoSyncingBanks, setAutoSyncingBanks] = useState<Set<string>>(new Set());
+  const [syncStatus, setSyncStatus] = useState<Record<string, { lastSyncAt?: string | null; consentDaysRemaining?: number | null; consentWarning?: string | null }>>({});
+
+  // Delete confirmation modal
+  const [deleteModal, setDeleteModal] = useState<{ bankId: string; bankName: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -233,6 +254,13 @@ export default function Banks() {
     setEbSearch('');
     setEbAspsps([]);
     setEbLoading(true);
+
+    // Fetch tunnel URL for redirect URI display
+    fetch('/api/tunnel')
+      .then(r => r.json())
+      .then(d => setEbTunnelUrl(d.publicUrl || ''))
+      .catch(() => {});
+
     try {
       const res = await fetch(`/api/enablebanking/aspsps?country=${country}`);
       if (!res.ok) {
@@ -247,11 +275,19 @@ export default function Banks() {
     } catch (err: any) {
       console.error('Error loading ASPSPs:', err);
       toast.error(err.message || 'Impossible de charger la liste Enable Banking');
-      setEbModal(null);
+      closeEbModal();
     } finally {
       setEbLoading(false);
     }
   };
+
+  const stopEbPolling = useCallback(() => {
+    if (ebPollRef.current) {
+      clearInterval(ebPollRef.current);
+      ebPollRef.current = null;
+    }
+    ebPollBankIdRef.current = null;
+  }, []);
 
   const handleEbLink = async (aspspName: string, aspspCountry: string) => {
     if (!ebModal) return;
@@ -265,16 +301,41 @@ export default function Banks() {
       if (!res.ok) throw new Error(data.error);
       setEbLinkUrl(data.link);
       setEbStep('waiting');
-      window.open(data.link, '_blank');
-      // Poll for status
-      const poll = setInterval(async () => {
+      ebPollBankIdRef.current = ebModal.bankId;
+
+      // Open link — try Tauri shell first, fallback to window.open
+      const openUrl = async (url: string) => {
         try {
-          const sr = await fetch(`/api/enablebanking/banks/${ebModal.bankId}/status`);
+          // @ts-ignore — Tauri v2 window.__TAURI__
+          if (window.__TAURI__?.shell?.open) {
+            await window.__TAURI__.shell.open(url);
+          } else {
+            window.open(url, '_blank');
+          }
+        } catch {
+          window.open(url, '_blank');
+        }
+      };
+      await openUrl(data.link);
+
+      // Poll for status — max 2 minutes, every 3s
+      const MAX_POLLS = 40; // 40 × 3s = 120s
+      let polls = 0;
+      ebPollRef.current = setInterval(async () => {
+        polls++;
+        if (polls > MAX_POLLS) {
+          stopEbPolling();
+          toast.error('Timeout — réessayez en cliquant sur le lien');
+          return;
+        }
+        try {
+          const sr = await fetch(`/api/enablebanking/banks/${ebPollBankIdRef.current}/status`);
           const sd = await sr.json();
           if (sd.ebStatus === 'LINKED') {
-            clearInterval(poll);
+            stopEbPolling();
             await loadBanks();
-            setEbModal(null);
+            await loadTransactions({ forceRefresh: true });
+            closeEbModal();
             toast.success('Compte lié avec succès !');
           }
         } catch {}
@@ -284,21 +345,161 @@ export default function Banks() {
     }
   };
 
-  const handleDelete = async (bankId: string) => {
-    setOpenMenuId(null);
-    if (!confirm('Supprimer ce portefeuille ?')) return;
+  const closeEbModal = useCallback(() => {
+    stopEbPolling();
+    setEbModal(null);
+  }, [stopEbPolling]);
 
+  const handleDelete = async (bankId: string, bankName: string) => {
+    setOpenMenuId(null);
+    setDeleteModal({ bankId, bankName });
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
     try {
-      const res = await fetch(`/api/banks/${bankId}`, { method: 'DELETE' });
+      const res = await fetch(`/api/banks/${deleteModal.bankId}`, { method: 'DELETE' });
       if (res.ok) {
         await loadBanks();
+        await loadTransactions({ forceRefresh: true });
         toast.success('Portefeuille supprimé');
+        setDeleteModal(null);
       }
     } catch (error) {
       console.error('Error deleting:', error);
       toast.error('Erreur lors de la suppression');
+    } finally {
+      setDeleting(false);
     }
   };
+
+  // ── Sync handlers ──
+
+  const loadSyncStatuses = async () => {
+    const statuses: Record<string, any> = {};
+    for (const bank of banks) {
+      if (!bank.ebStatus || bank.ebStatus !== 'LINKED') continue;
+      try {
+        const res = await fetch(`/api/enablebanking/banks/${bank.id}/status`);
+        if (res.ok) {
+          const data = await res.json();
+          statuses[bank.id] = {
+            lastSyncAt: data.ebLastSyncAt,
+            consentDaysRemaining: data.consentDaysRemaining,
+            consentWarning: data.consentWarning,
+          };
+        }
+      } catch {}
+    }
+    setSyncStatus(statuses);
+  };
+
+  const handleSync = async (bankId: string) => {
+    if (syncingBankId) return;
+    setSyncingBankId(bankId);
+    try {
+      const res = await fetch(`/api/enablebanking/banks/${bankId}/sync-manual`, { method: 'POST' });
+      const data = await res.json();
+
+      if (res.status === 429) {
+        toast.error(data.message || 'Patientez avant de resynchroniser');
+        return;
+      }
+      if (res.status === 403 && data.error === 'CONSENT_EXPIRED') {
+        toast.error('Consentement expiré. Réauthentifiez votre compte bancaire.');
+        return;
+      }
+      if (res.status === 403 && data.error === 'SESSION_EXPIRED') {
+        toast.error(data.message || 'Session expirée. Cliquez sur « Lier » pour réauthentifier.', { duration: 6000 });
+        await loadBanks();
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data.error || `Erreur ${res.status}`);
+      }
+
+      const msg = `Sync OK : +${data.imported} nouvelles, ${data.pendingReconciled} réconciliées`;
+      toast.success(msg);
+
+      // Refresh data
+      await loadTransactions({ forceRefresh: true });
+      await loadSyncStatuses();
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur de synchronisation');
+    } finally {
+      setSyncingBankId(null);
+    }
+  };
+
+  // Auto-sync on mount if any bank hasn't synced in 6h
+  const autoSyncTriggered = React.useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (banks.length === 0) return;
+    const THRESHOLD_MS = 6 * 60 * 60 * 1000;
+    const now = Date.now();
+    const banksToSync: { id: string; name: string }[] = [];
+
+    for (const bank of banks) {
+      if (bank.ebStatus !== 'LINKED' || !bank.ebAccountUid) continue;
+      if (bank.ebStatus === 'EXPIRED') continue;
+      if (autoSyncTriggered.current.has(bank.id)) continue;
+      const lastSync = bank.ebLastSyncAt ? new Date(bank.ebLastSyncAt).getTime() : 0;
+      if (now - lastSync > THRESHOLD_MS) {
+        banksToSync.push({ id: bank.id, name: bank.name });
+      }
+    }
+
+    if (banksToSync.length === 0) return;
+
+    // Show loading state
+    setAutoSyncingBanks(new Set(banksToSync.map((b) => b.id)));
+
+    for (const bank of banksToSync) {
+      autoSyncTriggered.current.add(bank.id);
+      console.log(`[Sync] Auto-syncing ${bank.name}...`);
+
+      fetch(`/api/enablebanking/banks/${bank.id}/sync`, { method: 'POST' })
+        .then(async (res) => {
+          const data = await res.json();
+          if (!res.ok) {
+            if (data.error === 'CONSENT_EXPIRED') {
+              toast.error(`${bank.name} : consentement expiré`, { duration: 5000 });
+            } else if (data.error === 'SESSION_EXPIRED') {
+              toast.error(`${bank.name} : ${data.message || 'Session expirée. Cliquez sur « Lier ».'}`, { duration: 6000 });
+              await loadBanks();
+            } else {
+              toast.error(`Sync ${bank.name} : ${data.error || data.message || 'Erreur'}`, { duration: 5000 });
+              console.error(`[Sync] ${bank.name} failed:`, data);
+            }
+            return;
+          }
+          if (data.imported > 0 || data.pendingReconciled > 0) {
+            toast.success(`${bank.name} : +${data.imported} nouvelles, ${data.pendingReconciled} réconciliées`, { duration: 4000 });
+          } else {
+            console.log(`[Sync] ${bank.name} : no new transactions`);
+          }
+          await loadTransactions({ forceRefresh: true });
+          await loadSyncStatuses();
+        })
+        .catch((err) => {
+          console.error(`[Sync] ${bank.name} error:`, err);
+        })
+        .finally(() => {
+          setAutoSyncingBanks((prev) => {
+            const next = new Set(prev);
+            next.delete(bank.id);
+            return next;
+          });
+        });
+    }
+  }, [banks, loadTransactions]);
+
+  // Load sync statuses when banks change
+  useEffect(() => {
+    loadSyncStatuses();
+  }, [banks]);
 
   if (loading) {
     return (
@@ -346,6 +547,17 @@ export default function Banks() {
         </div>
       </div>
 
+      {/* ── Global sync indicator ── */}
+      {autoSyncingBanks.size > 0 && (
+        <div className="flex items-center gap-2 rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-2.5 text-sm text-violet-300">
+          <ArrowPathIcon className="h-4 w-4 animate-spin flex-shrink-0" />
+          <span>
+            Synchronisation en cours…
+            {autoSyncingBanks.size > 1 && ` (${autoSyncingBanks.size} comptes)`}
+          </span>
+        </div>
+      )}
+
       {/* ── Famille (avatars) ── */}
       {users.length > 0 && (
         <div className="flex items-center gap-3">
@@ -374,6 +586,8 @@ export default function Banks() {
             </div>
             <span className="text-[10px] text-zinc-500">Ajouter</span>
           </button>
+        </div>
+      )}
         </div>
       )}
 
@@ -471,6 +685,13 @@ export default function Banks() {
                     )}
                   </div>
 
+                  {/* Sync spinner (auto-sync in progress) */}
+                  {(autoSyncingBanks.has(bank.id) || syncingBankId === bank.id) && (
+                    <div className="flex-shrink-0" title="Synchronisation en cours…">
+                      <ArrowPathIcon className="h-4 w-4 text-violet-400 animate-spin" />
+                    </div>
+                  )}
+
                   {/* Menu button */}
                   <div className="relative flex-shrink-0">
                     <button
@@ -494,15 +715,28 @@ export default function Banks() {
                             onClick={() => { setOpenMenuId(null); openEbModal(bank.id, bank.name); }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
                           >
-                            <LinkIcon className="h-4 w-4 text-violet-400" />
-                            <span>Lier</span>
+                            <LinkIcon className={`h-4 w-4 ${bank.ebStatus === 'EXPIRED' ? 'text-amber-400' : 'text-violet-400'}`} />
+                            <span>{bank.ebStatus === 'EXPIRED' ? 'Relier' : 'Lier'}</span>
                             {bank.ebStatus === 'LINKED' && (
                               <span className="ml-auto text-[10px] text-green-400 font-medium">✓</span>
                             )}
                             {bank.ebStatus === 'PENDING' && (
                               <span className="ml-auto text-[10px] text-amber-400 font-medium">⏳</span>
                             )}
+                            {bank.ebStatus === 'EXPIRED' && (
+                              <span className="ml-auto text-[10px] text-amber-400 font-medium">⚠</span>
+                            )}
                           </button>
+                          {bank.ebStatus === 'LINKED' && (
+                            <button
+                              onClick={() => { setOpenMenuId(null); handleSync(bank.id); }}
+                              disabled={syncingBankId === bank.id}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors disabled:opacity-40"
+                            >
+                              <ArrowPathIcon className={`h-4 w-4 text-emerald-400 ${syncingBankId === bank.id ? 'animate-spin' : ''}`} />
+                              <span>{syncingBankId === bank.id ? 'Sync en cours…' : 'Synchroniser'}</span>
+                            </button>
+                          )}
                           <button
                             onClick={() => openEdit(bank)}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
@@ -511,7 +745,7 @@ export default function Banks() {
                             Modifier
                           </button>
                           <button
-                            onClick={() => handleDelete(bank.id)}
+                            onClick={() => handleDelete(bank.id, bank.name)}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -537,6 +771,29 @@ export default function Banks() {
                 <div className="mt-2 text-[10px] text-zinc-500 font-mono tabular-nums">
                   {displayIban}
                 </div>
+
+                {/* Row 5 — Sync status & consent warning */}
+                {bank.ebStatus === 'EXPIRED' && (
+                  <div className="mt-2 flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 rounded-md px-1.5 py-1">
+                    <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0" />
+                    <span>Session expirée — cliquez « Relier »</span>
+                  </div>
+                )}
+                {bank.ebStatus === 'LINKED' && syncStatus[bank.id] && (
+                  <div className="mt-2 space-y-1">
+                    {syncStatus[bank.id].lastSyncAt && (
+                      <div className="text-[10px] text-zinc-600">
+                        Sync: {new Date(syncStatus[bank.id].lastSyncAt!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                    {syncStatus[bank.id].consentWarning && (
+                      <div className="flex items-center gap-1 text-[10px] text-amber-400/90 bg-amber-500/10 rounded-md px-1.5 py-0.5">
+                        <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0" />
+                        <span className="truncate">{syncStatus[bank.id].consentDaysRemaining}j avant expiration</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -751,7 +1008,7 @@ export default function Banks() {
       {/* ── Enable Banking modal ── */}
       {ebModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEbModal(null)} />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeEbModal} />
           <div className="relative w-full max-w-md rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl">
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
@@ -760,7 +1017,7 @@ export default function Banks() {
                 <p className="text-xs text-zinc-500 mt-0.5">{ebModal.bankName}</p>
               </div>
               <button
-                onClick={() => setEbModal(null)}
+                onClick={closeEbModal}
                 className="h-7 w-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-colors"
               >
                 <XMarkIcon className="h-5 w-5" />
@@ -793,6 +1050,30 @@ export default function Banks() {
                       ))}
                     </select>
                   </div>
+                  {ebTunnelUrl && (
+                    <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-2.5">
+                      <p className="text-[10px] text-amber-300/80 mb-1">
+                        Si c'est votre première fois, ajoutez cette URL dans Enable Banking → Redirect URIs :
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <code className="flex-1 text-[10px] text-zinc-300 bg-black/30 rounded px-2 py-1 truncate select-all">
+                          {ebTunnelUrl}/api/enablebanking/callback
+                        </code>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${ebTunnelUrl}/api/enablebanking/callback`);
+                            toast.success('URL copiée');
+                          }}
+                          className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors flex-shrink-0"
+                          title="Copier"
+                        >
+                          <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="space-y-1 max-h-64 overflow-y-auto">
                     {ebLoading && (
                       <div className="flex justify-center items-center py-4">
@@ -821,23 +1102,80 @@ export default function Banks() {
                 </>
               ) : (
                 <div className="text-center py-6">
-                  <LinkIcon className="h-10 w-10 text-violet-400 mx-auto mb-3" />
+                  <div className="animate-spin rounded-full h-10 w-10 border-2 border-violet-500/30 border-t-violet-500 mx-auto mb-3" />
                   <p className="text-sm font-medium text-zinc-50">Autorisation en cours</p>
                   <p className="text-xs text-zinc-500 mt-1 mb-4">
-                    Complétez l'authentification dans la fenêtre ouverte, puis revenez ici.
+                    Complétez l'authentification dans la fenêtre ouverte.<br />
+                    La liaison sera détectée automatiquement.
                   </p>
                   {ebLinkUrl && (
-                    <a
-                      href={ebLinkUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={async () => {
+                        try {
+                          // @ts-ignore
+                          if (window.__TAURI__?.shell?.open) {
+                            await window.__TAURI__.shell.open(ebLinkUrl);
+                          } else {
+                            window.open(ebLinkUrl, '_blank');
+                          }
+                        } catch {
+                          window.open(ebLinkUrl, '_blank');
+                        }
+                      }}
                       className="text-xs text-violet-400 hover:text-violet-300 underline"
                     >
-                      Rouvrir le lien
-                    </a>
+                      Rouvrir le lien d'authentification
+                    </button>
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !deleting && setDeleteModal(null)} />
+          <div className="relative w-full max-w-sm rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-red-500/15 flex items-center justify-center flex-shrink-0">
+                <TrashIcon className="h-5 w-5 text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-zinc-50">Supprimer le compte</h3>
+                <p className="text-xs text-zinc-500">{deleteModal.bankName}</p>
+              </div>
+            </div>
+            <p className="text-sm text-zinc-400 mb-1">
+              Voulez-vous vraiment supprimer ce compte bancaire ?
+            </p>
+            <p className="text-sm text-red-400 font-medium mb-5">
+              Toutes les transactions associées seront définitivement supprimées.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteModal(null)}
+                disabled={deleting}
+                className="rounded-lg border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors disabled:opacity-40"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="rounded-lg bg-red-600 hover:bg-red-500 px-3.5 py-2 text-sm font-medium text-white transition-colors disabled:opacity-40 inline-flex items-center gap-1.5"
+              >
+                {deleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white/30 border-t-white" />
+                    Suppression…
+                  </>
+                ) : (
+                  'Supprimer'
+                )}
+              </button>
             </div>
           </div>
         </div>

@@ -1,7 +1,0 @@
-{
-  "enablebanking": {
-    "apiKey": "https://fino.com/api/enablebanking/callback`",
-    "enabled": true,
-    "updatedAt": "2026-07-13T12:40:25.902Z"
-  }
-}

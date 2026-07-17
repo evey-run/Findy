@@ -80,10 +80,22 @@ router.get('/', async (req, res) => {
         createdAt: 'desc'
       }
     });
-    
+
+    // Compute balances: bank.balance + sum(transactions) for each bank
+    const bankIds = banks.map(b => b.id);
+    const aggregated = bankIds.length > 0
+      ? await prisma.transaction.groupBy({
+          by: ['bankId'],
+          where: { bankId: { in: bankIds } },
+          _sum: { amount: true },
+        })
+      : [];
+    const txSums = new Map(aggregated.map((g) => [g.bankId, g._sum.amount ?? 0]));
+
     // Transform the data to match the expected format
     const transformedBanks = banks.map(bank => ({
       ...bank,
+      balance: bank.balance + (txSums.get(bank.id) ?? 0),
       users: bank.userBanks.map(ub => ub.user)
     }));
     

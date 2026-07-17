@@ -36,6 +36,7 @@ export interface Bank {
   ebStatus?: 'PENDING' | 'LINKED' | 'EXPIRED' | null;
   ebLinkedAt?: string | null;
   ebExpiresAt?: string | null;
+  ebLastSyncAt?: string | null;
   ebAccountUid?: string | null;
   ebAspspName?: string | null;
 }
@@ -61,6 +62,7 @@ export interface Transaction {
   quantity?: number;
   ticker?: string;
   assetType?: 'CRYPTO' | 'ETF' | 'ACTION';
+  status?: 'BOOK' | 'PENDING';
   createdAt: string;
   updatedAt: string;
   bankId: string;
