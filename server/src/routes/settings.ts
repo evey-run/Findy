@@ -286,10 +286,23 @@ router.get('/sync', (req, res) => {
     // Mask API keys in response
     const masked: Record<string, any> = {};
     for (const [provider, config] of Object.entries(settings)) {
-      masked[provider] = {
-        configured: !!(config as any).apiKey,
-        provider,
-      };
+      const c = config as any;
+      if (provider === 'enablebanking') {
+        const configured = !!(c.appId && c.privateKey);
+        masked[provider] = {
+          configured,
+          provider,
+          appId: configured && c.appId ? `${c.appId.slice(0, 4)}…${c.appId.slice(-4)}` : null,
+          hasPrivateKey: configured && !!c.privateKey,
+          hasNgrokToken: !!(c.ngrokAuthToken),
+          hasNgrokDomain: !!(c.ngrokDomain),
+        };
+      } else {
+        masked[provider] = {
+          configured: !!c.apiKey,
+          provider,
+        };
+      }
     }
     res.json(masked);
   } catch (error) {
@@ -302,16 +315,25 @@ router.get('/sync', (req, res) => {
 router.put('/sync/:provider', (req, res) => {
   try {
     const { provider } = req.params;
-    const { apiKey, enabled } = req.body;
-
-    if (!apiKey && apiKey !== '') {
-      return res.status(400).json({ error: 'apiKey is required' });
-    }
+    const { apiKey, appId, privateKey, ngrokAuthToken, ngrokDomain, enabled } = req.body;
 
     const settings = readSyncSettings();
-    settings[provider] = { apiKey, enabled: enabled ?? true, updatedAt: new Date().toISOString() };
-    writeSyncSettings(settings);
 
+    if (provider === 'enablebanking') {
+      // Enable Banking uses appId + privateKey
+      if (!appId || !privateKey) {
+        return res.status(400).json({ error: 'appId and privateKey are required for Enable Banking' });
+      }
+      settings[provider] = { appId, privateKey, ngrokAuthToken: ngrokAuthToken || '', ngrokDomain: ngrokDomain || '', enabled: enabled ?? true, updatedAt: new Date().toISOString() };
+    } else {
+      // Other providers use a single apiKey
+      if (!apiKey && apiKey !== '') {
+        return res.status(400).json({ error: 'apiKey is required' });
+      }
+      settings[provider] = { apiKey, enabled: enabled ?? true, updatedAt: new Date().toISOString() };
+    }
+
+    writeSyncSettings(settings);
     res.json({ configured: true, provider });
   } catch (error) {
     console.error('Error saving sync settings:', error);
