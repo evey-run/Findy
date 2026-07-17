@@ -6,10 +6,6 @@ on:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
 
-env:
-  # Désactive la signature Apple (pas de certificat Developer ID)
-  TAURI_SIGNING_PRIVATE_KEY: ""
-
 jobs:
   # ─── 1. Créer la release GitHub (vide) ─────────────────────────────────────
   create-release:
@@ -37,7 +33,11 @@ jobs:
             | `Finance_*_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
             | `Finance_*_x64.dmg` | Intel Mac |
 
-            ### Installation
+            ### Mise à jour automatique
+            Depuis l'application, allez dans **Paramètres → Mises à jour** et cliquez sur **Vérifier**.
+            L'application téléchargera et installera la mise à jour automatiquement.
+
+            ### Installation manuelle
             1. Ouvrir le `.dmg` correspondant à ton Mac
             2. Glisser **Finance.app** dans `/Applications`
             3. **Contourner Gatekeeper** (app non signée) — une seule fois :
@@ -56,6 +56,8 @@ jobs:
     name: Build arm64 (Apple Silicon)
     runs-on: macos-14
     needs: create-release
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -92,16 +94,20 @@ jobs:
       - name: Build Tauri (arm64)
         run: npm run tauri build
 
-      - name: Upload DMG arm64
+      - name: Upload DMG + signature arm64
         uses: softprops/action-gh-release@v2
         with:
-          files: src-tauri/target/release/bundle/dmg/*.dmg
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/dmg/*.sig
 
   # ─── 2b. Build x64 (Intel) ─────────────────────────────────────────────────
   build-x64:
     name: Build x64 (Intel)
     runs-on: macos-13
     needs: create-release
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -138,7 +144,92 @@ jobs:
       - name: Build Tauri (x64)
         run: npm run tauri build
 
-      - name: Upload DMG x64
+      - name: Upload DMG + signature x64
         uses: softprops/action-gh-release@v2
         with:
-          files: src-tauri/target/release/bundle/dmg/*.dmg
+          files: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/dmg/*.sig
+
+  # ─── 3. Générer latest.json pour l'updater ────────────────────────────────
+  generate-updater-json:
+    name: Générer latest.json
+    runs-on: ubuntu-latest
+    needs: [build-arm64, build-x64]
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+
+    steps:
+      - name: Download release assets
+        uses: robinraju/release-downloader@v1
+        with:
+          tag: ${{ github.ref_name }}
+          fileName: "*.dmg"
+          out-file-path: assets
+
+      - name: Download signatures
+        uses: robinraju/release-downloader@v1
+        with:
+          tag: ${{ github.ref_name }}
+          fileName: "*.sig"
+          out-file-path: assets
+
+      - name: Generate latest.json
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          REPO="avialleguerin/Findy"
+          TAG="${GITHUB_REF_NAME}"
+
+          # Trouver les fichiers DMG et SIG
+          ARM64_DMG=$(ls assets/*_aarch64.dmg 2>/dev/null | head -1)
+          X64_DMG=$(ls assets/*_x64.dmg 2>/dev/null | head -1)
+          ARM64_SIG=$(ls assets/*_aarch64.dmg.sig 2>/dev/null | head -1)
+          X64_SIG=$(ls assets/*_x64.dmg.sig 2>/dev/null | head -1)
+
+          # Construire le JSON
+          cat > latest.json << 'TEMPLATE'
+          {
+            "version": "PLACEHOLDER_VERSION",
+            "notes": "Mise à jour vers la version PLACEHOLDER_VERSION",
+            "pub_date": "PLACEHOLDER_DATE",
+            "platforms": {}
+          }
+          TEMPLATE
+
+          # Remplacer les placeholders
+          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          sed -i "s|PLACEHOLDER_VERSION|${VERSION}|g" latest.json
+          sed -i "s|PLACEHOLDER_DATE|${PUB_DATE}|g" latest.json
+
+          # Ajouter les plateformes
+          if [ -n "$ARM64_DMG" ] && [ -n "$ARM64_SIG" ]; then
+            ARM64_DMG_NAME=$(basename "$ARM64_DMG")
+            ARM64_SIG_CONTENT=$(cat "$ARM64_SIG")
+            ARM64_URL="https://github.com/${REPO}/releases/download/${TAG}/${ARM64_DMG_NAME}"
+            python3 -c "
+          import json, sys
+          with open('latest.json') as f: data = json.load(f)
+          data['platforms']['darwin-aarch64'] = {'url': sys.argv[1], 'signature': sys.argv[2]}
+          with open('latest.json', 'w') as f: json.dump(data, f, indent=2)
+          " "$ARM64_URL" "$ARM64_SIG_CONTENT"
+          fi
+
+          if [ -n "$X64_DMG" ] && [ -n "$X64_SIG" ]; then
+            X64_DMG_NAME=$(basename "$X64_DMG")
+            X64_SIG_CONTENT=$(cat "$X64_SIG")
+            X64_URL="https://github.com/${REPO}/releases/download/${TAG}/${X64_DMG_NAME}"
+            python3 -c "
+          import json, sys
+          with open('latest.json') as f: data = json.load(f)
+          data['platforms']['darwin-x86_64'] = {'url': sys.argv[1], 'signature': sys.argv[2]}
+          with open('latest.json', 'w') as f: json.dump(data, f, indent=2)
+          " "$X64_URL" "$X64_SIG_CONTENT"
+          fi
+
+          echo "=== latest.json ==="
+          cat latest.json
+
+      - name: Upload latest.json
+        uses: softprops/action-gh-release@v2
+        with:
+          files: latest.json

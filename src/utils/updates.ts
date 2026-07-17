@@ -1,3 +1,5 @@
+import { check, type Update } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 import toast from 'react-hot-toast';
 
 const AUTO_UPDATE_KEY = 'findy.autoCheckUpdates';
@@ -11,49 +13,80 @@ export function setAutoUpdateEnabled(v: boolean): void {
   localStorage.setItem(AUTO_UPDATE_KEY, String(v));
 }
 
+export interface UpdateProgress {
+  event: 'started' | 'progress' | 'finished' | 'error';
+  downloaded?: number;
+  total?: number;
+  error?: string;
+}
+
 export interface VersionInfo {
   current: string;
   latest: string;
+  updateAvailable: boolean;
+  notes?: string;
 }
 
-// Compare deux numéros de version semver simples (x.y.z). >0 si a plus récent que b.
-export function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map((n) => parseInt(n, 10) || 0);
-  const pb = b.split('.').map((n) => parseInt(n, 10) || 0);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i++) {
-    const da = pa[i] || 0;
-    const db = pb[i] || 0;
-    if (da !== db) return da - db;
-  }
-  return 0;
-}
-
-export async function fetchVersionInfo(): Promise<VersionInfo> {
-  const res = await fetch('/api/settings/version');
-  if (!res.ok) throw new Error('Version check failed');
-  return res.json();
-}
-
-// Vérifie les mises à jour. Notifie une seule fois par session si une MAJ est dispo.
-// Retourne les infos de version (avec updateAvailable) ou null en cas d'erreur.
-export async function checkForUpdates(): Promise<(VersionInfo & { updateAvailable: boolean }) | null> {
+export async function checkForUpdates(): Promise<VersionInfo | null> {
   try {
-    const info = await fetchVersionInfo();
-    const updateAvailable = compareVersions(info.latest, info.current) > 0;
-    if (updateAvailable) {
-      const alreadyNotified = sessionStorage.getItem(NOTIFIED_KEY) === info.latest;
-      if (!alreadyNotified) {
-        sessionStorage.setItem(NOTIFIED_KEY, info.latest);
-        toast(
-          `Mise à jour disponible : ${info.current} → ${info.latest}`,
-          { id: 'update-available', duration: 8000 }
-        );
-      }
-      return { ...info, updateAvailable };
+    const update: Update | null = await check();
+    if (!update) {
+      return { current: '', latest: '', updateAvailable: false };
     }
-    return { ...info, updateAvailable: false };
+
+    const current = update.currentVersion ?? '';
+    const latest = update.version;
+    const updateAvailable = true;
+
+    const alreadyNotified = sessionStorage.getItem(NOTIFIED_KEY) === latest;
+    if (!alreadyNotified) {
+      sessionStorage.setItem(NOTIFIED_KEY, latest);
+      toast(
+        `Mise à jour disponible : v${latest}`,
+        { id: 'update-available', duration: 8000 }
+      );
+    }
+
+    return { current, latest, updateAvailable, notes: update.body ?? undefined };
   } catch {
     return null;
+  }
+}
+
+export async function downloadAndInstallUpdate(
+  onProgress?: (progress: UpdateProgress) => void
+): Promise<boolean> {
+  try {
+    const update: Update | null = await check();
+    if (!update) {
+      onProgress?.({ event: 'error', error: 'Aucune mise à jour disponible' });
+      return false;
+    }
+
+    let downloaded = 0;
+    let contentLength = 0;
+
+    await update.downloadAndInstall((event) => {
+      switch (event.event) {
+        case 'Started':
+          contentLength = event.data.contentLength ?? 0;
+          onProgress?.({ event: 'started', total: contentLength });
+          break;
+        case 'Progress':
+          downloaded += event.data.chunkLength;
+          onProgress?.({ event: 'progress', downloaded, total: contentLength });
+          break;
+        case 'Finished':
+          onProgress?.({ event: 'finished' });
+          break;
+      }
+    });
+
+    await relaunch();
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Erreur lors de la mise à jour';
+    onProgress?.({ event: 'error', error: msg });
+    return false;
   }
 }

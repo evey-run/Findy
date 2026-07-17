@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, CheckCircleIcon, TrashIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { ArrowDownTrayIcon, ArrowUpTrayIcon, CheckCircleIcon, TrashIcon, ArrowPathIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { getAutoUpdateEnabled, setAutoUpdateEnabled, checkForUpdates, fetchVersionInfo, type VersionInfo } from '../utils/updates';
+import { getAutoUpdateEnabled, setAutoUpdateEnabled, checkForUpdates, downloadAndInstallUpdate, type VersionInfo, type UpdateProgress } from '../utils/updates';
 
 type Msg = { type: 'success' | 'error'; text: string };
 
@@ -17,7 +17,7 @@ const SYNC_PROVIDERS: SyncProvider[] = [
   {
     id: 'enablebanking',
     name: 'Enable Banking',
-    description: 'Open Banking API pour l\'Europe. Supporte +300 banques dans 20+ pays.',
+    description: 'Open Banking API pour l\'Europe. Supporte +300 portefeuilles dans 20+ pays.',
     url: 'https://enablebanking.com',
     logo: '🏦',
   },
@@ -44,8 +44,10 @@ export default function Settings() {
 
   // Mises à jour automatiques
   const [autoUpdate, setAutoUpdate] = useState(getAutoUpdateEnabled());
-  const [versionInfo, setVersionInfo] = useState<(VersionInfo & { updateAvailable: boolean }) | null>(null);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateProgress, setUpdateProgress] = useState<UpdateProgress | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   // Sync settings
   const [syncStatus, setSyncStatus] = useState<Record<string, { configured: boolean; appId?: string; hasPrivateKey?: boolean; hasNgrokToken?: boolean; hasNgrokDomain?: boolean }>>({});
@@ -62,8 +64,9 @@ export default function Settings() {
   useEffect(() => {
     loadSyncSettings();
     loadTunnelUrl();
-    fetchVersionInfo()
-      .then((info) => setVersionInfo({ ...info, updateAvailable: false }))
+    checkForUpdates()
+      .then((info) => { if (info) setVersionInfo(info); })
+      .catch(() => {});
       .catch(() => {});
   }, []);
 
@@ -81,6 +84,18 @@ export default function Settings() {
     } finally {
       setCheckingUpdate(false);
     }
+  };
+
+  const handleDownloadUpdate = async () => {
+    setDownloading(true);
+    setUpdateProgress({ event: 'started', total: 0 });
+    await downloadAndInstallUpdate((progress) => {
+      setUpdateProgress(progress);
+      if (progress.event === 'error') {
+        setDownloading(false);
+        toast.error(progress.error ?? 'Erreur lors de la mise à jour');
+      }
+    });
   };
 
   const loadSyncSettings = async () => {
@@ -220,7 +235,7 @@ export default function Settings() {
       <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 max-w-2xl">
         <h3 className="text-base font-semibold text-white mb-0.5">Synchronisation bancaire</h3>
         <p className="text-sm text-zinc-400 mb-5">
-          Connectez vos banques pour synchroniser automatiquement vos transactions.
+          Connectez vos portefeuilles pour synchroniser automatiquement vos transactions.
         </p>
 
         <div className="space-y-3">
@@ -335,12 +350,12 @@ export default function Settings() {
           <div className="min-w-0">
             <p className="text-sm font-medium text-white">Recherches de mises à jour automatiques</p>
             <p className="text-xs text-zinc-500 mt-0.5">
-              {versionInfo
-                ? `Version actuelle : ${versionInfo.current}`
+              {versionInfo?.current
+                ? `Version actuelle : v${versionInfo.current}`
                 : 'Chargement de la version…'}
               {versionInfo?.updateAvailable && (
                 <span className="ml-2 text-violet-400">
-                  Mise à jour disponible : {versionInfo.current} → {versionInfo.latest}
+                  Mise à jour disponible : v{versionInfo.latest}
                 </span>
               )}
             </p>
@@ -366,26 +381,72 @@ export default function Settings() {
             <p className="text-sm font-medium text-white">Vérifier maintenant</p>
             <p className="text-xs text-zinc-500 mt-0.5">
               {versionInfo?.updateAvailable
-                ? `Nouvelle version disponible : ${versionInfo.current} → ${versionInfo.latest}`
+                ? `Nouvelle version disponible : v${versionInfo.latest}`
                 : 'Vous utilisez la dernière version disponible.'}
             </p>
+            {versionInfo?.notes && (
+              <p className="text-xs text-zinc-500 mt-1 max-w-md">{versionInfo.notes}</p>
+            )}
           </div>
-          <button
-            onClick={runUpdateCheck}
-            disabled={checkingUpdate}
-            className="shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg border border-white/10 bg-white/[0.05] transition-opacity hover:opacity-80 disabled:opacity-40"
-          >
-            <ArrowPathIcon className={`h-4 w-4 ${checkingUpdate ? 'animate-spin' : ''}`} />
-            {checkingUpdate ? 'Vérification…' : 'Vérifier'}
-          </button>
+          {versionInfo?.updateAvailable && !downloading ? (
+            <button
+              onClick={handleDownloadUpdate}
+              className="shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors"
+            >
+              <ArrowUpIcon className="h-4 w-4" />
+              Mettre à jour
+            </button>
+          ) : (
+            <button
+              onClick={runUpdateCheck}
+              disabled={checkingUpdate || downloading}
+              className="shrink-0 flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg border border-white/10 bg-white/[0.05] transition-opacity hover:opacity-80 disabled:opacity-40"
+            >
+              <ArrowPathIcon className={`h-4 w-4 ${checkingUpdate ? 'animate-spin' : ''}`} />
+              {checkingUpdate ? 'Vérification…' : 'Vérifier'}
+            </button>
+          )}
         </div>
+
+        {downloading && updateProgress && (
+          <div className="mt-3 p-4 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-white">
+                {updateProgress.event === 'started' && 'Préparation du téléchargement…'}
+                {updateProgress.event === 'progress' && 'Téléchargement en cours…'}
+                {updateProgress.event === 'finished' && 'Installation en cours… Redémarrage automatique.'}
+              </p>
+              {updateProgress.event === 'progress' && updateProgress.total ? (
+                <span className="text-xs text-zinc-400">
+                  {Math.round(((updateProgress.downloaded ?? 0) / updateProgress.total) * 100)}%
+                </span>
+              ) : null}
+            </div>
+            {updateProgress.event === 'progress' && updateProgress.total ? (
+              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-violet-500 transition-all duration-300"
+                  style={{ width: `${Math.round(((updateProgress.downloaded ?? 0) / updateProgress.total) * 100)}%` }}
+                />
+              </div>
+            ) : updateProgress.event === 'finished' ? (
+              <div className="w-full h-1.5 rounded-full bg-violet-500/30 overflow-hidden">
+                <div className="h-full rounded-full bg-violet-500 animate-pulse w-full" />
+              </div>
+            ) : (
+              <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="h-full rounded-full bg-violet-500/50 animate-pulse w-1/4" />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Sauvegarde des données ── */}
       <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 max-w-2xl">
         <h3 className="text-base font-semibold text-white mb-0.5">Sauvegarde des données</h3>
         <p className="text-sm text-zinc-400 mb-6">
-          Exportez ou importez l'intégralité de vos données (transactions, banques, catégories, budgets…).
+          Exportez ou importez l'intégralité de vos données (transactions, portefeuilles, catégories, budgets…).
         </p>
 
         <div className="space-y-3">

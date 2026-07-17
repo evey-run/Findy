@@ -94,7 +94,7 @@ export default function UserProfile() {
 
   const handleRemoveBankAccess = async (bankId: string) => {
     if (!currentUser) return;
-    if (!confirm('Êtes-vous sûr de vouloir retirer l\'accès à cette banque ?')) return;
+    if (!confirm('Êtes-vous sûr de vouloir retirer l\'accès à ce portefeuille ?')) return;
     try {
       const response = await fetch(`/api/banks/${bankId}/share/${currentUser.id}`, { method: 'DELETE' });
       if (response.ok) await loadUserBanks();
@@ -135,7 +135,7 @@ export default function UserProfile() {
             Profil utilisateur
           </h2>
           <p className="text-sm text-zinc-400 mt-1">
-            Gérez les informations de profil et les banques associées
+            Gérez les informations de profil et les portefeuilles associés
           </p>
         </div>
         <div className="mt-4 flex md:mt-0 md:ml-4">
@@ -247,7 +247,7 @@ export default function UserProfile() {
       <div className="rounded-2xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10">
         <div className="px-6 py-4 bg-zinc-900/40 border-b border-white/[0.06]">
           <h3 className="text-base font-semibold text-zinc-50">
-            Banques associées ({userBanks.length})
+            Portefeuilles associés ({userBanks.length})
           </h3>
         </div>
 
@@ -257,8 +257,8 @@ export default function UserProfile() {
               <svg className="mx-auto h-12 w-12 text-zinc-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-2a1 1 0 011-1h1a1 1 0 011 1v2M7 19h10" />
               </svg>
-              <h3 className="mt-2 text-sm font-medium text-zinc-400">Aucune banque associée</h3>
-              <p className="mt-1 text-sm text-zinc-600">Cet utilisateur n'a accès à aucune banque.</p>
+              <h3 className="mt-2 text-sm font-medium text-zinc-400">Aucun portefeuille associé</h3>
+              <p className="mt-1 text-sm text-zinc-600">Cet utilisateur n'a accès à aucun portefeuille.</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -11,6 +11,7 @@ import {
   LinkIcon,
   ArrowPathIcon,
   ExclamationTriangleIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -76,6 +77,11 @@ export default function Banks() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+
+  // Member creation
+  const [isMemberFormOpen, setIsMemberFormOpen] = useState(false);
+  const [memberName, setMemberName] = useState('');
+  const [isSavingMember, setIsSavingMember] = useState(false);
 
   // Enable Banking modal
   const [ebModal, setEbModal] = useState<EbModal | null>(null);
@@ -161,6 +167,32 @@ export default function Banks() {
     setImagePreview(null);
   };
 
+  const handleCreateMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!memberName.trim()) return;
+    setIsSavingMember(true);
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: memberName.trim() }),
+      });
+      if (res.ok) {
+        await loadUsers();
+        toast.success('Membre ajouté');
+        setIsMemberFormOpen(false);
+        setMemberName('');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Erreur');
+      }
+    } catch {
+      toast.error('Erreur lors de la création');
+    } finally {
+      setIsSavingMember(false);
+    }
+  };
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -204,7 +236,7 @@ export default function Banks() {
       const res = await fetch(url, { method, body: fd });
       if (res.ok) {
         await loadBanks();
-        toast.success(isEdit ? 'Banque mise à jour' : 'Banque créée');
+        toast.success(isEdit ? 'Portefeuille mis à jour' : 'Portefeuille créé');
         closeForm();
       } else {
         const err = await res.json().catch(() => ({}));
@@ -331,7 +363,7 @@ export default function Banks() {
       if (res.ok) {
         await loadBanks();
         await loadTransactions({ forceRefresh: true });
-        toast.success('Banque supprimée');
+        toast.success('Portefeuille supprimé');
         setDeleteModal(null);
       }
     } catch (error) {
@@ -488,20 +520,31 @@ export default function Banks() {
       {/* ── Header (compact) ── */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-2.5 min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Banques</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Portefeuille</h2>
           {banks.length > 0 && (
             <span className="text-xs font-medium text-zinc-500">
               {banks.length} compte{banks.length > 1 ? 's' : ''}
             </span>
           )}
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors flex-shrink-0"
-        >
-          <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
-          <span className="hidden sm:inline">Nouveau compte</span>
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {users.length === 0 && (
+            <button
+              onClick={() => setIsMemberFormOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 hover:bg-white/5 text-zinc-300 text-sm font-medium px-3 py-1.5 transition-colors"
+            >
+              <UserGroupIcon className="h-4 w-4" />
+              <span className="hidden sm:inline">Ajouter un membre</span>
+            </button>
+          )}
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors"
+          >
+            <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
+            <span className="hidden sm:inline">Nouveau compte</span>
+          </button>
+        </div>
       </div>
 
       {/* ── Global sync indicator ── */}
@@ -512,6 +555,39 @@ export default function Banks() {
             Synchronisation en cours…
             {autoSyncingBanks.size > 1 && ` (${autoSyncingBanks.size} comptes)`}
           </span>
+        </div>
+      )}
+
+      {/* ── Famille (avatars) ── */}
+      {users.length > 0 && (
+        <div className="flex items-center gap-3">
+          {users.map((user) => (
+            <div key={user.id} className="flex flex-col items-center gap-1">
+              {user.avatar ? (
+                <img
+                  src={assetUrl(user.avatar)}
+                  alt={user.name}
+                  className="w-10 h-10 rounded-full object-cover ring-2 ring-white/10"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white text-sm font-bold">
+                  {user.name ? user.name[0].toUpperCase() : '?'}
+                </div>
+              )}
+              <span className="text-[10px] text-zinc-500 truncate max-w-[60px]">{user.name}</span>
+            </div>
+          ))}
+          <button
+            onClick={() => setIsMemberFormOpen(true)}
+            className="flex flex-col items-center gap-1"
+          >
+            <div className="w-10 h-10 rounded-full border-2 border-dashed border-zinc-600 hover:border-violet-500/60 flex items-center justify-center text-zinc-500 hover:text-violet-400 transition-colors">
+              <PlusIcon className="h-4 w-4" />
+            </div>
+            <span className="text-[10px] text-zinc-500">Ajouter</span>
+          </button>
+        </div>
+      )}
         </div>
       )}
 
@@ -539,7 +615,7 @@ export default function Banks() {
           </div>
           <p className="mt-4 text-sm font-medium text-zinc-300">Aucun compte bancaire</p>
           <p className="mt-1 text-xs text-zinc-500">
-            Connectez votre première banque pour commencer à tracker vos finances.
+            Connectez votre premier portefeuille pour commencer à tracker vos finances.
           </p>
           <button
             onClick={openCreate}
@@ -956,7 +1032,7 @@ export default function Banks() {
                       type="text"
                       value={ebSearch}
                       onChange={(e) => setEbSearch(e.target.value)}
-                      placeholder="Rechercher une banque…"
+                      placeholder="Rechercher un portefeuille…"
                       className="flex-1 rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none"
                       autoFocus
                     />
@@ -1005,7 +1081,7 @@ export default function Banks() {
                       </div>
                     )}
                     {!ebLoading && ebAspsps.length === 0 && (
-                      <p className="text-xs text-zinc-500 text-center py-4">Aucune banque trouvée</p>
+                      <p className="text-xs text-zinc-500 text-center py-4">Aucun portefeuille trouvé</p>
                     )}
                     {!ebLoading && ebAspsps
                       .filter(a => !ebSearch || a.name.toLowerCase().includes(ebSearch.toLowerCase()))
@@ -1102,6 +1178,57 @@ export default function Banks() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Add member modal ── */}
+      {isMemberFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setIsMemberFormOpen(false); setMemberName(''); }} />
+          <form
+            onSubmit={handleCreateMember}
+            className="relative w-full max-w-sm rounded-2xl bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-2xl"
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
+              <h3 className="text-base font-semibold text-zinc-50">Ajouter un membre</h3>
+              <button
+                type="button"
+                onClick={() => { setIsMemberFormOpen(false); setMemberName(''); }}
+                className="h-7 w-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-colors"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-5">
+              <label className="block text-xs font-medium text-zinc-400 mb-1.5">Nom</label>
+              <input
+                type="text"
+                value={memberName}
+                onChange={(e) => setMemberName(e.target.value)}
+                className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
+                placeholder="Prénom"
+                autoFocus
+                required
+                maxLength={20}
+              />
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t border-white/[0.06]">
+              <button
+                type="button"
+                onClick={() => { setIsMemberFormOpen(false); setMemberName(''); }}
+                className="rounded-lg border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingMember || !memberName.trim()}
+                className="rounded-lg bg-violet-600 hover:bg-violet-500 px-3.5 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSavingMember ? '...' : 'Ajouter'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </div>
