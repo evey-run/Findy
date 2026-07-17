@@ -33,3 +33,4 @@ dist-ssr
 
 # Clés de signature des mises à jour (JAMAIS en git)
 keys/
+data/sync-settings.json
