@@ -442,8 +442,8 @@ export default function Banks() {
     const banksToSync: { id: string; name: string }[] = [];
 
     for (const bank of banks) {
-      if (bank.ebStatus !== 'LINKED' || !bank.ebAccountUid) continue;
       if (bank.ebStatus === 'EXPIRED') continue;
+      if (bank.ebStatus !== 'LINKED' || !bank.ebAccountUid) continue;
       if (autoSyncTriggered.current.has(bank.id)) continue;
       const lastSync = bank.ebLastSyncAt ? new Date(bank.ebLastSyncAt).getTime() : 0;
       if (now - lastSync > THRESHOLD_MS) {
@@ -586,8 +586,6 @@ export default function Banks() {
             </div>
             <span className="text-[10px] text-zinc-500">Ajouter</span>
           </button>
-        </div>
-      )}
         </div>
       )}
 

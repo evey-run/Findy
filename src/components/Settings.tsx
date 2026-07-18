@@ -67,7 +67,6 @@ export default function Settings() {
     checkForUpdates()
       .then((info) => { if (info) setVersionInfo(info); })
       .catch(() => {});
-      .catch(() => {});
   }, []);
 
   const handleToggleAutoUpdate = (next: boolean) => {

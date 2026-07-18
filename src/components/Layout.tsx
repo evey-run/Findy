@@ -3,7 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { useState, useEffect, useRef } from 'react';
 import { assetUrl } from '../lib/url';
-import { getAutoUpdateEnabled, checkForUpdates, fetchVersionInfo, type VersionInfo } from '../utils/updates';
+import { getAutoUpdateEnabled, checkForUpdates, type VersionInfo } from '../utils/updates';
 import {
   HomeIcon,
   CreditCardIcon,
@@ -62,15 +62,12 @@ export default function Layout({ children }: LayoutProps) {
 
   // Vérification automatique des mises à jour si l'option est activée
   useEffect(() => {
-    fetchVersionInfo()
-      .then((info) => setVersionInfo({ ...info, updateAvailable: false }))
-      .catch(() => {});
     if (getAutoUpdateEnabled()) {
-      checkForUpdates().then((info) => info && setVersionInfo(info));
+      checkForUpdates().then((info: VersionInfo | null) => info && setVersionInfo(info));
     }
   }, []);
 
-  const renderAvatar = (user: any, size = 'h-8 w-8') => {
+  const renderAvatar = (user: { name?: string; avatar?: string } | null | undefined, size = 'h-8 w-8') => {
     if (user?.avatar) {
       return (
         <img
