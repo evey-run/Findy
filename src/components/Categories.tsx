@@ -69,7 +69,7 @@ const predefinedColors = [
 ];
 
 // ── DonutChart (camembert) ──────────────────────────────────────────────
-function DonutChart({ data, centerLabel, centerValue }: {
+function DonutChart({ data, centerLabel, centerValue: _centerValue }: {
   data: { label: string; value: number; color: string }[];
   centerLabel: string; centerValue: string;
 }) {
@@ -351,11 +351,6 @@ export default function Categories() {
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    const t = categoryTypes.find((ct) => ct.value === type);
-    return t ? t.icon : '📂';
-  };
-
   const getTypeLabel = (type: string) => {
     const t = categoryTypes.find((ct) => ct.value === type);
     return t ? t.label : type;
@@ -532,11 +527,6 @@ export default function Categories() {
 
             {/* Categories without limits */}
             {noLimitCategories.map((category) => {
-              const spending = getCategorySpending(category.id);
-              const budget = getCategoryBudget(category.id);
-              const hasOverBudget = spending?.isOverBudget ?? false;
-              const percentage = spending?.percentage ?? 0;
-
               return (
                 <div
                   key={category.id}
