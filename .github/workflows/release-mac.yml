@@ -24,17 +24,17 @@ jobs:
         id: create
         uses: softprops/action-gh-release@v2
         with:
-          name: "Finance ${{ github.ref_name }}"
+          name: "Findy ${{ github.ref_name }}"
           draft: false
           prerelease: false
           body: |
-            ## Finance ${{ github.ref_name }}
+            ## Findy ${{ github.ref_name }}
 
             ### Téléchargement
             | Fichier | Architecture |
             |---------|-------------|
-            | `Finance_*_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
-            | `Finance_*_x64.dmg` | Intel Mac |
+            | `Findy_*_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
+            | `Findy_*_x64.dmg` | Intel Mac |
 
             ### Mise à jour automatique
             Depuis l'application, allez dans **Paramètres → Mises à jour** et cliquez sur **Vérifier**.
@@ -45,7 +45,7 @@ jobs:
             2. Glisser **Finance.app** dans `/Applications`
             3. **Contourner Gatekeeper** (app non signée) — une seule fois :
                ```bash
-               xattr -rd com.apple.quarantine /Applications/Finance.app
+               xattr -rd com.apple.quarantine /Applications/Findy.app
                ```
                ou double-cliquer sur **`fix-quarantine.command`** ci-joint.
 
