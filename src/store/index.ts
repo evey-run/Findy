@@ -118,11 +118,13 @@ export const useAppStore = create<AppState>()(
         try {
           const state = get();
           const batchSize = 500;
+          const maxBatches = 50;
           let offset = 0;
           let hasMore = true;
+          let batchCount = 0;
           const all: Transaction[] = [];
 
-          while (hasMore) {
+          while (hasMore && batchCount < maxBatches) {
             const params = new URLSearchParams({
               limit: batchSize.toString(),
               offset: offset.toString(),
@@ -147,6 +149,10 @@ export const useAppStore = create<AppState>()(
             if (options?.accountType) params.append('accountType', options.accountType);
 
             const resp = await fetch(`/api/transactions?${params}`);
+            if (!resp.ok) {
+              console.error(`loadAllTransactions: HTTP ${resp.status}`);
+              break;
+            }
             const data = await resp.json();
             const batch: Transaction[] = Array.isArray(data)
               ? data
@@ -154,6 +160,7 @@ export const useAppStore = create<AppState>()(
               ? data.transactions
               : [];
             all.push(...batch);
+            batchCount++;
 
             const serverHasMore: boolean | undefined = typeof data?.hasMore === 'boolean' ? data.hasMore : undefined;
             if (serverHasMore !== undefined) {
@@ -373,12 +380,17 @@ export const useAppStore = create<AppState>()(
           
           console.log(`Loading transactions with limit: ${limit}`);
           const response = await fetch(`/api/transactions?${params}`);
-          const data = await response.json();
-          if (data.transactions) {
-            set({ transactions: data.transactions });
-          } else {
-            set({ transactions: data });
+          if (!response.ok) {
+            console.error(`loadTransactions: HTTP ${response.status}`);
+            return;
           }
+          const data = await response.json();
+          const batch: Transaction[] = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.transactions)
+            ? data.transactions
+            : [];
+          set({ transactions: batch });
         } catch (error) {
           console.error('Failed to load transactions:', error);
         }
@@ -491,17 +503,17 @@ export const useAppStore = create<AppState>()(
         })),
       loadBudgets: async () => {
         try {
-          // Pas besoin de filtres pour les budgets
-          const params = new URLSearchParams();
-          
-          // Ne jamais filtrer par banque pour les budgets
-          // Même si une banque est sélectionnée
-          
-          const response = await fetch(`/api/budgets?${params}`);
-          const budgets = await response.json();
-          set({ budgets });
+          const response = await fetch(`/api/budgets`);
+          if (!response.ok) {
+            console.error(`loadBudgets: HTTP ${response.status}`);
+            set({ budgets: [] });
+            return;
+          }
+          const data = await response.json();
+          set({ budgets: Array.isArray(data) ? data : [] });
         } catch (error) {
           console.error('Failed to load budgets:', error);
+          set({ budgets: [] });
         }
       },
       

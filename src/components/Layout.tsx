@@ -60,8 +60,11 @@ export default function Layout({ children }: LayoutProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Vérification automatique des mises à jour si l'option est activée
+  // Afficher la version, et vérifier les MAJ si l'option est activée
   useEffect(() => {
+    import('@tauri-apps/api/app').then(({ getVersion }) =>
+      getVersion().then((v) => setVersionInfo((prev) => ({ ...prev, current: v, latest: v, updateAvailable: false })))
+    );
     if (getAutoUpdateEnabled()) {
       checkForUpdates().then((info: VersionInfo | null) => info && setVersionInfo(info));
     }
@@ -92,8 +95,8 @@ export default function Layout({ children }: LayoutProps) {
       <div className="hidden md:flex md:w-64 md:flex-col flex-shrink-0">
         <div className="flex flex-col h-full bg-white/[0.03] backdrop-blur-xl border-r border-white/[0.06] overflow-y-auto">
 
-          {/* Logo */}
-          <div className="px-6 pt-7 pb-2 flex-shrink-0">
+          {/* Drag region + Logo */}
+          <div className="px-6 pt-10 pb-2 flex-shrink-0" data-tauri-drag-region>
             <div className="flex items-center gap-2.5">
               <img src="/assets/findy-logo.png" alt="Findy" className="h-5 w-auto flex-shrink-0" />
               <span className="text-zinc-50 font-semibold text-lg tracking-tight">Findy</span>
@@ -234,6 +237,8 @@ export default function Layout({ children }: LayoutProps) {
 
       {/* ── Main content ── */}
       <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white/[0.03]">
+        {/* Drag region for overlay titlebar */}
+        <div className="h-8 w-full flex-shrink-0" data-tauri-drag-region />
         <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* pb-20 on mobile for bottom nav clearance */}
           <div className="flex-1 min-h-0 flex flex-col w-full px-6 md:px-10 pt-6 md:pt-8 pb-20 md:pb-6">
