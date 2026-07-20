@@ -48,6 +48,9 @@ input[type="date"]::-webkit-datetime-edit-month-field { order: 2; }
 input[type="date"]::-webkit-datetime-edit-year-field  { order: 3; }
 input[type="date"]::-moz-focus-inner { border: 0; }
 
+/* Tauri window drag region */
+[data-tauri-drag-region] { app-region: drag; }
+
 /* Avatar tooltip */
 .avatar-tooltip {
   position: absolute;

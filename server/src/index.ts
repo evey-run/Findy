@@ -115,7 +115,7 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Serve static files (images)
 app.use('/uploads', express.static(UPLOADS_DIR));
@@ -155,6 +155,10 @@ app.get('/api/tunnel', (req, res) => {
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err.type === 'entity.too.large') {
+    console.error('Payload too large:', err);
+    return res.status(413).json({ error: 'Le fichier est trop volumineux. Taille maximale : 50 Mo.' });
+  }
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong!' });
 });

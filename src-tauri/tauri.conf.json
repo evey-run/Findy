@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Findy",
-  "version": "0.1.0",
+  "version": "0.4.5",
   "identifier": "com.evey.finance",
   "build": {
     "frontendDist": "../dist",
@@ -13,6 +13,8 @@
     "windows": [
       {
         "title": "Findy",
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
         "width": 1280,
         "height": 800,
         "minWidth": 960,

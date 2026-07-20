@@ -9,6 +9,7 @@ import Categories from './components/Categories';
 import Budgets from './components/Budgets';
 import Banks from './components/Banks';
 import Settings from './components/Settings';
+import ErrorBoundary from './components/ErrorBoundary';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -43,17 +44,19 @@ function App() {
     <Router>
       <div className="min-h-screen bg-[#09090b]">
         <Layout>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/transactions" element={<Transactions />} />
-            <Route path="/investissement" element={<Investissement />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/budgets" element={<Budgets />} />
-            <Route path="/banks" element={<Banks />} />
-            <Route path="/users" element={<Navigate to="/banks" replace />} />
-            <Route path="/settings" element={<Settings />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/investissement" element={<Investissement />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/budgets" element={<Budgets />} />
+              <Route path="/banks" element={<Banks />} />
+              <Route path="/users" element={<Navigate to="/banks" replace />} />
+              <Route path="/settings" element={<Settings />} />
+            </Routes>
+          </ErrorBoundary>
         </Layout>
         <Toaster
           position="top-right"

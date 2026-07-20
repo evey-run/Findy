@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-APP_NAME="Finance.app"
+APP_NAME="Findy.app"
 SEARCH_DIRS=("$HOME/Downloads" "$HOME/Desktop" "/Applications")
 
 echo "Recherche de $APP_NAME..."
@@ -21,7 +21,7 @@ if [[ -z "$FOUND" ]]; then
     # Demander manuellement
     echo ""
     echo "L'app n'a pas été trouvée automatiquement."
-    echo "Glisse Finance.app dans ce terminal et appuie sur Entrée:"
+    echo "Glisse Findy.app dans ce terminal et appuie sur Entrée:"
     read -r FOUND
     FOUND="${FOUND// /\\ }"
 fi
@@ -29,7 +29,7 @@ fi
 echo "Suppression de la quarantaine sur: $FOUND"
 xattr -rd com.apple.quarantine "$FOUND"
 echo ""
-echo "✅ Terminé. Tu peux maintenant ouvrir Finance normalement."
+    echo "✅ Terminé. Tu peux maintenant ouvrir Findy normalement."
 
 # Ouvrir l'app
 open "$FOUND" 2>/dev/null || true

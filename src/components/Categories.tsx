@@ -146,9 +146,11 @@ export default function Categories() {
     const load = async () => {
       setLoading(true);
       try {
-        await loadCategories();
-        await loadBudgets(true);
-        await loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true });
+        await Promise.allSettled([
+          loadCategories(),
+          loadBudgets(true),
+          loadAllTransactions({ forceIgnoreSelectedBank: true, ignoreDateRange: true }),
+        ]);
       } catch (e) {
         console.error('Error loading:', e);
       } finally {

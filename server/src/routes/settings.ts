@@ -79,10 +79,13 @@ router.get('/export', async (req, res) => {
         prisma.objective.findMany(),
       ]);
 
+    const syncSettings = readSyncSettings();
+
     const backup = {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       data: { users, banks, userBanks, categories, categoryKeywords, transactions, budgets, recurrences, objectives },
+      syncSettings: Object.keys(syncSettings).length ? syncSettings : undefined,
     };
 
     const filename = `findy-backup-${new Date().toISOString().split('T')[0]}.json`;
@@ -97,7 +100,7 @@ router.get('/export', async (req, res) => {
 
 // POST /api/settings/import
 router.post('/import', async (req, res) => {
-  const { data } = req.body;
+  const { data, syncSettings } = req.body;
 
   if (!data || typeof data !== 'object') {
     return res.status(400).json({ error: 'Format de fichier invalide' });
@@ -115,10 +118,14 @@ router.post('/import', async (req, res) => {
     objectives = [],
   } = data;
 
+  // Restore sync settings (credentials, tokens, etc.) before DB transaction
+  if (syncSettings && typeof syncSettings === 'object') {
+    writeSyncSettings(syncSettings);
+  }
+
   try {
     await prisma.$transaction(
       async (tx) => {
-        // Delete in reverse dependency order
         await tx.categoryKeyword.deleteMany();
         await tx.transaction.deleteMany();
         await tx.budget.deleteMany();
@@ -129,22 +136,21 @@ router.post('/import', async (req, res) => {
         await tx.bank.deleteMany();
         await tx.user.deleteMany();
 
-        // Insert in dependency order
-        for (const u of users) {
-          await tx.user.create({
-            data: {
+        if (users.length) {
+          await tx.user.createMany({
+            data: users.map(u => ({
               id: u.id,
               name: u.name,
               avatar: u.avatar ?? null,
               createdAt: new Date(u.createdAt),
               updatedAt: new Date(u.updatedAt),
-            },
+            })),
           });
         }
 
-        for (const b of banks) {
-          await tx.bank.create({
-            data: {
+        if (banks.length) {
+          await tx.bank.createMany({
+            data: banks.map(b => ({
               id: b.id,
               name: b.name,
               shortName: b.shortName ?? null,
@@ -165,13 +171,13 @@ router.post('/import', async (req, res) => {
               ebExpiresAt: d(b.ebExpiresAt),
               createdAt: new Date(b.createdAt),
               updatedAt: new Date(b.updatedAt),
-            },
+            })),
           });
         }
 
-        for (const c of categories) {
-          await tx.category.create({
-            data: {
+        if (categories.length) {
+          await tx.category.createMany({
+            data: categories.map(c => ({
               id: c.id,
               name: c.name,
               type: c.type,
@@ -179,13 +185,13 @@ router.post('/import', async (req, res) => {
               icon: c.icon ?? null,
               createdAt: new Date(c.createdAt),
               updatedAt: new Date(c.updatedAt),
-            },
+            })),
           });
         }
 
-        for (const o of objectives) {
-          await tx.objective.create({
-            data: {
+        if (objectives.length) {
+          await tx.objective.createMany({
+            data: objectives.map(o => ({
               id: o.id,
               title: o.title,
               description: o.description ?? null,
@@ -195,25 +201,33 @@ router.post('/import', async (req, res) => {
               archived: o.archived ?? false,
               createdAt: new Date(o.createdAt),
               updatedAt: new Date(o.updatedAt),
-            },
+            })),
           });
         }
 
-        for (const ub of userBanks) {
-          await tx.userBank.create({
-            data: { id: ub.id, userId: ub.userId, bankId: ub.bankId },
+        if (userBanks.length) {
+          await tx.userBank.createMany({
+            data: userBanks.map(ub => ({
+              id: ub.id,
+              userId: ub.userId,
+              bankId: ub.bankId,
+            })),
           });
         }
 
-        for (const ck of categoryKeywords) {
-          await tx.categoryKeyword.create({
-            data: { id: ck.id, value: ck.value, categoryId: ck.categoryId },
+        if (categoryKeywords.length) {
+          await tx.categoryKeyword.createMany({
+            data: categoryKeywords.map(ck => ({
+              id: ck.id,
+              value: ck.value,
+              categoryId: ck.categoryId,
+            })),
           });
         }
 
-        for (const t of transactions) {
-          await tx.transaction.create({
-            data: {
+        if (transactions.length) {
+          await tx.transaction.createMany({
+            data: transactions.map(t => ({
               id: t.id,
               amount: t.amount,
               description: t.description,
@@ -228,13 +242,13 @@ router.post('/import', async (req, res) => {
               categoryId: t.categoryId ?? null,
               createdAt: new Date(t.createdAt),
               updatedAt: new Date(t.updatedAt),
-            },
+            })),
           });
         }
 
-        for (const b of budgets) {
-          await tx.budget.create({
-            data: {
+        if (budgets.length) {
+          await tx.budget.createMany({
+            data: budgets.map(b => ({
               id: b.id,
               amount: b.amount,
               period: b.period,
@@ -244,13 +258,13 @@ router.post('/import', async (req, res) => {
               categoryId: b.categoryId,
               createdAt: new Date(b.createdAt),
               updatedAt: new Date(b.updatedAt),
-            },
+            })),
           });
         }
 
-        for (const r of recurrences) {
-          await tx.recurrence.create({
-            data: {
+        if (recurrences.length) {
+          await tx.recurrence.createMany({
+            data: recurrences.map(r => ({
               id: r.id,
               amount: r.amount,
               frequency: r.frequency,
@@ -261,7 +275,7 @@ router.post('/import', async (req, res) => {
               categoryId: r.categoryId,
               createdAt: new Date(r.createdAt),
               updatedAt: new Date(r.updatedAt),
-            },
+            })),
           });
         }
       },
