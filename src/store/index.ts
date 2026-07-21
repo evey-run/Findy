@@ -12,6 +12,7 @@ interface AppState {
   setUsers: (users: User[]) => void;
   setSelectedUser: (user: User | null) => void;
   loadUsers: () => Promise<void>;
+  setMeUser: (userId: string) => Promise<void>;
   
   // Current bank
   currentBank: Bank | null;
@@ -42,8 +43,8 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => Promise<void>;
-  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   loadAllTransactions: (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; pageName?: string }) => Promise<void>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
@@ -65,6 +66,21 @@ interface AppState {
   // UI State
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
+
+  // Confirmation dialog (remplace window.confirm, non fiable dans la WebView Tauri)
+  confirmDialog: {
+    open: boolean;
+    message: string;
+    title?: string;
+    confirmLabel?: string;
+    danger?: boolean;
+  };
+  _confirmResolver?: (value: boolean) => void;
+  requestConfirm: (
+    message: string,
+    opts?: { title?: string; confirmLabel?: string; danger?: boolean }
+  ) => Promise<boolean>;
+  resolveConfirm: (value: boolean) => void;
   
   // Filters globaux (pour compatibilité)
   dateRange: {
@@ -194,6 +210,20 @@ export const useAppStore = create<AppState>()(
           set({ users: [] }); // Set empty array on error
         }
       },
+      setMeUser: async (userId: string) => {
+        try {
+          const response = await fetch(`/api/users/${userId}/set-me`, { method: 'PUT' });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          const users = await response.json();
+          set({ users });
+        } catch (error) {
+          console.error('Failed to set "me" user:', error);
+          // Recharge par sécurité pour rester cohérent
+          get().loadUsers();
+        }
+      },
       
       // Current bank
       currentBank: null,
@@ -302,12 +332,13 @@ export const useAppStore = create<AppState>()(
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
       
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => {
         // Create a unique key for this request based on the options
         const requestKey = JSON.stringify({
           categoryId: options?.categoryId || null,
           bankId: options?.forceIgnoreSelectedBank ? null : get().selectedBank?.id,
           accountType: options?.accountType || null,
+          excludeAccountType: options?.excludeAccountType || null,
           searchText: options?.searchText || null,
           startDate: options?.startDate || null,
           endDate: options?.endDate || null,
@@ -351,7 +382,12 @@ export const useAppStore = create<AppState>()(
           if (options?.accountType) {
             params.append('accountType', options.accountType);
           }
-          
+
+          // Exclure un type de compte (ex: investissement sur la page Transactions)
+          if (options?.excludeAccountType) {
+            params.append('excludeAccountType', options.excludeAccountType);
+          }
+
           // Ajouter le filtre de recherche si fourni
           if (options?.searchText && options.searchText.trim() !== '') {
             params.append('search', options.searchText);
@@ -396,7 +432,7 @@ export const useAppStore = create<AppState>()(
         }
       },
        
-      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => {
+      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -406,9 +442,13 @@ export const useAppStore = create<AppState>()(
           const offset = Math.max(0, (page - 1) * itemsPerPage);
           params.append('offset', offset.toString());
           
-          // Ajouter les filtres de dates depuis les options (priorité) ou depuis l'état global
-          const startDate = options?.startDate || state.dateRange.startDate;
-          const endDate = options?.endDate || state.dateRange.endDate;
+          // Filtres de dates : UNIQUEMENT ceux passés en options (les filtres de la
+          // page). NE PAS retomber sur state.dateRange : ce dernier est piloté par le
+          // Dashboard (mois courant) et le chargement initial de la page Transactions
+          // l'ignore. Y retomber ici filtrait la page suivante sur un mois souvent vide
+          // → « charger plus » ne ramenait aucune ligne et la liste restait à 25.
+          const startDate = options?.startDate;
+          const endDate = options?.endDate;
           if (startDate && startDate !== '') {
             params.append('startDate', startDate);
           }
@@ -439,7 +479,12 @@ export const useAppStore = create<AppState>()(
           if (options?.accountType) {
             params.append('accountType', options.accountType);
           }
-          
+
+          // Exclure un type de compte (cohérence avec le chargement initial)
+          if (options?.excludeAccountType) {
+            params.append('excludeAccountType', options.excludeAccountType);
+          }
+
           const response = await fetch(`/api/transactions?${params}`);
           const data = await response.json();
 
@@ -554,6 +599,30 @@ export const useAppStore = create<AppState>()(
       // UI State
       isLoading: false,
       setIsLoading: (loading: boolean) => set({ isLoading: loading }),
+
+      // Confirmation dialog
+      confirmDialog: { open: false, message: '' },
+      requestConfirm: (message, opts) =>
+        new Promise<boolean>((resolve) => {
+          // Si une confirmation était déjà ouverte, on l'annule proprement.
+          const prev = get()._confirmResolver;
+          if (prev) prev(false);
+          set({
+            confirmDialog: {
+              open: true,
+              message,
+              title: opts?.title,
+              confirmLabel: opts?.confirmLabel,
+              danger: opts?.danger
+            },
+            _confirmResolver: resolve
+          });
+        }),
+      resolveConfirm: (value: boolean) => {
+        const resolver = get()._confirmResolver;
+        set({ confirmDialog: { open: false, message: '' }, _confirmResolver: undefined });
+        if (resolver) resolver(value);
+      },
       
       // Filters
       dateRange: {

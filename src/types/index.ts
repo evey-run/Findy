@@ -3,9 +3,23 @@ export interface User {
   name: string;
   avatar?: string;
   email?: string; // Optional field for future use
+  isMe?: boolean; // Marque l'utilisateur « Moi »
   createdAt: string;
   updatedAt: string;
   userBanks?: UserBank[];
+}
+
+// Dette « tricount » : fromUser doit `amount` à toUser.
+export interface Debt {
+  id: string;
+  amount: number;
+  description: string;
+  date: string;
+  settled: boolean;
+  fromUserId: string;
+  toUserId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface UserBank {

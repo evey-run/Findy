@@ -35,6 +35,7 @@ export default function Investissement() {
     loadBanks,
     addTransaction,
     removeTransaction,
+    requestConfirm,
   } = useAppStore();
 
   const [localSelectedBank, setLocalSelectedBank] = useState<any>(null);
@@ -761,6 +762,7 @@ export default function Investissement() {
   };
 
   const handleDeleteTransaction = async (id: string) => {
+    if (!(await requestConfirm('Supprimer cette transaction ?', { title: 'Supprimer la transaction', confirmLabel: 'Supprimer', danger: true }))) return;
     try {
       const response = await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
       if (response.ok) {

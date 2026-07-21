@@ -40,12 +40,13 @@ body {
   scrollbar-color: #3f3f46 transparent;
 }
 
-/* Date inputs — French order */
+/* Date inputs.
+   L'ordre jour/mois/année vient déjà de <html lang="fr"> (JJ/MM/AAAA).
+   Ne PAS réordonner les champs via flex `order` : le wrapper contient aussi
+   les séparateurs « / » (::-webkit-datetime-edit-text) restés à order:0, qui
+   se retrouvaient alors poussés en tête sous WebKit/WKWebView (Tauri macOS),
+   d'où l'affichage « //21 07 2026 ». */
 input[type="date"] { position: relative; text-align: left; direction: ltr; }
-input[type="date"]::-webkit-datetime-edit-fields-wrapper { display: flex; }
-input[type="date"]::-webkit-datetime-edit-day-field   { order: 1; }
-input[type="date"]::-webkit-datetime-edit-month-field { order: 2; }
-input[type="date"]::-webkit-datetime-edit-year-field  { order: 3; }
 input[type="date"]::-moz-focus-inner { border: 0; }
 
 /* Tauri window drag region */

@@ -155,31 +155,22 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    
-    // Vérifier si la catégorie est utilisée
-    const count = await prisma.category.findUnique({
-      where: { id },
-      select: {
-        _count: {
-          select: {
-            transactions: true,
-            budgets: true,
-            recurrences: true
-          }
-        }
-      }
-    });
-    
-    if (count && (count._count.transactions > 0 || count._count.budgets > 0 || count._count.recurrences > 0)) {
-      return res.status(400).json({ 
-        error: 'Cannot delete category that is being used in transactions, budgets, or recurrences' 
-      });
+
+    const category = await prisma.category.findUnique({ where: { id } });
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
     }
-    
-    await prisma.category.delete({
-      where: { id }
-    });
-    
+
+    // Suppression robuste : on détache les transactions (categoryId devient null,
+    // le champ est optionnel) et on supprime les budgets/récurrences liés, puis
+    // la catégorie. Évite l'échec FK et le blocage « catégorie utilisée ».
+    await prisma.$transaction([
+      prisma.transaction.updateMany({ where: { categoryId: id }, data: { categoryId: null } }),
+      prisma.budget.deleteMany({ where: { categoryId: id } }),
+      prisma.recurrence.deleteMany({ where: { categoryId: id } }),
+      prisma.category.delete({ where: { id } })
+    ]);
+
     res.status(204).send();
   } catch (error: any) {
     console.error('Error deleting category:', error);
