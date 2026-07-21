@@ -6,7 +6,7 @@ const router = express.Router();
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
   try {
-    const { bankId, categoryId, startDate, endDate, limit, offset, search, accountType, checked, userId } = req.query;
+    const { bankId, categoryId, startDate, endDate, limit, offset, search, accountType, excludeAccountType, checked, userId } = req.query;
     const where: any = {};
 
     // Filtre par ID de banque
@@ -18,6 +18,16 @@ router.get('/', async (req, res) => {
       where.bank = {
         ...(where.bank || {}),
         accountType: accountType as string
+      };
+    }
+
+    // Exclusion d'un type de compte (ex: la page Transactions masque l'investissement).
+    // Fait côté serveur pour que la pagination reste cohérente (sinon un filtrage
+    // client peut vider une page entière et bloquer le scroll infini).
+    if (excludeAccountType) {
+      where.bank = {
+        ...(where.bank || {}),
+        accountType: { not: excludeAccountType as string }
       };
     }
 

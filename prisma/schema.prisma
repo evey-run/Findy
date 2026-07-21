@@ -22,11 +22,32 @@ model User {
   id        String     @id @default(cuid())
   name      String
   avatar    String?
+  isMe      Boolean    @default(false)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   userBanks UserBank[]
+  debtsFrom Debt[]     @relation("DebtsOwed")
+  debtsTo   Debt[]     @relation("DebtsOwing")
 
   @@map("users")
+}
+
+// Dette « tricount » entre deux personnes.
+// fromUser doit `amount` à toUser (fromUser = débiteur, toUser = créancier).
+model Debt {
+  id          String   @id @default(cuid())
+  amount      Float
+  description String
+  date        DateTime @default(now())
+  settled     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  fromUserId  String
+  toUserId    String
+  fromUser    User     @relation("DebtsOwed", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser      User     @relation("DebtsOwing", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@map("debts")
 }
 
 model Bank {

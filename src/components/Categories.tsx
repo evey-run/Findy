@@ -133,6 +133,7 @@ export default function Categories() {
     addBudget,
     updateBudget,
     removeBudget,
+    requestConfirm,
   } = useAppStore();
 
   const [loading, setLoading] = useState(true);
@@ -333,7 +334,7 @@ export default function Categories() {
 
   const handleDelete = async (categoryId: string) => {
     setOpenMenuId(null);
-    if (!confirm('Supprimer cette catégorie et son budget ?')) return;
+    if (!(await requestConfirm('Supprimer cette catégorie et son budget ?', { title: 'Supprimer la catégorie', confirmLabel: 'Supprimer', danger: true }))) return;
 
     try {
       const budget = getCategoryBudget(categoryId);
@@ -346,6 +347,9 @@ export default function Categories() {
       if (res.ok) {
         removeCategory(categoryId);
         toast.success('Catégorie supprimée');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Erreur lors de la suppression');
       }
     } catch (error) {
       console.error('Error deleting:', error);

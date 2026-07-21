@@ -8,28 +8,30 @@ import Investissement from './components/Investissement';
 import Categories from './components/Categories';
 import Budgets from './components/Budgets';
 import Banks from './components/Banks';
+import Tricount from './components/Tricount';
 import Settings from './components/Settings';
 import ErrorBoundary from './components/ErrorBoundary';
+import ConfirmDialog from './components/ConfirmDialog';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
-  const { 
+  const {
     loadUsers,
-    loadCategories, 
-    loadTransactions, 
-    loadBudgets, 
+    loadCategories,
+    loadBudgets,
     loadDashboardOverview
   } = useAppStore();
 
   useEffect(() => {
-    // Charger toutes les données au démarrage
+    // Charger les données globales au démarrage.
+    // NB: on ne précharge PAS les transactions ici — chaque page (Transactions,
+    // Investissement) charge sa propre liste paginée. Un chargement global (limit 50)
+    // ré-écrasait l'état paginé de la page Transactions et désynchronisait l'offset
+    // du scroll infini (liste qui ne se complétait pas).
     const initializeApp = async () => {
       try {
         await loadUsers();
         await loadCategories();
-        // Only load transactions when the app initializes
-        // We'll use the modified loadTransactions function which has caching
-        await loadTransactions();
         await loadBudgets();
         await loadDashboardOverview();
       } catch (error) {
@@ -38,7 +40,7 @@ function App() {
     };
 
     initializeApp();
-  }, [loadUsers, loadCategories, loadBudgets, loadDashboardOverview]); // Removed loadTransactions from dependencies
+  }, [loadUsers, loadCategories, loadBudgets, loadDashboardOverview]);
 
   return (
     <Router>
@@ -53,11 +55,13 @@ function App() {
               <Route path="/categories" element={<Categories />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/banks" element={<Banks />} />
+              <Route path="/tricount/:userId" element={<Tricount />} />
               <Route path="/users" element={<Navigate to="/banks" replace />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </ErrorBoundary>
         </Layout>
+        <ConfirmDialog />
         <Toaster
           position="top-right"
           toastOptions={{

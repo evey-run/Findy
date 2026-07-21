@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { assetUrl } from '../lib/url';
@@ -69,7 +70,9 @@ interface EbModal { bankId: string; bankName: string; }
 interface EbAspsp { name: string; country: string; logo: string; }
 
 export default function Banks() {
-  const { banks, loadBanks, loadTransactions, loadUsers, users } = useAppStore();
+  const { banks, loadBanks, loadTransactions, loadUsers, users, setMeUser } = useAppStore();
+  const navigate = useNavigate();
+  const meUser = users.find((u) => u.isMe);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -560,32 +563,96 @@ export default function Banks() {
 
       {/* ── Famille (avatars) ── */}
       {users.length > 0 && (
-        <div className="flex items-center gap-3">
-          {users.map((user) => (
-            <div key={user.id} className="flex flex-col items-center gap-1">
-              {user.avatar ? (
-                <img
-                  src={assetUrl(user.avatar)}
-                  alt={user.name}
-                  className="w-10 h-10 rounded-full object-cover ring-2 ring-white/10"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white text-sm font-bold">
-                  {user.name ? user.name[0].toUpperCase() : '?'}
+        <div className="space-y-1.5">
+          <div className="flex items-start gap-4 flex-wrap">
+            {users.map((user) => {
+              const isMe = !!user.isMe;
+              // On peut ouvrir un tricount avec les autres personnes dès qu'un « Moi » est défini.
+              const canOpenTricount = !isMe && !!meUser;
+              const handleClick = () => {
+                if (isMe) return;
+                if (meUser) {
+                  navigate(`/tricount/${user.id}`);
+                } else {
+                  // Aucun « Moi » défini : le premier clic désigne cette personne.
+                  setMeUser(user.id);
+                  toast.success(`${user.name} est maintenant « Moi »`);
+                }
+              };
+              return (
+                <div key={user.id} className="flex flex-col items-center gap-1 w-16">
+                  <button
+                    type="button"
+                    onClick={handleClick}
+                    title={
+                      isMe
+                        ? 'C\'est vous'
+                        : canOpenTricount
+                        ? `Ouvrir le tricount avec ${user.name}`
+                        : `Définir ${user.name} comme « Moi »`
+                    }
+                    className="relative group"
+                  >
+                    {user.avatar ? (
+                      <img
+                        src={assetUrl(user.avatar)}
+                        alt={user.name}
+                        className={`w-11 h-11 rounded-full object-cover ring-2 transition-all ${
+                          isMe ? 'ring-violet-500' : 'ring-white/10 group-hover:ring-violet-400/60'
+                        }`}
+                      />
+                    ) : (
+                      <div
+                        className={`w-11 h-11 rounded-full bg-zinc-700 flex items-center justify-center text-white text-sm font-bold ring-2 transition-all ${
+                          isMe ? 'ring-violet-500' : 'ring-white/10 group-hover:ring-violet-400/60'
+                        }`}
+                      >
+                        {user.name ? user.name[0].toUpperCase() : '?'}
+                      </div>
+                    )}
+                    {isMe && (
+                      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-violet-600 text-white text-[8px] font-bold px-1.5 py-0.5 leading-none shadow">
+                        MOI
+                      </span>
+                    )}
+                  </button>
+                  <span className="text-[10px] text-zinc-400 truncate max-w-[64px]">{user.name}</span>
+                  {isMe ? (
+                    <span className="text-[9px] text-violet-400/70 leading-none">vous</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMeUser(user.id);
+                        toast.success(`${user.name} est maintenant « Moi »`);
+                      }}
+                      className="text-[9px] text-zinc-600 hover:text-violet-400 leading-none transition-colors"
+                    >
+                      définir « moi »
+                    </button>
+                  )}
                 </div>
-              )}
-              <span className="text-[10px] text-zinc-500 truncate max-w-[60px]">{user.name}</span>
-            </div>
-          ))}
-          <button
-            onClick={() => setIsMemberFormOpen(true)}
-            className="flex flex-col items-center gap-1"
-          >
-            <div className="w-10 h-10 rounded-full border-2 border-dashed border-zinc-600 hover:border-violet-500/60 flex items-center justify-center text-zinc-500 hover:text-violet-400 transition-colors">
-              <PlusIcon className="h-4 w-4" />
-            </div>
-            <span className="text-[10px] text-zinc-500">Ajouter</span>
-          </button>
+              );
+            })}
+            <button
+              onClick={() => setIsMemberFormOpen(true)}
+              className="flex flex-col items-center gap-1 w-16"
+            >
+              <div className="w-11 h-11 rounded-full border-2 border-dashed border-zinc-600 hover:border-violet-500/60 flex items-center justify-center text-zinc-500 hover:text-violet-400 transition-colors">
+                <PlusIcon className="h-4 w-4" />
+              </div>
+              <span className="text-[10px] text-zinc-500">Ajouter</span>
+            </button>
+          </div>
+          {!meUser ? (
+            <p className="text-[11px] text-amber-400/80">
+              Choisissez qui est « Moi » pour activer les tricounts.
+            </p>
+          ) : (
+            <p className="text-[11px] text-zinc-500">
+              Appuyez sur une personne pour ouvrir votre tricount partagé.
+            </p>
+          )}
         </div>
       )}
 

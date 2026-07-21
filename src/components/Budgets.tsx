@@ -53,7 +53,7 @@ const isOverdue = (deadline: string) => new Date(deadline) < new Date();
 
 export default function Budgets() {
   const navigate = useNavigate();
-  const { loadCategories, loadBanks } = useAppStore();
+  const { loadCategories, loadBanks, requestConfirm } = useAppStore();
 
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: ObjectiveProgress }>({});
@@ -183,7 +183,7 @@ export default function Budgets() {
 
   const handleDelete = async (objectiveId: string) => {
     setOpenMenuId(null);
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet objectif ?')) return;
+    if (!(await requestConfirm('Êtes-vous sûr de vouloir supprimer cet objectif ?', { title: 'Supprimer l\'objectif', confirmLabel: 'Supprimer', danger: true }))) return;
 
     try {
       const response = await fetch(`/api/objectives/${objectiveId}`, { method: 'DELETE' });

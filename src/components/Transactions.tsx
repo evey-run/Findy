@@ -34,6 +34,15 @@ const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('fr-FR');
 };
 
+// Tronque une description trop longue et ajoute des « … »
+const MAX_DESCRIPTION_LENGTH = 40;
+const truncateDescription = (text: string) => {
+  if (!text) return '';
+  return text.length > MAX_DESCRIPTION_LENGTH
+    ? text.slice(0, MAX_DESCRIPTION_LENGTH).trimEnd() + '…'
+    : text;
+};
+
 interface TransactionsProps {
   pageName?: string;
   showHeader?: boolean;
@@ -71,7 +80,8 @@ export default function Transactions({
     appendTransactions,
     setTransactions,
     pageFilters,
-    setPageFilter
+    setPageFilter,
+    requestConfirm
   } = useAppStore();
   
   // États pour l'import CSV
@@ -95,6 +105,13 @@ export default function Transactions({
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const ITEMS_PER_PAGE = 25; // Reduced for better initial performance
+  // Références pour un scroll infini robuste (IntersectionObserver + auto-remplissage)
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<() => void>(() => {});
+  // Empêche le chargement de la page suivante tant que la page 1 n'est pas chargée
+  // (évite une course entre le chargement initial et l'auto-remplissage → trou d'offset).
+  const initialLoadDoneRef = useRef(false);
   
   // États pour la sélection multiple
   const [selectedTransactions, setSelectedTransactions] = useState<string[]>([]);
@@ -173,11 +190,12 @@ export default function Transactions({
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
+      initialLoadDoneRef.current = false;
       try {
         // Initialiser les états de pagination pour le scroll infini
         setPage(1);
         setHasMore(true);
-        
+
         // Récupérer le paramètre de recherche depuis l'URL
         const searchParams = new URLSearchParams(location.search);
         const searchFromURL = searchParams.get('search');
@@ -217,15 +235,21 @@ export default function Transactions({
         // Mettre à jour les filtres dans l'état local
         setFilters(activeFilters);
         
-        // Use loadTransactions for initial load but with limit for pagination
-        await loadTransactions({ 
+        // Use loadTransactions for initial load but with limit for pagination.
+        // forceRefresh: true est essentiel — sans cela, revenir sur la page
+        // (navigation SPA) réutilise la liste en cache (potentiellement agrandie
+        // par le scroll infini) alors que la pagination locale repart à 1, ce qui
+        // désynchronise l'offset et empêche de charger la suite des transactions.
+        await loadTransactions({
           searchText: activeFilters.searchText || undefined,
           categoryId: activeFilters.categoryId || undefined,
           startDate: activeFilters.startDate || undefined,
           endDate: activeFilters.endDate || undefined,
           checked: activeFilters.checked || undefined,
+          excludeAccountType: 'INVESTMENT',
           pageName,
-          limit: ITEMS_PER_PAGE
+          limit: ITEMS_PER_PAGE,
+          forceRefresh: true
         });
         
         // Get the current state after loading to check transaction count
@@ -236,10 +260,11 @@ export default function Transactions({
         // Set hasMore based on whether we got a full page of results
         const hasMoreData = loadedCount >= ITEMS_PER_PAGE;
         setHasMore(hasMoreData);
-        
-        // Force a check for infinite scroll after initial load
-        console.log('🔄 Initial scroll check - hasMore:', hasMoreData, 'loadedCount:', loadedCount, 'ITEMS_PER_PAGE:', ITEMS_PER_PAGE);
-        
+
+        // Page 1 chargée : on autorise désormais le chargement des pages suivantes.
+        setPage(1);
+        initialLoadDoneRef.current = true;
+
         // Initialiser le formulaire d'ajout
         setEditingTransaction({
           id: '',
@@ -463,14 +488,16 @@ export default function Transactions({
     }
   };
   
-  // Filtrer les transactions en fonction des critères
+  // Filtrer les transactions en fonction des critères.
+  // NB: l'exclusion des comptes d'investissement est faite côté serveur
+  // (excludeAccountType) pour garder une pagination cohérente.
   const filteredTransactions = transactions.filter(transaction => {
-    // Exclure les transactions liées aux banques de type investissement
+    // Filet de sécurité si des transactions d'investissement traînent dans le cache
     const transactionBank = banks.find(bank => bank.id === transaction.bankId);
     if (transactionBank && transactionBank.accountType === 'INVESTMENT') {
       return false;
     }
-    
+
     // Filtre par banque sélectionnée
     if (selectedBank && String(transaction.bankId) !== String(selectedBank.id)) {
       return false;
@@ -546,7 +573,8 @@ export default function Transactions({
 
       // Recharger les transactions pour refléter l'état de la base
       try {
-        await loadTransactions();
+        await loadTransactions({ excludeAccountType: 'INVESTMENT', pageName, limit: ITEMS_PER_PAGE, forceRefresh: true });
+        setPage(1);
       } catch (e) {
         console.warn('Reload after bulk update failed:', e);
       }
@@ -803,8 +831,9 @@ export default function Transactions({
           }
           
           // Recharger les transactions
-          await loadTransactions();
-          
+          await loadTransactions({ excludeAccountType: 'INVESTMENT', pageName, limit: ITEMS_PER_PAGE, forceRefresh: true });
+          setPage(1);
+
           // Finaliser l'import
           setImportProgress(prev => ({ 
             ...prev, 
@@ -843,9 +872,7 @@ export default function Transactions({
 
   // Fonction pour charger plus de transactions
   const loadMoreData = async () => {
-    console.log('🔄 loadMoreData called - loadingMore:', loadingMore, 'hasMore:', hasMore, 'page:', page);
-    if (loadingMore || !hasMore) {
-      console.log('🚫 loadMoreData blocked - loadingMore:', loadingMore, 'hasMore:', hasMore);
+    if (!initialLoadDoneRef.current || loadingMore || !hasMore) {
       return;
     }
     
@@ -859,6 +886,7 @@ export default function Transactions({
         startDate: filters.startDate,
         endDate: filters.endDate,
         checked: filters.checked,
+        excludeAccountType: 'INVESTMENT',
         pageName
       });
       
@@ -878,21 +906,48 @@ export default function Transactions({
     }
   };
 
-  // Fonction de détection du scroll
+  // Fonction de détection du scroll (repli si l'IntersectionObserver ne suffit pas)
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    
-    console.log('📜 Scroll detected:', { scrollTop, scrollHeight, clientHeight, distanceFromBottom, distanceType: typeof distanceFromBottom });
-    
-    // Si on est proche du bas (4500px), charger plus de données
-    console.log('🔍 Checking condition: distanceFromBottom <=', 4500, ':', distanceFromBottom <= 4500, '- distanceFromBottom:', distanceFromBottom);
-    if (distanceFromBottom <= 4500) {
-      console.log('🎯 Near bottom, triggering loadMoreData - hasMore:', hasMore, 'loadingMore:', loadingMore, 'page:', page);
+    if (distanceFromBottom <= 800) {
       loadMoreData();
     }
   };
-  
+
+  // Garde une référence fraîche vers loadMoreData pour l'IntersectionObserver.
+  loadMoreRef.current = loadMoreData;
+
+  // IntersectionObserver : déclenche le chargement quand le bas de liste approche.
+  // Bien plus fiable que l'évènement scroll (qui peut ne pas se déclencher dans
+  // la WebView Tauri ou quand le conteneur défile peu).
+  useEffect(() => {
+    const root = scrollContainerRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMoreRef.current();
+      },
+      { root, rootMargin: '800px' }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
+  // Auto-remplissage : si la liste ne remplit pas le conteneur (grande fenêtre,
+  // pas de barre de défilement), on charge la page suivante jusqu'à ce qu'il y ait
+  // de quoi défiler. Sans ça, une fenêtre haute reste bloquée sur 25 lignes.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (hasMore && !loadingMore && el.scrollHeight <= el.clientHeight + 4) {
+      loadMoreData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredTransactions.length, hasMore, loadingMore]);
+
+
   // Fonctions pour la sélection multiple
   const handleToggleSelect = (id: string) => {
     setSelectedTransactions(prev => {
@@ -925,7 +980,7 @@ export default function Transactions({
   const handleDeleteSelected = async () => {
     if (selectedTransactions.length === 0) return;
     
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer ${selectedTransactions.length} transaction(s) ?`)) {
+    if (!(await requestConfirm(`Êtes-vous sûr de vouloir supprimer ${selectedTransactions.length} transaction(s) ?`, { title: 'Supprimer les transactions', confirmLabel: 'Supprimer', danger: true }))) {
       return;
     }
     
@@ -1018,6 +1073,7 @@ export default function Transactions({
     setPage(1);
     setHasMore(true);
     setLoading(true);
+    initialLoadDoneRef.current = false;
     try {
       await loadTransactions({
         searchText: newFilters.searchText || undefined,
@@ -1025,13 +1081,16 @@ export default function Transactions({
         startDate: newFilters.startDate || undefined,
         endDate: newFilters.endDate || undefined,
         checked: newFilters.checked || undefined,
+        excludeAccountType: 'INVESTMENT',
         pageName,
-        limit: ITEMS_PER_PAGE
+        limit: ITEMS_PER_PAGE,
+        forceRefresh: true
       });
       // Après loadTransactions, récupérer l'état courant
       const currentState = useAppStore.getState();
       setTransactions(currentState.transactions);
       setHasMore((currentState.transactions?.length || 0) >= ITEMS_PER_PAGE);
+      initialLoadDoneRef.current = true;
     } catch (err) {
       console.error('Erreur lors du chargement des transactions filtrées:', err);
     } finally {
@@ -1183,9 +1242,10 @@ export default function Transactions({
       </div>
 
       {/* Transactions Table */}
-      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10">
+      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 flex flex-col">
         <div
-          className="overflow-y-auto custom-scrollbar h-full"
+          ref={scrollContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
           onScroll={handleScroll}
         >
           <table className="w-full divide-y divide-zinc-800">
@@ -1389,12 +1449,12 @@ export default function Transactions({
                       autoFocus
                     />
                   ) : (
-                    <span 
+                    <span
                       onClick={() => handleInlineEdit(transaction.id, 'description')}
                       className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
-                      title="Double-cliquez pour éditer"
+                      title={transaction.description}
                     >
-                      {transaction.description}
+                      {truncateDescription(transaction.description)}
                     </span>
                   )}
                 </td>
@@ -1610,8 +1670,7 @@ export default function Transactions({
             ))}
           </tbody>
         </table>
-        </div>
-        
+
         {/* Indicateur de chargement pour le scroll infini */}
         {loadingMore && (
           <div className="flex justify-center py-4">
@@ -1619,7 +1678,25 @@ export default function Transactions({
             <span className="ml-2 text-sm text-zinc-300">Chargement...</span>
           </div>
         )}
-        
+
+        {/* Bouton « Charger plus » — repli garanti si la détection de scroll
+            ne se déclenche pas (WebView Tauri). Toujours atteignable en bas de liste. */}
+        {!loadingMore && hasMore && filteredTransactions.length > 0 && (
+          <div className="flex justify-center py-4">
+            <button
+              type="button"
+              onClick={() => loadMoreData()}
+              className="inline-flex items-center gap-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 text-zinc-200 text-sm font-medium px-4 py-2 transition-colors"
+            >
+              Charger plus de transactions
+            </button>
+          </div>
+        )}
+
+        {!hasMore && filteredTransactions.length > 0 && (
+          <div className="text-center py-4 text-xs text-zinc-600">Fin de la liste</div>
+        )}
+
         {filteredTransactions.length === 0 && (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1629,6 +1706,9 @@ export default function Transactions({
             <p className="mt-1 text-sm text-zinc-300">Commencez par ajouter une nouvelle transaction.</p>
           </div>
         )}
+        {/* Sentinelle observée pour le chargement infini */}
+        <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
+        </div>
       </div>
 
       {/* Modal d'import CSV */}
