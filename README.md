@@ -18,9 +18,9 @@ Locale, rapide, sans abonnement. Vos données ne quittent jamais votre machine.
 ---
 
 <div align="center">
-  <img src="docs/screenshots/dashboard-2.png" alt="Dashboard Findy - Vue d'ensemble" width="85%" />
+  <img src="public/assets/dashboard-screenshot.png" alt="Dashboard Findy - Vue d'ensemble" width="85%" />
   <br/><br/>
-  <img src="docs/screenshots/dashboard-1.png" alt="Dashboard Findy" width="85%" />
+  <img src="public/assets/Categories-screenshot.png" alt="Dashboard Findy" width="85%" />
 </div>
 
 ---
