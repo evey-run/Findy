@@ -1,5 +1,6 @@
 import express from 'express';
 import prisma from '../prisma';
+import { resolveScope, categoryWhere } from '../lib/scope';
 
 const router = express.Router();
 
@@ -9,7 +10,13 @@ router.get('/', async (req, res) => {
     const { type } = req.query;
     
     const categories = await prisma.category.findMany({
-      where: type ? { type: type as any } : undefined,
+      // Les catégories sont un vocabulaire commun : `spaceId = null` = catalogue
+      // partagé par tous, toujours visible. Une catégorie rattachée à un espace
+      // est privée à ses membres (l'exception, pas la règle).
+      where: {
+        ...(type ? { type: type as any } : {}),
+        ...categoryWhere(await resolveScope(req.query as any))
+      },
       include: {
         _count: {
           select: {

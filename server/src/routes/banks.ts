@@ -3,11 +3,29 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from '../prisma';
+import { resolveScope, resolveSpaceForUsers } from '../lib/scope';
+import { computeBalance } from '../lib/balance';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+/**
+ * Un compte appartient désormais à un Espace. L'UI, elle, raisonne encore en
+ * « qui possède ce compte ? » — on expose donc `users` (les membres de l'espace)
+ * et `userBanks` (même forme qu'avant) pour ne rien casser côté front.
+ */
+function withSpaceMembers(bank: any) {
+  const users = (bank.space?.members ?? []).map((m: any) => m.user);
+  return {
+    ...bank,
+    initialBalance: bank.balance,
+    users,
+    userBanks: users.map((user: any) => ({ userId: user.id, bankId: bank.id, user })),
+    spaceName: bank.space?.name ?? null
+  };
+}
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 
 // Configuration multer pour l'upload d'images
@@ -42,18 +60,15 @@ const upload = multer({
 // GET /api/banks - Get all banks (optionally filtered by user)
 router.get('/', async (req, res) => {
   try {
-    const { userId, archived } = req.query;
-    
+    const { archived } = req.query;
+
     // Construire le filtre where
     let whereClause: any = {};
-    
-    // Filtre par utilisateur si spécifié
-    if (userId) {
-      whereClause.userBanks = {
-        some: {
-          userId: userId as string
-        }
-      };
+
+    // Portée : un espace précis (spaceId) ou l'union des espaces de l'utilisateur (userId)
+    const scope = await resolveScope(req.query as any);
+    if (scope) {
+      whereClause.spaceId = { in: scope };
     }
     
     // Filtre par statut archivé
@@ -64,15 +79,9 @@ router.get('/', async (req, res) => {
     const banks = await prisma.bank.findMany({
       where: whereClause,
       include: {
-        userBanks: {
+        space: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true
-              }
-            }
+            members: { include: { user: { select: { id: true, name: true, avatar: true } } } }
           }
         }
       },
@@ -81,22 +90,37 @@ router.get('/', async (req, res) => {
       }
     });
 
-    // Compute balances: bank.balance + sum(transactions) for each bank
+    // Solde = bank.balance + mouvements, avec deux régimes selon le type de
+    // compte (cf. lib/balance.ts). On agrège séparément les transactions qui
+    // portent une quantité (achat/vente d'actif) des autres (flux de trésorerie).
     const bankIds = banks.map(b => b.id);
-    const aggregated = bankIds.length > 0
-      ? await prisma.transaction.groupBy({
-          by: ['bankId'],
-          where: { bankId: { in: bankIds } },
-          _sum: { amount: true },
-        })
-      : [];
-    const txSums = new Map(aggregated.map((g) => [g.bankId, g._sum.amount ?? 0]));
+    const [assetSums, cashSums] = bankIds.length > 0
+      ? await Promise.all([
+          prisma.transaction.groupBy({
+            by: ['bankId'],
+            where: { bankId: { in: bankIds }, quantity: { not: null } },
+            _sum: { amount: true },
+          }),
+          prisma.transaction.groupBy({
+            by: ['bankId'],
+            where: { bankId: { in: bankIds }, quantity: null },
+            _sum: { amount: true },
+          }),
+        ])
+      : [[], []];
+    const assetFlow = new Map(assetSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
+    const cashFlow = new Map(cashSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
 
     // Transform the data to match the expected format
     const transformedBanks = banks.map(bank => ({
-      ...bank,
-      balance: bank.balance + (txSums.get(bank.id) ?? 0),
-      users: bank.userBanks.map(ub => ub.user)
+      ...withSpaceMembers(bank),
+      // `initialBalance` = valeur stockée, celle qu'édite le formulaire.
+      // `balance` = solde affiché, recalculé depuis les mouvements.
+      initialBalance: bank.balance,
+      balance: computeBalance(bank, {
+        assetFlow: assetFlow.get(bank.id) ?? 0,
+        cashFlow: cashFlow.get(bank.id) ?? 0
+      })
     }));
     
     res.json(transformedBanks);
@@ -113,31 +137,19 @@ router.get('/:id', async (req, res) => {
     const bank = await prisma.bank.findUnique({
       where: { id },
       include: {
-        userBanks: {
+        space: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true
-              }
-            }
+            members: { include: { user: { select: { id: true, name: true, avatar: true } } } }
           }
         }
       }
     });
-    
+
     if (!bank) {
       return res.status(404).json({ error: 'Bank not found' });
     }
-    
-    // Transform the data to match the expected format
-    const transformedBank = {
-      ...bank,
-      users: bank.userBanks.map(ub => ub.user)
-    };
-    
-    res.json(transformedBank);
+
+    res.json(withSpaceMembers(bank));
   } catch (error) {
     console.error('Error fetching bank:', error);
     res.status(500).json({ error: 'Failed to fetch bank' });
@@ -187,33 +199,21 @@ router.post('/', upload.single('image'), async (req, res) => {
         balance: parseFloat(balance) || 0,
         accountType: accountType || 'CURRENT',
         createdAt: createdAtDate,
-        userBanks: {
-          create: userIds.map((userId: string) => ({
-            userId: userId
-          }))
-        }
+        // L'UI coche des personnes ; on en déduit l'espace correspondant
+        // (réutilisé s'il existe déjà avec exactement ces membres, sinon créé).
+        spaceId: await resolveSpaceForUsers(userIds)
       },
       include: {
-        userBanks: {
+        space: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true
-              }
-            }
+            members: { include: { user: { select: { id: true, name: true, avatar: true } } } }
           }
         }
       }
     });
-    
-    // Transform the data to match the expected format
-    const transformedBank = {
-      ...bank,
-      users: bank.userBanks.map(ub => ub.user)
-    };
-    
+
+    const transformedBank = withSpaceMembers(bank);
+
     console.log('🔧 Bank created successfully:', transformedBank.name);
     res.status(201).json(transformedBank);
   } catch (error) {
@@ -289,20 +289,13 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateData.image = `/uploads/${req.file.filename}`;
     }
     
-    // Si des userIds sont fournis, mettre à jour les relations utilisateur-banque
+    // Changer les propriétaires = déplacer le compte vers l'espace correspondant.
     if (userIds.length > 0) {
-      // Supprimer toutes les relations existantes
-      await prisma.userBank.deleteMany({
-        where: { bankId: id }
-      });
-      
-      // Créer les nouvelles relations
-      await prisma.userBank.createMany({
-        data: userIds.map((userId) => ({
-          userId,
-          bankId: id
-        }))
-      });
+      updateData.spaceId = await resolveSpaceForUsers(userIds);
+    }
+    // Déplacement explicite vers un espace donné (action « Déplacer vers… »).
+    if (req.body.spaceId) {
+      updateData.spaceId = req.body.spaceId;
     }
 
     console.log('🔧 About to update bank with ID:', id);
@@ -310,27 +303,15 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       where: { id },
       data: updateData,
       include: {
-        userBanks: {
+        space: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true
-              }
-            }
+            members: { include: { user: { select: { id: true, name: true, avatar: true } } } }
           }
         }
       }
     });
-    
-    // Transform the data to match the expected format
-    const transformedBank = {
-      ...bank,
-      users: bank.userBanks.map(ub => ub.user)
-    };
-    
-    res.json(transformedBank);
+
+    res.json(withSpaceMembers(bank));
   } catch (error) {
     console.error('Error updating bank:', error);
     res.status(500).json({ error: 'Failed to update bank' });
@@ -346,27 +327,15 @@ router.put('/:id/restore', async (req, res) => {
       where: { id },
       data: { archived: false },
       include: {
-        userBanks: {
+        space: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                avatar: true
-              }
-            }
+            members: { include: { user: { select: { id: true, name: true, avatar: true } } } }
           }
         }
       }
     });
-    
-    // Transform the data to match the expected format
-    const transformedBank = {
-      ...bank,
-      users: bank.userBanks.map(ub => ub.user)
-    };
-    
-    res.json(transformedBank);
+
+    res.json(withSpaceMembers(bank));
   } catch (error) {
     console.error('Error restoring bank:', error);
     res.status(500).json({ error: 'Failed to restore bank' });
@@ -407,11 +376,6 @@ router.delete('/:id/permanent', async (req, res) => {
       
       // Delete all recurrences associated with this bank
       await tx.recurrence.deleteMany({
-        where: { bankId: id }
-      });
-      
-      // Delete user-bank relationships
-      await tx.userBank.deleteMany({
         where: { bankId: id }
       });
       

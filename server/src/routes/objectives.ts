@@ -1,13 +1,19 @@
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../prisma';
+import { resolveScope, personalSpaceId } from '../lib/scope';
 
 const router = express.Router();
 
 // Récupérer tous les objectifs
 router.get('/', async (req, res) => {
   try {
+    // Portée : un objectif appartient à un espace. « Famille » = partagé,
+    // l'espace perso = privé. Sans filtre, on renvoie tout (vue globale).
+    const scope = await resolveScope(req.query as any);
     const objectives = await prisma.objective.findMany({
+      where: scope ? { spaceId: { in: scope } } : {},
+      include: { space: { select: { id: true, name: true, kind: true } } },
       orderBy: { createdAt: 'desc' }
     });
     res.json(objectives);
@@ -100,8 +106,8 @@ router.get('/:id/progress', async (req, res) => {
 // Créer un nouvel objectif
 router.post('/', async (req, res) => {
   try {
-    const { title, description, targetAmount, deadline, icon } = req.body;
-    
+    const { title, description, targetAmount, deadline, icon, spaceId, userId } = req.body;
+
     if (!title || !targetAmount) {
       return res.status(400).json({ error: 'Title and target amount are required' });
     }
@@ -117,6 +123,9 @@ router.post('/', async (req, res) => {
         targetAmount: parseFloat(targetAmount),
         deadline: deadline ? new Date(deadline) : null,
         isCompleted: false,
+        // L'espace suit le sélecteur actif ; à défaut l'espace personnel, pour
+        // qu'un objectif ne devienne jamais partagé par accident.
+        spaceId: spaceId || (userId ? await personalSpaceId(userId) : null),
         createdAt: new Date(now),
         updatedAt: new Date(now)
       }
@@ -131,7 +140,7 @@ router.post('/', async (req, res) => {
 // Mettre à jour un objectif
 router.put('/:id', async (req, res) => {
   try {
-    const { title, description, targetAmount, deadline, icon } = req.body;
+    const { title, description, targetAmount, deadline, icon, spaceId } = req.body;
     const { id } = req.params;
     
     if (!title || !targetAmount) {
@@ -154,6 +163,8 @@ router.put('/:id', async (req, res) => {
         description: description || '',
         targetAmount: parseFloat(targetAmount),
         deadline: deadline ? new Date(deadline) : null,
+        // Déplacement d'espace = action « Partager / Rendre privé ».
+        ...(spaceId !== undefined && { spaceId }),
         updatedAt: new Date(now)
       }
     });

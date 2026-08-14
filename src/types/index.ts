@@ -4,9 +4,30 @@ export interface User {
   avatar?: string;
   email?: string; // Optional field for future use
   isMe?: boolean; // Marque l'utilisateur « Moi »
+  hasPassword?: boolean; // Profil protégé par un mot de passe (optionnel)
+  spaces?: Space[];      // Espaces dont l'utilisateur est membre
   createdAt: string;
   updatedAt: string;
   userBanks?: UserBank[];
+}
+
+/** Un Espace : le périmètre de partage des données (perso ou partagé). */
+export interface Space {
+  id: string;
+  name: string;
+  kind: 'PERSONAL' | 'SHARED';
+  color?: string | null;
+  members?: User[];
+  memberIds?: string[];
+}
+
+/** Profil léger affiché sur l'écran de connexion. */
+export interface AuthProfile {
+  id: string;
+  name: string;
+  avatar?: string | null;
+  isMe?: boolean;
+  hasPassword: boolean;
 }
 
 // Dette « tricount » : fromUser doit `amount` à toUser.
@@ -37,7 +58,10 @@ export interface Bank {
   color: string;
   image?: string;
   iban?: string;
+  /** Solde affiché, recalculé depuis les mouvements (cf. server/lib/balance.ts). */
   balance: number;
+  /** Solde initial stocké — c'est lui qu'édite le formulaire, pas `balance`. */
+  initialBalance?: number;
   accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT';
   archived: boolean;
   archivedAt?: string;
@@ -56,6 +80,8 @@ export interface Bank {
 }
 
 export interface Category {
+  /** null = catalogue commun visible par tous ; sinon privée à un espace. */
+  spaceId?: string | null;
   id: string;
   name: string;
   type: 'INCOME' | 'EXPENSE' | 'FIXED';
@@ -104,7 +130,8 @@ export interface Budget {
   amount: number;
   period: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
   startDate: string;
-  shared: boolean;
+  /** Espace propriétaire : c'est lui qui définit si le budget est partagé. */
+  spaceId?: string | null;
   createdAt: string;
   updatedAt: string;
   bankId?: string;
@@ -186,6 +213,9 @@ export interface Objective {
   icon?: string;
   isCompleted: boolean;
   archived: boolean;
+  /** Espace propriétaire : perso = privé, partagé = visible par ses membres. */
+  spaceId?: string | null;
+  space?: { id: string; name: string; kind: 'PERSONAL' | 'SHARED' };
   createdAt: string;
   updatedAt: string;
 }
@@ -218,7 +248,7 @@ export interface CreateBudgetData {
   amount: number;
   period?: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
   startDate?: string;
-  shared?: boolean;
+  spaceId?: string;
   bankId?: string;
   categoryId: string;
 }

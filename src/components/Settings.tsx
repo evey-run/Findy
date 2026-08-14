@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowDownTrayIcon, ArrowUpTrayIcon, CheckCircleIcon, TrashIcon, ArrowPathIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { getAutoUpdateEnabled, setAutoUpdateEnabled, checkForUpdates, downloadAndInstallUpdate, type VersionInfo, type UpdateProgress } from '../utils/updates';
+import { useAppStore } from '../store';
 
 type Msg = { type: 'success' | 'error'; text: string };
 
@@ -38,6 +40,68 @@ const SYNC_PROVIDERS: SyncProvider[] = [
 ];
 
 export default function Settings() {
+  // Compte connecté — le mot de passe reste optionnel, on peut l'ajouter ou le retirer ici.
+  const { authUser, setPassword, logout, users, loadUsers, spaces, loadSpaces, createSpace, renameSpace } = useAppStore();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ── Espaces : le périmètre de partage (perso vs « Famille ») ──
+  const [newSpaceName, setNewSpaceName] = useState('');
+  const [newSpaceMembers, setNewSpaceMembers] = useState<string[]>([]);
+  const [creatingSpace, setCreatingSpace] = useState(false);
+
+  useEffect(() => {
+    loadUsers();
+    loadSpaces();
+  }, [loadUsers, loadSpaces]);
+
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const handleRename = async (spaceId: string) => {
+    if (!renameValue.trim()) return setRenamingId(null);
+    try {
+      await renameSpace(spaceId, renameValue.trim());
+      toast.success('Espace renommé');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Renommage impossible');
+    } finally {
+      setRenamingId(null);
+    }
+  };
+
+  const handleCreateSpace = async () => {
+    if (!newSpaceName.trim() || newSpaceMembers.length < 2) return;
+    setCreatingSpace(true);
+    try {
+      await createSpace(newSpaceName.trim(), newSpaceMembers);
+      setNewSpaceName('');
+      setNewSpaceMembers([]);
+      toast.success('Espace créé');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Création impossible');
+    } finally {
+      setCreatingSpace(false);
+    }
+  };
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [savingPwd, setSavingPwd] = useState(false);
+
+  const handleSavePassword = async (remove: boolean) => {
+    if (!authUser) return;
+    setSavingPwd(true);
+    try {
+      await setPassword(authUser.id, remove ? null : newPwd, currentPwd || undefined);
+      setCurrentPwd('');
+      setNewPwd('');
+      toast.success(remove ? 'Mot de passe retiré' : 'Mot de passe enregistré');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Modification impossible');
+    } finally {
+      setSavingPwd(false);
+    }
+  };
+
   const [importing, setImporting] = useState(false);
   const [msg, setMsg] = useState<Msg | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -68,6 +132,21 @@ export default function Settings() {
       .then((info) => { if (info) setVersionInfo(info); })
       .catch(() => {});
   }, []);
+
+  // « Lier une banque » redirige ici quand Enable Banking n'est pas configuré —
+  // ouvre directement le modal de configuration.
+  useEffect(() => {
+    if (searchParams.get('setup') !== 'enablebanking') return;
+    const provider = SYNC_PROVIDERS.find((p) => p.id === 'enablebanking');
+    if (provider) {
+      setSetupModal(provider);
+      setEbAppIdInput('');
+      setEbPrivateKeyInput('');
+      setEbNgrokInput('');
+      setEbNgrokDomainInput('');
+    }
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const handleToggleAutoUpdate = (next: boolean) => {
     setAutoUpdate(next);
@@ -228,6 +307,162 @@ export default function Settings() {
       <div>
         <h2 className="text-2xl font-bold text-white">Paramètres</h2>
         <p className="text-sm text-zinc-400 mt-1">Gérez vos données et préférences</p>
+      </div>
+
+      {/* ── Compte ── */}
+      {authUser && (
+        <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 max-w-2xl">
+          <h3 className="text-base font-semibold text-white mb-0.5">Compte</h3>
+          <p className="text-sm text-zinc-400 mb-5">
+            Connecté en tant que <span className="text-zinc-200 font-medium">{authUser.name}</span>.
+            Le mot de passe est optionnel — il sert uniquement à protéger l'accès à ce profil.
+          </p>
+
+          <div className="space-y-3">
+            {authUser.hasPassword && (
+              <input
+                type="password"
+                value={currentPwd}
+                onChange={(e) => setCurrentPwd(e.target.value)}
+                placeholder="Mot de passe actuel"
+                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-50 placeholder-zinc-600 focus:outline-none focus:border-violet-500/50"
+              />
+            )}
+            <input
+              type="password"
+              value={newPwd}
+              onChange={(e) => setNewPwd(e.target.value)}
+              placeholder={authUser.hasPassword ? 'Nouveau mot de passe' : 'Définir un mot de passe'}
+              className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-50 placeholder-zinc-600 focus:outline-none focus:border-violet-500/50"
+            />
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleSavePassword(false)}
+                disabled={savingPwd || !newPwd}
+                className="bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl px-4 py-2.5 transition-colors"
+              >
+                {authUser.hasPassword ? 'Changer le mot de passe' : 'Définir un mot de passe'}
+              </button>
+              {authUser.hasPassword && (
+                <button
+                  onClick={() => handleSavePassword(true)}
+                  disabled={savingPwd || !currentPwd}
+                  className="border border-white/10 hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-300 text-sm font-medium rounded-xl px-4 py-2.5 transition-colors"
+                >
+                  Retirer le mot de passe
+                </button>
+              )}
+              <button
+                onClick={logout}
+                className="ml-auto border border-white/10 hover:bg-white/5 text-zinc-400 text-sm font-medium rounded-xl px-4 py-2.5 transition-colors"
+              >
+                Déconnexion
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Espaces ── */}
+      <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 max-w-2xl">
+        <h3 className="text-base font-semibold text-white mb-0.5">Espaces</h3>
+        <p className="text-sm text-zinc-400 mb-5">
+          Un espace définit qui voit quoi. Votre espace personnel reste privé. Un groupe
+          réunit au moins deux personnes et porte le nom que vous lui donnez — comptes,
+          objectifs et budgets appartiennent chacun à un espace.
+        </p>
+
+        <div className="space-y-2 mb-5">
+          {spaces.map((space) => (
+            <div
+              key={space.id}
+              className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-4 py-3"
+            >
+              <div className="min-w-0 flex-1">
+                {renamingId === space.id ? (
+                  <input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={() => handleRename(space.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRename(space.id);
+                      if (e.key === 'Escape') setRenamingId(null);
+                    }}
+                    className="w-full bg-zinc-900 border border-violet-500/50 rounded-lg px-2 py-1 text-sm text-zinc-50 focus:outline-none"
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-zinc-100 truncate">{space.name}</p>
+                )}
+                <p className="text-xs text-zinc-500 truncate">
+                  {space.kind === 'SHARED'
+                    ? (space.members ?? []).map((m) => m.name).join(', ')
+                    : 'Personnel'}
+                </p>
+              </div>
+              {space.kind === 'SHARED' && renamingId !== space.id && (
+                <button
+                  onClick={() => { setRenamingId(space.id); setRenameValue(space.name); }}
+                  className="text-xs text-zinc-500 hover:text-violet-300 transition-colors"
+                >
+                  Renommer
+                </button>
+              )}
+              <span className="text-[11px] uppercase tracking-wide text-zinc-600">
+                {space.kind === 'SHARED' ? 'Groupe' : 'Perso'}
+              </span>
+            </div>
+          ))}
+          {spaces.length === 0 && (
+            <p className="text-sm text-zinc-500">Aucun espace pour l'instant.</p>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-dashed border-white/10 p-4 space-y-3">
+          <p className="text-xs font-medium text-zinc-400">Nouveau groupe</p>
+          <input
+            type="text"
+            value={newSpaceName}
+            onChange={(e) => setNewSpaceName(e.target.value)}
+            placeholder="Nom du groupe (ex. Famille, Coloc, Tout…)"
+            className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-50 placeholder-zinc-600 focus:outline-none focus:border-violet-500/50"
+          />
+          <div className="flex flex-wrap gap-2">
+            {users.map((user) => {
+              const selected = newSpaceMembers.includes(user.id);
+              return (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() =>
+                    setNewSpaceMembers((prev) =>
+                      prev.includes(user.id) ? prev.filter((id) => id !== user.id) : [...prev, user.id]
+                    )
+                  }
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    selected
+                      ? 'border-violet-500/50 bg-violet-600/20 text-violet-200'
+                      : 'border-white/10 text-zinc-400 hover:border-white/20 hover:text-zinc-200'
+                  }`}
+                >
+                  {user.name}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            onClick={handleCreateSpace}
+            disabled={creatingSpace || !newSpaceName.trim() || newSpaceMembers.length < 2}
+            className="bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl px-4 py-2.5 transition-colors"
+          >
+            {creatingSpace ? 'Création…' : 'Créer le groupe'}
+          </button>
+          {newSpaceMembers.length === 1 && (
+            <p className="text-[11px] text-zinc-600">
+              Sélectionnez au moins deux personnes — votre espace personnel existe déjà.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* ── Synchronisation ── */}

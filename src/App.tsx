@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAppStore } from './store';
 import Layout from './components/Layout';
+import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Transactions from './components/Transactions';
 import Investissement from './components/Investissement';
@@ -14,15 +15,43 @@ import ErrorBoundary from './components/ErrorBoundary';
 import ConfirmDialog from './components/ConfirmDialog';
 import { Toaster } from 'react-hot-toast';
 
+const toaster = (
+  <Toaster
+    position="top-right"
+    toastOptions={{
+      duration: 3000,
+      style: {
+        background: '#18181b',
+        color: '#fafafa',
+        border: '1px solid rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(24px)',
+      },
+    }}
+  />
+);
+
 function App() {
   const {
+    authUser,
+    authReady,
+    restoreSession,
     loadUsers,
     loadCategories,
     loadBudgets,
     loadDashboardOverview
   } = useAppStore();
 
+  // Restaure la session au démarrage (avant tout chargement de données).
   useEffect(() => {
+    restoreSession();
+  }, [restoreSession]);
+
+  useEffect(() => {
+    // Les données sont rattachées à l'utilisateur connecté : rien à charger tant
+    // que personne n'est connecté.
+    if (!authUser) return;
+
+    console.log('Bonjour et bienvenue sur findy !');
     // Charger les données globales au démarrage.
     // NB: on ne précharge PAS les transactions ici — chaque page (Transactions,
     // Investissement) charge sa propre liste paginée. Un chargement global (limit 50)
@@ -40,7 +69,23 @@ function App() {
     };
 
     initializeApp();
-  }, [loadUsers, loadCategories, loadBudgets, loadDashboardOverview]);
+  }, [authUser, loadUsers, loadCategories, loadBudgets, loadDashboardOverview]);
+
+  // Évite le flash de l'écran de connexion le temps de restaurer la session.
+  if (!authReady) {
+    return <div className="min-h-screen bg-[#09090b]" />;
+  }
+
+  if (!authUser) {
+    return (
+      <div className="min-h-screen bg-[#09090b]">
+        <ErrorBoundary>
+          <Login />
+        </ErrorBoundary>
+        {toaster}
+      </div>
+    );
+  }
 
   return (
     <Router>
@@ -62,18 +107,7 @@ function App() {
           </ErrorBoundary>
         </Layout>
         <ConfirmDialog />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#18181b',
-              color: '#fafafa',
-              border: '1px solid rgba(255,255,255,0.1)',
-              backdropFilter: 'blur(24px)',
-            },
-          }}
-        />
+        {toaster}
       </div>
     </Router>
   );

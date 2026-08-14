@@ -1,7 +1,12 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import { installApiBase } from './lib/apiBase'
 import './index.css'
+
+// Avant tout rendu : en app packagée, les appels backend doivent viser le
+// sidecar Express et non le protocole d'assets de Tauri.
+installApiBase();
 
 // Configuration globale pour la locale française
 if (typeof window !== 'undefined') {

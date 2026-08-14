@@ -11,6 +11,23 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
 
+/**
+ * Le hash du mot de passe ne doit jamais sortir de l'API : on expose juste
+ * `hasPassword`. On aplatit aussi les espaces en `spaces` + `userBanks`
+ * (les comptes de tous ses espaces), forme attendue par l'UI existante.
+ */
+function sanitizeUser<T extends { passwordHash?: string | null; spaceMembers?: any[] }>(user: T) {
+  const { passwordHash, spaceMembers, ...rest } = user as any;
+  const spaces = (spaceMembers ?? []).map((m: any) => m.space);
+  const banks = spaces.flatMap((space: any) => space?.banks ?? []);
+  return {
+    ...rest,
+    hasPassword: !!passwordHash,
+    spaces: spaces.map((s: any) => ({ id: s.id, name: s.name, kind: s.kind })),
+    userBanks: banks.map((bank: any) => ({ userId: rest.id, bankId: bank.id, bank }))
+  };
+}
+
 // Configuration multer pour upload d'avatar
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -43,9 +60,9 @@ router.get('/', async (req, res) => {
   try {
     const users = await prisma.user.findMany({
       include: {
-        userBanks: {
+        spaceMembers: {
           include: {
-            bank: true
+            space: { include: { banks: true } }
           }
         }
       },
@@ -53,7 +70,7 @@ router.get('/', async (req, res) => {
         createdAt: 'asc'
       }
     });
-    res.json(users);
+    res.json(users.map(sanitizeUser));
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
@@ -67,9 +84,9 @@ router.get('/:id', async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
-        userBanks: {
+        spaceMembers: {
           include: {
-            bank: true
+            space: { include: { banks: true } }
           }
         }
       }
@@ -79,7 +96,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    res.json(user);
+    res.json(sanitizeUser(user));
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({ error: 'Failed to fetch user' });
@@ -109,13 +126,15 @@ router.post('/', async (req, res) => {
         isMe: existingCount === 0
       },
       include: {
-        userBanks: {
-          include: { bank: true }
+        spaceMembers: {
+          include: {
+            space: { include: { banks: true } }
+          }
         }
       }
     });
 
-    res.status(201).json(user);
+    res.status(201).json(sanitizeUser(user));
   } catch (error) {
     console.error('Error creating user:', error);
     res.status(500).json({ error: 'Failed to create user' });
@@ -139,11 +158,17 @@ router.put('/:id/set-me', async (req, res) => {
     ]);
 
     const users = await prisma.user.findMany({
-      include: { userBanks: { include: { bank: true } } },
+      include: {
+        spaceMembers: {
+          include: {
+            space: { include: { banks: true } }
+          }
+        }
+      },
       orderBy: { createdAt: 'asc' }
     });
 
-    res.json(users);
+    res.json(users.map(sanitizeUser));
   } catch (error) {
     console.error('Error setting "me" user:', error);
     res.status(500).json({ error: 'Failed to set current user' });
@@ -187,15 +212,15 @@ router.put('/:id', upload.single('avatar'), async (req, res) => {
       where: { id },
       data: updateData,
       include: {
-        userBanks: {
+        spaceMembers: {
           include: {
-            bank: true
+            space: { include: { banks: true } }
           }
         }
       }
     });
     
-    res.json(user);
+    res.json(sanitizeUser(user));
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Failed to update user' });

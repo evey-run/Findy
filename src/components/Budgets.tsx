@@ -32,6 +32,7 @@ const emptyForm = {
   targetAmount: '',
   deadline: '',
   icon: 'TrophyIcon',
+  spaceId: '', // '' = suit le sélecteur d'espace actif
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ const isOverdue = (deadline: string) => new Date(deadline) < new Date();
 
 export default function Budgets() {
   const navigate = useNavigate();
-  const { loadCategories, loadBanks, requestConfirm } = useAppStore();
+  const { loadCategories, loadBanks, requestConfirm, spaces, currentSpace, authUser, scopeParams } = useAppStore();
 
   const [objectives, setObjectives] = useState<Objective[]>([]);
   const [objectiveProgress, setObjectiveProgress] = useState<{ [key: string]: ObjectiveProgress }>({});
@@ -72,7 +73,8 @@ export default function Budgets() {
     loadObjectives();
     loadCategories();
     loadBanks();
-  }, [loadCategories, loadBanks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadCategories, loadBanks, currentSpace?.id]);
 
   useEffect(() => {
     objectives.forEach((objective) => fetchObjectiveProgress(objective.id));
@@ -89,7 +91,8 @@ export default function Budgets() {
   const loadObjectives = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/objectives');
+      const params = new URLSearchParams(scopeParams());
+      const response = await fetch(`/api/objectives?${params}`);
       if (response.ok) {
         setObjectives(await response.json());
       }
@@ -129,6 +132,7 @@ export default function Budgets() {
       targetAmount: objective.targetAmount.toString(),
       deadline: objective.deadline ? objective.deadline.split('T')[0] : '',
       icon: objective.icon || 'TrophyIcon',
+      spaceId: objective.spaceId || '',
     });
     setIsFormOpen(true);
   };
@@ -151,6 +155,10 @@ export default function Budgets() {
       ...formData,
       targetAmount: parseFloat(formData.targetAmount),
       deadline: formData.deadline || null,
+      // L'espace suit le sélecteur actif : en « Famille » l'objectif est partagé,
+      // en perso il est privé. En « Tout », on retombe sur l'espace personnel.
+      spaceId: formData.spaceId || currentSpace?.id || undefined,
+      userId: authUser?.id,
     };
 
     try {
@@ -504,6 +512,30 @@ export default function Budgets() {
                     className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors [color-scheme:dark]"
                   />
                 </div>
+              </div>
+
+              {/* Partage : c'est l'espace qui décide qui voit l'objectif. */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">Visible dans</label>
+                <select
+                  value={formData.spaceId}
+                  onChange={(e) => setFormData({ ...formData, spaceId: e.target.value })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
+                >
+                  {currentSpace && (
+                    <option value="">{currentSpace.name} (espace actif)</option>
+                  )}
+                  {spaces
+                    .filter((space) => space.id !== currentSpace?.id)
+                    .map((space) => (
+                      <option key={space.id} value={space.id}>
+                        {space.name}{space.kind === 'SHARED' ? ' — groupe' : ''}
+                      </option>
+                    ))}
+                </select>
+                <p className="text-[11px] text-zinc-600 mt-1.5">
+                  Un groupe rend l'objectif visible par tous ses membres.
+                </p>
               </div>
 
               <div>

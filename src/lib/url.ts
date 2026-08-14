@@ -1,6 +1,7 @@
-// Base de l'API/assets. Vide en dev (proxy Vite gère /api et /uploads) ;
-// surchargeable au build via VITE_API_BASE pour le packaging.
-export const API_BASE = import.meta.env.VITE_API_BASE ?? '';
+// Base de l'API/assets — résolue à l'exécution, cf. lib/apiBase.ts.
+// Vide en dev (le proxy Vite gère /api et /uploads) et sur le web.
+export { API_BASE } from './apiBase';
+import { API_BASE } from './apiBase';
 
 /** Construit l'URL d'un asset servi par le backend (images uploadées). */
 export function assetUrl(path?: string | null): string {

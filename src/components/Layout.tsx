@@ -14,6 +14,8 @@ import {
   ChevronUpIcon,
   FlagIcon,
   Cog6ToothIcon,
+  ArrowRightOnRectangleIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 
 interface LayoutProps {
@@ -45,7 +47,7 @@ function cx(...classes: (string | false | undefined)[]) {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
 
-  const { users, selectedUser, setSelectedUser } = useAppStore();
+  const { spaces, currentSpace, setCurrentSpace, authUser, logout } = useAppStore();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const [versionInfo, setVersionInfo] = useState<(VersionInfo & { updateAvailable: boolean }) | null>(null);
@@ -87,7 +89,23 @@ export default function Layout({ children }: LayoutProps) {
     );
   };
 
-  const currentUserDisplay = selectedUser ?? null;
+  /** Un espace partagé montre les avatars empilés de ses membres ; un perso, son avatar. */
+  const renderSpaceIcon = (space: { name: string; kind: string; members?: { id: string; name: string; avatar?: string }[] }, size = 'h-9 w-9') => {
+    const members = space.members ?? [];
+    if (space.kind === 'PERSONAL' || members.length <= 1) {
+      return renderAvatar(members[0] ?? { name: space.name }, size);
+    }
+    return (
+      <div className={`${size} rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0`}>
+        <UsersIcon className="h-4 w-4 text-violet-400" />
+      </div>
+    );
+  };
+
+  // Le sélecteur bascule la PORTÉE des données, pas l'identité : on reste
+  // connecté en tant que soi (nécessaire pour les dettes « qui a payé »), on
+  // choisit juste ce qu'on regarde — son espace, ou un groupe dont on est membre.
+  const scopeLabel = currentSpace?.name ?? '…';
 
   return (
     <div className="flex h-screen bg-[#09090b] overflow-hidden">
@@ -103,21 +121,20 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           </div>
 
-          {/* User selector */}
+          {/* Sélecteur d'espace */}
           <div className="px-4 mt-6 flex-shrink-0">
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                 className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 rounded-xl transition-colors"
               >
-                {currentUserDisplay ? (
-                  renderAvatar(currentUserDisplay, 'h-9 w-9')
-                ) : (
-                  <div className="h-9 w-9 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400 font-bold text-sm flex-shrink-0">
-                    ∀
-                  </div>
-                )}
-                <span className="text-zinc-50 font-medium text-sm truncate">{currentUserDisplay?.name ?? 'Tous'}</span>
+                {currentSpace && renderSpaceIcon(currentSpace)}
+                <div className="min-w-0 text-left">
+                  <p className="text-zinc-50 font-medium text-sm truncate">{scopeLabel}</p>
+                  <p className="text-zinc-500 text-[11px] truncate">
+                    {currentSpace?.kind === 'SHARED' ? 'Groupe partagé' : 'Mon espace'}
+                  </p>
+                </div>
                 <span className="ml-auto flex-shrink-0">
                   {isUserMenuOpen
                     ? <ChevronUpIcon className="h-3 w-3 text-zinc-500" />
@@ -128,31 +145,26 @@ export default function Layout({ children }: LayoutProps) {
               {/* Dropdown */}
               {isUserMenuOpen && (
                 <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-xl z-50 overflow-hidden">
-                  <button
-                    onClick={() => { setSelectedUser(null); setIsUserMenuOpen(false); }}
-                    className={cx(
-                      'w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/5 transition-colors',
-                      selectedUser === null && 'bg-violet-600/15'
-                    )}
-                  >
-                    <div className="h-8 w-8 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-violet-400 text-xs font-bold">∀</div>
-                    <div>
-                      <p className="text-zinc-50 text-sm font-medium">Tous</p>
-                      <p className="text-zinc-500 text-xs">Vue globale</p>
-                    </div>
-                  </button>
-                  {users.map((user, idx) => (
+                  {spaces.map((space, idx) => (
                     <button
-                      key={user.id}
-                      onClick={() => { setSelectedUser(user); setIsUserMenuOpen(false); }}
+                      key={space.id}
+                      onClick={() => { setCurrentSpace(space); setIsUserMenuOpen(false); }}
                       className={cx(
                         'w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-white/5 transition-colors',
-                        idx === users.length - 1 && 'rounded-b-xl',
-                        selectedUser?.id === user.id && 'bg-violet-600/15'
+                        idx === 0 && 'rounded-t-xl',
+                        idx === spaces.length - 1 && 'rounded-b-xl',
+                        currentSpace?.id === space.id && 'bg-violet-600/15'
                       )}
                     >
-                      {renderAvatar(user, 'h-8 w-8')}
-                      <p className="text-zinc-50 text-sm font-medium">{user.name}</p>
+                      {renderSpaceIcon(space, 'h-8 w-8')}
+                      <div className="min-w-0">
+                        <p className="text-zinc-50 text-sm font-medium truncate">{space.name}</p>
+                        <p className="text-zinc-500 text-xs truncate">
+                          {space.kind === 'SHARED'
+                            ? (space.members ?? []).map((m) => m.name).join(', ')
+                            : 'Mon espace'}
+                        </p>
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -231,6 +243,21 @@ export default function Layout({ children }: LayoutProps) {
                 </Link>
               );
             })()}
+
+            {/* Compte connecté + déconnexion */}
+            {authUser && (
+              <button
+                onClick={logout}
+                className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.04] transition-all duration-200"
+                title={`Connecté en tant que ${authUser.name}`}
+              >
+                <ArrowRightOnRectangleIcon
+                  className="flex-shrink-0 h-5 w-5 text-zinc-500 group-hover:text-zinc-300 transition-colors duration-200"
+                  aria-hidden="true"
+                />
+                <span className="truncate">Déconnexion</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

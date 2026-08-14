@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import prisma from '../prisma';
 import { getPublicBaseUrl } from '../publicUrl';
+import { initialBalanceFor } from '../lib/balance';
 
 const router = express.Router();
 const EB_BASE = 'https://api.enablebanking.com';
@@ -217,17 +218,28 @@ export async function syncBackfill(bankId: string): Promise<SyncResult> {
     console.log(`[EB] Backfill: ${rawTransactions.length} raw transactions`);
     const result = await upsertTransactions(bankId, rawTransactions);
 
-    // Calibrate bank.balance so that bank.balance + sum(transactions) = realBalance
-    // This way the balance calculation works for all banks uniformly
+    // Cale bank.balance pour que le solde affiché tombe sur le solde réel.
+    // On inverse exactement la formule d'affichage (cf. lib/balance.ts) : la
+    // somme brute des mouvements ne convient pas aux comptes d'investissement,
+    // dont les achats comptent positivement.
     if (ebBalance != null) {
-      const txSum = await prisma.transaction.aggregate({
-        where: { bankId },
-        _sum: { amount: true },
-      });
-      const transactionsTotal = txSum._sum.amount ?? 0;
-      const initialBalance = ebBalance - transactionsTotal;
+      const [assetSum, cashSum] = await Promise.all([
+        prisma.transaction.aggregate({
+          where: { bankId, quantity: { not: null } },
+          _sum: { amount: true },
+        }),
+        prisma.transaction.aggregate({
+          where: { bankId, quantity: null },
+          _sum: { amount: true },
+        }),
+      ]);
+      const inputs = {
+        assetFlow: assetSum._sum.amount ?? 0,
+        cashFlow: cashSum._sum.amount ?? 0,
+      };
+      const initialBalance = initialBalanceFor(bank.accountType, ebBalance, inputs);
       await prisma.bank.update({ where: { id: bankId }, data: { balance: initialBalance } });
-      console.log(`[EB] Calibrated: ebBalance=${ebBalance} - txSum=${transactionsTotal} = initialBalance=${initialBalance}`);
+      console.log(`[EB] Calibrated: ebBalance=${ebBalance} → initialBalance=${initialBalance}`);
     }
 
     return result;

@@ -1,16 +1,21 @@
 import express from 'express';
 import prisma from '../prisma';
+import { resolveScope, personalSpaceId } from '../lib/scope';
 
 const router = express.Router();
 
 // GET /api/budgets - Récupérer tous les budgets
 router.get('/', async (req, res) => {
   try {
-    const { categoryId, shared } = req.query;
-    
+    const { categoryId } = req.query;
+
     const where: any = {};
     if (categoryId) where.categoryId = categoryId;
-    if (shared !== undefined) where.shared = shared === 'true';
+
+    // Le flag `shared` est remplacé par l'appartenance à un espace : un budget
+    // dans un espace partagé EST le budget partagé.
+    const scope = await resolveScope(req.query as any);
+    if (scope) where.spaceId = { in: scope };
     
     const budgets = await prisma.budget.findMany({
       where,
@@ -40,7 +45,7 @@ router.get('/', async (req, res) => {
 // POST /api/budgets - Créer un nouveau budget
 router.post('/', async (req, res) => {
   try {
-    const { amount, period, startDate, shared, categoryId } = req.body;
+    const { amount, period, startDate, categoryId, spaceId, userId } = req.body;
     
     if (!amount || !categoryId) {
       return res.status(400).json({ 
@@ -53,7 +58,9 @@ router.post('/', async (req, res) => {
         amount: parseFloat(amount),
         period: period || 'MONTHLY',
         startDate: startDate ? new Date(startDate) : new Date(),
-        shared: shared || false,
+        // L'espace du budget suit le sélecteur actif côté UI ; à défaut, l'espace
+        // personnel de l'utilisateur courant (jamais partagé par accident).
+        spaceId: spaceId || (userId ? await personalSpaceId(userId) : null),
         categoryId
       },
       include: {
@@ -80,7 +87,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, period, startDate, shared } = req.body;
+    const { amount, period, startDate, spaceId } = req.body;
     
     const budget = await prisma.budget.update({
       where: { id },
@@ -88,7 +95,7 @@ router.put('/:id', async (req, res) => {
         ...(amount && { amount: parseFloat(amount) }),
         ...(period && { period }),
         ...(startDate && { startDate: new Date(startDate) }),
-        ...(shared !== undefined && { shared })
+        ...(spaceId !== undefined && { spaceId })
       },
       include: {
         category: {

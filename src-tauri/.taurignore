@@ -1,0 +1,13 @@
+# Fichiers/dossiers ignorés par le watcher `tauri dev`
+# Préfixés d'un `/` pour cibler la racine de src-tauri.
+#
+# Pourquoi : le watcher de dev (notify/fsevents sur macOS) émet des événements
+# fantômes sur ces dossiers juste après le lancement de l'app, ce qui tue puis
+# relance l'app ("File src-tauri/icons changed. Rebuilding application...").
+# Voir https://github.com/tauri-apps/tauri/issues/12141
+#
+# Ces chemins ne sont pas des sources Rust à surveiller : les ignorer n'empêche
+# pas le hot-rebuild du code dans src/, tout en évitant les relances intempestives.
+/binaries/
+/capabilities/
+/icons/

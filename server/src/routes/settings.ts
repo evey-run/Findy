@@ -66,11 +66,12 @@ router.get('/version', (req, res) => {
 // GET /api/settings/export
 router.get('/export', async (req, res) => {
   try {
-    const [users, banks, userBanks, categories, categoryKeywords, transactions, budgets, recurrences, objectives] =
+    const [users, banks, spaces, spaceMembers, categories, categoryKeywords, transactions, budgets, recurrences, objectives] =
       await Promise.all([
         prisma.user.findMany(),
         prisma.bank.findMany(),
-        prisma.userBank.findMany(),
+        prisma.space.findMany(),
+        prisma.spaceMember.findMany(),
         prisma.category.findMany(),
         prisma.categoryKeyword.findMany(),
         prisma.transaction.findMany(),
@@ -82,9 +83,11 @@ router.get('/export', async (req, res) => {
     const syncSettings = readSyncSettings();
 
     const backup = {
-      version: 2,
+      // v3 : `userBanks` remplacé par `spaces` + `spaceMembers`. Les sauvegardes
+      // v2 restent importables (voir la reconstruction d'espaces plus bas).
+      version: 3,
       exportedAt: new Date().toISOString(),
-      data: { users, banks, userBanks, categories, categoryKeywords, transactions, budgets, recurrences, objectives },
+      data: { users, banks, spaces, spaceMembers, categories, categoryKeywords, transactions, budgets, recurrences, objectives },
       syncSettings: Object.keys(syncSettings).length ? syncSettings : undefined,
     };
 
@@ -109,7 +112,9 @@ router.post('/import', async (req, res) => {
   const {
     users = [],
     banks = [],
-    userBanks = [],
+    userBanks = [], // sauvegardes v2 — converties en espaces à la restauration
+    spaces = [],
+    spaceMembers = [],
     categories = [],
     categoryKeywords = [],
     transactions = [],
@@ -131,9 +136,10 @@ router.post('/import', async (req, res) => {
         await tx.budget.deleteMany();
         await tx.recurrence.deleteMany();
         await tx.objective.deleteMany();
-        await tx.userBank.deleteMany();
         await tx.category.deleteMany();
         await tx.bank.deleteMany();
+        await tx.spaceMember.deleteMany();
+        await tx.space.deleteMany();
         await tx.user.deleteMany();
 
         if (users.length) {
@@ -142,10 +148,67 @@ router.post('/import', async (req, res) => {
               id: u.id,
               name: u.name,
               avatar: u.avatar ?? null,
+              // Sans ces deux champs, une restauration effaçait silencieusement
+              // les mots de passe et le profil « Moi ».
+              passwordHash: u.passwordHash ?? null,
+              isMe: u.isMe ?? false,
               createdAt: new Date(u.createdAt),
               updatedAt: new Date(u.updatedAt),
             })),
           });
+        }
+
+        // Espaces : soit ceux de la sauvegarde (v3), soit reconstruits depuis
+        // les anciennes relations userBanks (v2) — un espace par set de
+        // propriétaires, exactement comme le backfill de migration.
+        let legacySpaceByBank = new Map<string, string>();
+        if (spaces.length) {
+          await tx.space.createMany({
+            data: spaces.map(sp => ({
+              id: sp.id,
+              name: sp.name,
+              kind: sp.kind ?? 'PERSONAL',
+              color: sp.color ?? null,
+              createdAt: new Date(sp.createdAt),
+              updatedAt: new Date(sp.updatedAt),
+            })),
+          });
+          if (spaceMembers.length) {
+            await tx.spaceMember.createMany({
+              data: spaceMembers.map(m => ({
+                id: m.id,
+                spaceId: m.spaceId,
+                userId: m.userId,
+                createdAt: new Date(m.createdAt),
+              })),
+            });
+          }
+        } else if (userBanks.length) {
+          const ownersByBank = new Map<string, string[]>();
+          for (const ub of userBanks) {
+            ownersByBank.set(ub.bankId, [...(ownersByBank.get(ub.bankId) ?? []), ub.userId]);
+          }
+          const spaceIdByKey = new Map<string, string>();
+          let seq = 0;
+          for (const [bankId, owners] of ownersByBank) {
+            const unique = [...new Set(owners)].sort();
+            const key = unique.join('|');
+            let spaceId = spaceIdByKey.get(key);
+            if (!spaceId) {
+              spaceId = `sp_restored_${seq++}`;
+              const names = unique.map(id => users.find(u => u.id === id)?.name).filter(Boolean);
+              await tx.space.create({
+                data: {
+                  id: spaceId,
+                  name: unique.length === users.length && users.length > 1 ? 'Famille' : names.join(' & ') || 'Espace',
+                  kind: unique.length === 1 ? 'PERSONAL' : 'SHARED',
+                  members: { create: unique.map(userId => ({ userId })) },
+                },
+              });
+              spaceIdByKey.set(key, spaceId);
+            }
+            legacySpaceByBank.set(bankId, spaceId);
+          }
         }
 
         if (banks.length) {
@@ -169,6 +232,7 @@ router.post('/import', async (req, res) => {
               ebStatus: b.ebStatus ?? null,
               ebLinkedAt: d(b.ebLinkedAt),
               ebExpiresAt: d(b.ebExpiresAt),
+              spaceId: b.spaceId ?? legacySpaceByBank.get(b.id) ?? null,
               createdAt: new Date(b.createdAt),
               updatedAt: new Date(b.updatedAt),
             })),
@@ -183,6 +247,7 @@ router.post('/import', async (req, res) => {
               type: c.type,
               color: c.color,
               icon: c.icon ?? null,
+              spaceId: c.spaceId ?? null,
               createdAt: new Date(c.createdAt),
               updatedAt: new Date(c.updatedAt),
             })),
@@ -199,18 +264,9 @@ router.post('/import', async (req, res) => {
               deadline: d(o.deadline),
               isCompleted: o.isCompleted,
               archived: o.archived ?? false,
+              spaceId: o.spaceId ?? null,
               createdAt: new Date(o.createdAt),
               updatedAt: new Date(o.updatedAt),
-            })),
-          });
-        }
-
-        if (userBanks.length) {
-          await tx.userBank.createMany({
-            data: userBanks.map(ub => ({
-              id: ub.id,
-              userId: ub.userId,
-              bankId: ub.bankId,
             })),
           });
         }
@@ -253,7 +309,7 @@ router.post('/import', async (req, res) => {
               amount: b.amount,
               period: b.period,
               startDate: new Date(b.startDate),
-              shared: b.shared,
+              spaceId: b.spaceId ?? null,
               bankId: b.bankId ?? null,
               categoryId: b.categoryId,
               createdAt: new Date(b.createdAt),

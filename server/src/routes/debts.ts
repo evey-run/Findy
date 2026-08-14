@@ -8,13 +8,14 @@ async function getMe() {
   return prisma.user.findFirst({ where: { isMe: true } });
 }
 
-// Renvoie les IDs des banques (portefeuilles) liées à un utilisateur.
+// Renvoie les IDs des banques (portefeuilles) accessibles à un utilisateur,
+// c'est-à-dire celles des espaces dont il est membre.
 async function bankIdsForUser(userId: string): Promise<string[]> {
-  const links = await prisma.userBank.findMany({
-    where: { userId },
-    select: { bankId: true }
+  const banks = await prisma.bank.findMany({
+    where: { space: { members: { some: { userId } } } },
+    select: { id: true }
   });
-  return links.map((l) => l.bankId);
+  return banks.map((b) => b.id);
 }
 
 // GET /api/debts?userId=X
