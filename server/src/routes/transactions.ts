@@ -1,7 +1,27 @@
 import express from 'express';
 import prisma from '../prisma';
+import { resolveScope } from '../lib/scope';
 
 const router = express.Router();
+
+/**
+ * L'UI affiche « qui possède le compte » sur chaque transaction. Depuis le
+ * passage aux Espaces, ces personnes sont les membres de l'espace du compte.
+ * On reconstruit `bank.users` / `bank.userBanks` pour ne rien casser côté front.
+ */
+function withBankMembers(transaction: any) {
+  const bank = transaction.bank;
+  if (!bank) return transaction;
+  const users = (bank.space?.members ?? []).map((m: any) => m.user);
+  return {
+    ...transaction,
+    bank: {
+      ...bank,
+      users,
+      userBanks: users.map((user: any) => ({ userId: user.id, bankId: bank.id, user }))
+    }
+  };
+}
 
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
@@ -31,12 +51,11 @@ router.get('/', async (req, res) => {
       };
     }
 
-    // Filtre par utilisateur (via les banques liées)
-    if (userId) {
-      where.bank = {
-        ...(where.bank || {}),
-        userBanks: { some: { userId: userId as string } }
-      };
+    // Portée : la transaction hérite de l'espace de sa banque (pas de spaceId
+    // propre — la banque est l'unique source de vérité de qui voit quoi).
+    const scope = await resolveScope(req.query as any);
+    if (scope) {
+      where.bank = { ...(where.bank || {}), spaceId: { in: scope } };
     }
     
     if (categoryId) where.categoryId = categoryId;
@@ -89,14 +108,9 @@ router.get('/', async (req, res) => {
       include: {
         bank: {
           include: {
-            userBanks: {
+            space: {
               include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true
-                  }
-                }
+                members: { include: { user: { select: { id: true, name: true } } } }
               }
             }
           }
@@ -120,7 +134,7 @@ router.get('/', async (req, res) => {
     
     // Removed debug logging of first transaction bank to reduce log spam
     
-    res.json(transactions);
+    res.json(transactions.map(withBankMembers));
   } catch (error) {
     console.error('Error fetching transactions:', error);
     res.status(500).json({ error: 'Failed to fetch transactions' });
@@ -134,8 +148,9 @@ router.get('/stats/summary', async (req, res) => {
 
     const where: any = {};
     if (bankId) where.bankId = bankId;
-    if (userId) {
-      where.bank = { ...(where.bank || {}), userBanks: { some: { userId: userId as string } } };
+    const scope = await resolveScope(req.query as any);
+    if (scope) {
+      where.bank = { ...(where.bank || {}), spaceId: { in: scope } };
     }
     if (startDate || endDate) {
       where.date = {};

@@ -152,7 +152,8 @@ export default function Dashboard() {
   const {
     dashboardData,
     loadDashboardOverview,
-    selectedUser,
+    currentSpace,
+    scopeParams,
     allTransactions,
     loadAllTransactions,
     categories,
@@ -229,12 +230,12 @@ export default function Dashboard() {
     setDateRange({ startDate, endDate });
     loadDashboardOverview();
     loadAllTransactions({ forceIgnoreSelectedBank: true });
-  }, [startDate, endDate, selectedUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startDate, endDate, currentSpace?.id]);
 
   useEffect(() => {
     if (!prevStart) return;
-    const prevParams = new URLSearchParams({ startDate: prevStart, endDate: prevEnd });
-    if (selectedUser) prevParams.append('userId', selectedUser.id);
+    const prevParams = new URLSearchParams({ startDate: prevStart, endDate: prevEnd, ...scopeParams() });
     fetch(`/api/dashboard/overview?${prevParams}`)
       .then(r => r.json())
       .then(data => setPreviousData({
@@ -244,7 +245,8 @@ export default function Dashboard() {
         investment: data.summary?.investmentMonthTotal   ?? 0,
       }))
       .catch(() => {});
-  }, [prevStart, prevEnd, selectedUser]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevStart, prevEnd, currentSpace?.id]);
 
   // Income/expense flux over the last 6 periods — reacts to periodType & selectedDate
   useEffect(() => {
@@ -284,8 +286,8 @@ export default function Dashboard() {
     const params = new URLSearchParams({
       limit: '5000', offset: '0',
       startDate: start.toISOString(), endDate: end.toISOString(),
+      ...scopeParams(),
     });
-    if (selectedUser) params.append('userId', selectedUser.id);
     fetch(`/api/transactions?${params}`)
       .then(r => r.json())
       .then(data => {
@@ -301,7 +303,8 @@ export default function Dashboard() {
         setFluxData(buckets.map(({ label, income, expense }) => ({ label, income, expense })));
       })
       .catch(() => {});
-  }, [selectedUser, periodType, selectedDate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSpace?.id, periodType, selectedDate]);
 
   // ── derived data ───────────────────────────────────────────────────────────
 
@@ -348,7 +351,9 @@ export default function Dashboard() {
       .map(c => {
         const budget = budgets.find(b => b.categoryId === c.id);
         if (!budget) return null;
-        if (!budget.shared && !banks.some(bk => bk.id === budget.bankId)) return null;
+        // Le budget est déjà filtré par espace côté API. Il ne reste à écarter
+        // que ceux rattachés à un compte absent de la vue courante.
+        if (budget.bankId && !banks.some(bk => bk.id === budget.bankId)) return null;
         const periodBudget = toPeriodBudget(budget);
         const spent = allTransactions
           .filter(t => t.categoryId === c.id && periodFilter(new Date(t.date)))

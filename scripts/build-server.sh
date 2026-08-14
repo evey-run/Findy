@@ -5,6 +5,9 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BINARIES_DIR="$REPO_ROOT/src-tauri/binaries"
 TARGET_DEBUG_DIR="$REPO_ROOT/src-tauri/target/debug"
 
+echo "==> Embarquement des migrations SQL..."
+node "$REPO_ROOT/scripts/generate-migrations-bundle.mjs"
+
 echo "==> Compilation du serveur Express avec Bun..."
 
 # Compiler pour arm64 (Apple Silicon)

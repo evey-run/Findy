@@ -152,7 +152,9 @@ export default function Banks() {
       name: bank.name,
       shortName: bank.shortName || '',
       iban: bank.iban || '',
-      balance: bank.balance,
+      // `bank.balance` est le solde *calculé* (initial + mouvements). Le réinjecter
+      // ici puis l'enregistrer doublerait les mouvements — on édite le solde initial.
+      balance: bank.initialBalance ?? bank.balance,
       accountType: bank.accountType,
       userIds: (bank.userBanks || []).map((ub) => ub.userId),
       createdAt: bank.createdAt.split('T')[0],
@@ -252,6 +254,21 @@ export default function Banks() {
   };
 
   const openEbModal = async (bankId: string, bankName: string, country: string = ebCountry) => {
+    // Enable Banking n'est pas configuré → rediriger vers les Paramètres
+    // au lieu d'ouvrir un modal qui échoue aussitôt.
+    try {
+      const confRes = await fetch('/api/enablebanking/configured');
+      const confData = await confRes.json().catch(() => ({ configured: false }));
+      if (!confData?.configured) {
+        toast.error('Enable Banking n\'est pas configuré. Renseignez vos identifiants dans les Paramètres.');
+        navigate('/settings?setup=enablebanking');
+        return;
+      }
+    } catch {
+      navigate('/settings?setup=enablebanking');
+      return;
+    }
+
     setEbModal({ bankId, bankName });
     setEbStep('search');
     setEbSearch('');

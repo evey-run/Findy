@@ -1,5 +1,6 @@
 import express from 'express';
 import prisma from '../prisma';
+import { resolveScope } from '../lib/scope';
 
 const router = express.Router();
 
@@ -14,9 +15,9 @@ router.get('/overview', async (req, res) => {
       if (endDate) dateFilter.lte = new Date(endDate as string);
     }
 
-    const userFilter = userId
-      ? { bank: { userBanks: { some: { userId: userId as string } } } }
-      : {};
+    // Portée : les transactions héritent de l'espace de leur banque.
+    const scope = await resolveScope(req.query as any);
+    const userFilter = scope ? { bank: { spaceId: { in: scope } } } : {};
     const transactionWhere = {
       ...userFilter,
       ...(Object.keys(dateFilter).length > 0 && { date: dateFilter })
@@ -157,7 +158,7 @@ router.get('/overview', async (req, res) => {
       where: {
         active: true,
         nextDue: { lte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }, // 7 jours
-        ...(userId && { bank: { userBanks: { some: { userId: userId as string } } } })
+        ...(scope ? { bank: { spaceId: { in: scope } } } : {})
       },
       include: {
         category: { select: { id: true, name: true, type: true, color: true, icon: true } },
@@ -202,22 +203,30 @@ router.get('/monthly-trends', async (req, res) => {
     startDate.setDate(1);
     startDate.setHours(0, 0, 0, 0);
     
-    const userFilter = userId ? { userId: userId as string } : {};
-    
-    const monthlyData = await prisma.$queryRaw`
-      SELECT 
-        strftime('%Y-%m', date) as month,
-        SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as income,
-        SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) as expenses,
-        COUNT(*) as transactionCount
-      FROM transactions 
-      JOIN banks ON transactions.bankId = banks.id
-      JOIN user_banks ON banks.id = user_banks.bankId
-      WHERE transactions.date >= ${startDate}
-        ${userId ? `AND user_banks.userId = ${userId}` : ''}
-      GROUP BY strftime('%Y-%m', transactions.date)
-      ORDER BY month ASC
-    `;
+    // NB: l'ancienne version interpolait `userId` dans le template SQL, ce qui
+    // était à la fois inopérant (chaîne littérale) et injectable. On passe par
+    // Prisma, qui paramètre correctement — et la jointure user_banks disparaît :
+    // la portée est désormais une simple colonne `banks.spaceId`.
+    const scope = await resolveScope(req.query as any);
+
+    const rows = await prisma.transaction.findMany({
+      where: {
+        date: { gte: startDate },
+        ...(scope ? { bank: { spaceId: { in: scope } } } : {})
+      },
+      select: { date: true, amount: true }
+    });
+
+    const buckets = new Map<string, { month: string; income: number; expenses: number; transactionCount: number }>();
+    for (const row of rows) {
+      const month = row.date.toISOString().slice(0, 7);
+      const bucket = buckets.get(month) ?? { month, income: 0, expenses: 0, transactionCount: 0 };
+      if (row.amount > 0) bucket.income += row.amount;
+      else bucket.expenses += Math.abs(row.amount);
+      bucket.transactionCount += 1;
+      buckets.set(month, bucket);
+    }
+    const monthlyData = [...buckets.values()].sort((a, b) => a.month.localeCompare(b.month));
     
     res.json(monthlyData);
   } catch (error) {
@@ -235,11 +244,13 @@ router.get('/budget-status', async (req, res) => {
     const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
     
-    const userFilter = userId ? { userId: userId as string } : {};
-    
+    // Budget n'a jamais eu de `userId` : l'ancien filtre faisait planter Prisma
+    // dès qu'un userId était passé. On filtre par espace, ce qui est le sens voulu.
+    const scope = await resolveScope(req.query as any);
+
     const budgets = await prisma.budget.findMany({
       where: {
-        ...userFilter,
+        ...(scope ? { spaceId: { in: scope } } : {}),
         period: 'MONTHLY' // Pour l'instant, on se concentre sur les budgets mensuels
       },
       include: {

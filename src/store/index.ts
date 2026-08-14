@@ -1,11 +1,36 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { User, Bank, Transaction, Category, Budget, DashboardOverview } from '../types';
+import type { User, AuthProfile, Space, Bank, Transaction, Category, Budget, DashboardOverview } from '../types';
+
+const AUTH_STORAGE_KEY = 'findy-auth-user-id';
+const SPACE_STORAGE_KEY = 'findy-current-space-id';
 
 interface AppState {
   // Internal state tracking
   _lastTransactionRequestKey?: string;
-  
+
+  // Auth — le profil connecté est aussi le « Moi » de l'app : toutes les données
+  // (banques, dettes, dashboard) sont rattachées à cet utilisateur.
+  authUser: User | null;
+  authReady: boolean; // true une fois la session restaurée (évite le flash de login)
+  loadAuthProfiles: () => Promise<AuthProfile[]>;
+  login: (userId: string, password?: string) => Promise<User>;
+  register: (name: string, password?: string) => Promise<User>;
+  setPassword: (userId: string, newPassword: string | null, currentPassword?: string) => Promise<User>;
+  logout: () => void;
+  restoreSession: () => Promise<void>;
+
+  // Espaces — le périmètre de partage. On en regarde UN à la fois : son espace
+  // personnel, ou un groupe qu'on a explicitement créé. Pas de vue « Tout ».
+  spaces: Space[];
+  currentSpace: Space | null;
+  loadSpaces: () => Promise<void>;
+  setCurrentSpace: (space: Space) => void;
+  createSpace: (name: string, memberIds: string[]) => Promise<Space>;
+  renameSpace: (spaceId: string, name: string) => Promise<void>;
+  /** Paramètres de portée à ajouter à toute requête API. */
+  scopeParams: () => Record<string, string>;
+
   // Users
   users: User[];
   selectedUser: User | null;
@@ -105,10 +130,177 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   devtools(
     (set, get) => ({
+      // Auth
+      authUser: null,
+      authReady: false,
+
+      loadAuthProfiles: async () => {
+        // On distingue « serveur injoignable » (fetch qui rejette) de « serveur
+        // qui répond en erreur » : confondre les deux avait rendu un problème
+        // de base de données indiscernable d'un backend éteint.
+        let response: Response;
+        try {
+          response = await fetch('/api/auth/profiles');
+        } catch {
+          throw new Error('Serveur injoignable. Vérifie que le backend tourne.');
+        }
+        if (!response.ok) {
+          const detail = await response.text().catch(() => '');
+          throw new Error(
+            `Le serveur répond mais renvoie une erreur (HTTP ${response.status}). ${detail.slice(0, 160)}`.trim()
+          );
+        }
+        return (await response.json()) as AuthProfile[];
+      },
+
+      login: async (userId: string, password?: string) => {
+        const response = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, password })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Connexion impossible');
+
+        localStorage.setItem(AUTH_STORAGE_KEY, data.id);
+        // Le profil connecté devient le filtre courant : on ne voit que ses données.
+        set({ authUser: data, authReady: true, selectedUser: data, selectedBank: null });
+        await get().loadSpaces();
+        await get().loadUsers();
+        return data as User;
+      },
+
+      register: async (name: string, password?: string) => {
+        const response = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, password: password || undefined })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Création impossible');
+
+        localStorage.setItem(AUTH_STORAGE_KEY, data.id);
+        set({ authUser: data, authReady: true, selectedUser: data, selectedBank: null });
+        await get().loadSpaces();
+        await get().loadUsers();
+        return data as User;
+      },
+
+      setPassword: async (userId: string, newPassword: string | null, currentPassword?: string) => {
+        const response = await fetch('/api/auth/password', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, newPassword, currentPassword })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Modification impossible');
+
+        if (get().authUser?.id === userId) set({ authUser: data });
+        return data as User;
+      },
+
+      logout: () => {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        set({ authUser: null, authReady: true, selectedUser: null, selectedBank: null, spaces: [], currentSpace: null });
+      },
+
+      restoreSession: async () => {
+        const userId = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (!userId) {
+          set({ authReady: true });
+          return;
+        }
+        try {
+          const response = await fetch(`/api/auth/session/${userId}`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const user = await response.json();
+          set({ authUser: user, authReady: true, selectedUser: user });
+          await get().loadSpaces();
+        } catch (error) {
+          // Profil supprimé ou serveur injoignable : on repart sur l'écran de connexion.
+          console.error('Failed to restore session:', error);
+          localStorage.removeItem(AUTH_STORAGE_KEY);
+          set({ authUser: null, authReady: true });
+        }
+      },
+
+      // Espaces
+      spaces: [],
+      currentSpace: null,
+
+      loadSpaces: async () => {
+        const authUser = get().authUser;
+        if (!authUser) {
+          set({ spaces: [], currentSpace: null });
+          return;
+        }
+        try {
+          const response = await fetch(`/api/spaces?userId=${authUser.id}`);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const spaces: Space[] = await response.json();
+
+          // Un espace est toujours sélectionné : celui mémorisé s'il est
+          // toujours accessible, sinon l'espace personnel, sinon le premier.
+          const savedId = localStorage.getItem(SPACE_STORAGE_KEY);
+          const current =
+            spaces.find((s) => s.id === savedId) ??
+            spaces.find((s) => s.kind === 'PERSONAL') ??
+            spaces[0] ??
+            null;
+          if (current) localStorage.setItem(SPACE_STORAGE_KEY, current.id);
+          set({ spaces, currentSpace: current });
+        } catch (error) {
+          console.error('Failed to load spaces:', error);
+          set({ spaces: [] });
+        }
+      },
+
+      setCurrentSpace: (space: Space) => {
+        localStorage.setItem(SPACE_STORAGE_KEY, space.id);
+        set({ currentSpace: space, selectedBank: null });
+        // Toutes les vues dépendent de la portée : on recharge.
+        get().loadBanks();
+        get().loadCategories();
+        get().loadBudgets();
+        get().loadDashboardOverview();
+      },
+
+      createSpace: async (name: string, memberIds: string[]) => {
+        const response = await fetch('/api/spaces', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, memberIds })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Création impossible');
+        await get().loadSpaces();
+        return data as Space;
+      },
+
+      renameSpace: async (spaceId: string, name: string) => {
+        const response = await fetch(`/api/spaces/${spaceId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data?.error || 'Renommage impossible');
+        await get().loadSpaces();
+      },
+
+      scopeParams: () => {
+        const { currentSpace, authUser } = get();
+        // On regarde toujours un espace précis. Le repli sur `userId` ne sert
+        // que le court instant entre la connexion et le chargement des espaces.
+        if (currentSpace) return { spaceId: currentSpace.id };
+        if (authUser) return { userId: authUser.id };
+        return {};
+      },
+
       // Users
       users: [],
       selectedUser: null,
-      
+
       // Filtres spécifiques par page
       pageFilters: {},
       setPageFilter: (pageName: string, filter: { startDate?: string; endDate?: string; categoryId?: string; searchText?: string }) => {
@@ -157,9 +349,9 @@ export const useAppStore = create<AppState>()(
               params.append('bankId', state.selectedBank.id);
             }
 
-            // Filtrer par utilisateur sélectionné (via ses banques)
-            if (state.selectedUser) {
-              params.append('userId', state.selectedUser.id);
+            // Portée : espace courant, ou l'union des espaces de l'utilisateur.
+            for (const [key, value] of Object.entries(state.scopeParams())) {
+              params.append(key, value);
             }
 
             if (options?.accountType) params.append('accountType', options.accountType);
@@ -243,12 +435,8 @@ export const useAppStore = create<AppState>()(
       loadBanks: async () => {
         try {
           console.log('Loading banks...');
-          const selectedUser = get().selectedUser;
-          const url = selectedUser 
-            ? `/api/banks?userId=${selectedUser.id}&archived=false`
-            : '/api/banks?archived=false';
-          
-          const response = await fetch(url);
+          const params = new URLSearchParams({ ...get().scopeParams(), archived: 'false' });
+          const response = await fetch(`/api/banks?${params}`);
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
@@ -281,7 +469,8 @@ export const useAppStore = create<AppState>()(
       loadCategories: async () => {
         try {
           console.log('Loading categories...');
-          const response = await fetch('/api/categories');
+          const params = new URLSearchParams(get().scopeParams());
+          const response = await fetch(`/api/categories?${params}`);
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
@@ -411,9 +600,14 @@ export const useAppStore = create<AppState>()(
           const limit = options?.limit || 50;
           params.append('limit', limit.toString());
           
+          // Portée : espace courant, ou l'union des espaces de l'utilisateur.
+          for (const [key, value] of Object.entries(get().scopeParams())) {
+            params.append(key, value);
+          }
+
           // Save this request key before making the request
           set({ _lastTransactionRequestKey: requestKey });
-          
+
           console.log(`Loading transactions with limit: ${limit}`);
           const response = await fetch(`/api/transactions?${params}`);
           if (!response.ok) {
@@ -485,6 +679,11 @@ export const useAppStore = create<AppState>()(
             params.append('excludeAccountType', options.excludeAccountType);
           }
 
+          // Portée : espace courant, ou l'union des espaces de l'utilisateur.
+          for (const [key, value] of Object.entries(get().scopeParams())) {
+            params.append(key, value);
+          }
+
           const response = await fetch(`/api/transactions?${params}`);
           const data = await response.json();
 
@@ -548,7 +747,8 @@ export const useAppStore = create<AppState>()(
         })),
       loadBudgets: async () => {
         try {
-          const response = await fetch(`/api/budgets`);
+          const params = new URLSearchParams(get().scopeParams());
+          const response = await fetch(`/api/budgets?${params}`);
           if (!response.ok) {
             console.error(`loadBudgets: HTTP ${response.status}`);
             set({ budgets: [] });
@@ -579,8 +779,8 @@ export const useAppStore = create<AppState>()(
           if (state.selectedBank) {
             params.append('bankId', state.selectedBank.id);
           }
-          if (state.selectedUser) {
-            params.append('userId', state.selectedUser.id);
+          for (const [key, value] of Object.entries(state.scopeParams())) {
+            params.append(key, value);
           }
           console.log(`Fetching dashboard data from: /api/dashboard/overview?${params}`);
           const response = await fetch(`/api/dashboard/overview?${params}`);

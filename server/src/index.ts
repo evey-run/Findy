@@ -8,12 +8,15 @@ import { cleanupUnusedImages } from './utils/cleanupImages';
 import { prisma } from './prisma';
 import ngrok from '@ngrok/ngrok';
 import { setPublicBaseUrl, getPublicBaseUrl } from './publicUrl';
+import { runPendingMigrations } from './lib/migrate';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Routes
 import userRoutes from './routes/users';
+import authRoutes from './routes/auth';
+import spaceRoutes from './routes/spaces';
 import bankRoutes from './routes/banks';
 import categoryRoutes from './routes/categories';
 import transactionRoutes from './routes/transactions';
@@ -122,6 +125,8 @@ app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/spaces', spaceRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/banks', bankRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -235,8 +240,18 @@ process.on('SIGTERM', async () => {
 
 app.listen(PORT, async () => {
   console.log(`🚀 Server running on port ${PORT}`);
+
+  // Avant toute chose : mettre le schéma à niveau. En app packagée il n'y a ni
+  // CLI Prisma ni fichiers de migration, et une base neuve est vide — sans ça
+  // chaque requête échoue et le front affiche « Serveur injoignable ».
+  try {
+    await runPendingMigrations();
+  } catch (err: any) {
+    console.error('[Migrations] Échec — la base est peut-être inutilisable:', err.message);
+  }
+
   console.log(`📊 Finance Tracker API ready!`);
-  
+
   // Start tunnel for PSD2 OAuth (public HTTPS URL)
   await startNgrokTunnel();
 

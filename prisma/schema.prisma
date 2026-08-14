@@ -15,7 +15,10 @@ model CategoryKeyword {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  // Doit venir de l'environnement : l'app packagée passe le chemin de sa propre
+  // base (~/Library/Application Support/…), et la CI utilise /tmp/build.db.
+  // Codé en dur, le binaire compilé pointait sur le dev.db du dépôt.
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -23,9 +26,12 @@ model User {
   name      String
   avatar    String?
   isMe      Boolean    @default(false)
+  // Mot de passe optionnel : sert uniquement à protéger le profil à la connexion.
+  // Null = profil ouvert, on entre d'un clic. Format: "scrypt:<salt hex>:<hash hex>".
+  passwordHash String?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
-  userBanks UserBank[]
+  spaceMembers SpaceMember[]
   debtsFrom Debt[]     @relation("DebtsOwed")
   debtsTo   Debt[]     @relation("DebtsOwing")
 
@@ -48,6 +54,37 @@ model Debt {
   toUser      User     @relation("DebtsOwing", fields: [toUserId], references: [id], onDelete: Cascade)
 
   @@map("debts")
+}
+
+// Un Espace est le seul primitif de partage de l'app : un périmètre de données
+// avec des membres. « Ozan » (perso, 1 membre), « Famille » (partagé, 2 membres).
+// Tout ce qui est scopable appartient à un espace ; partager = déplacer d'espace.
+model Space {
+  id         String        @id @default(cuid())
+  name       String
+  kind       String        @default("PERSONAL") // PERSONAL | SHARED
+  color      String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  members    SpaceMember[]
+  banks      Bank[]
+  objectives Objective[]
+  budgets    Budget[]
+  categories Category[]
+
+  @@map("spaces")
+}
+
+model SpaceMember {
+  id        String   @id @default(cuid())
+  spaceId   String
+  userId    String
+  createdAt DateTime @default(now())
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([spaceId, userId])
+  @@map("space_members")
 }
 
 model Bank {
@@ -73,23 +110,13 @@ model Bank {
   ebLinkedAt     DateTime?
   ebExpiresAt    DateTime?
   ebLastSyncAt   DateTime?
+  spaceId      String
+  space        Space         @relation(fields: [spaceId], references: [id])
   budgets      Budget[]
   recurrences  Recurrence[]
   transactions Transaction[]
-  userBanks    UserBank[]
 
   @@map("banks")
-}
-
-model UserBank {
-  id     String @id @default(cuid())
-  userId String
-  bankId String
-  bank   Bank   @relation(fields: [bankId], references: [id], onDelete: Cascade)
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, bankId])
-  @@map("user_banks")
 }
 
 model Category {
@@ -98,6 +125,9 @@ model Category {
   type         String
   color        String        @default("#6b7280")
   icon         String?
+  // null = catalogue commun, visible par tous. Non-null = catégorie privée à un espace.
+  spaceId      String?
+  space        Space?        @relation(fields: [spaceId], references: [id])
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   budgets      Budget[]
@@ -137,11 +167,12 @@ model Budget {
   amount     Float
   period     String   @default("MONTHLY")
   startDate  DateTime @default(now())
-  shared     Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   bankId     String?
   categoryId String
+  spaceId    String?
+  space      Space?   @relation(fields: [spaceId], references: [id])
   category   Category @relation(fields: [categoryId], references: [id])
   bank       Bank?    @relation(fields: [bankId], references: [id], onDelete: Cascade)
 
@@ -175,6 +206,8 @@ model Objective {
   archived     Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+  spaceId      String?
+  space        Space?    @relation(fields: [spaceId], references: [id])
 
   @@map("objectives")
 }
