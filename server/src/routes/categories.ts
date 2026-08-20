@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
       // est privée à ses membres (l'exception, pas la règle).
       where: {
         ...(type ? { type: type as any } : {}),
-        ...categoryWhere(await resolveScope(req.query as any))
+        ...categoryWhere(await resolveScope(req.query as any, req.authUserId))
       },
       include: {
         _count: {

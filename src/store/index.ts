@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
+import { getAuthToken, setAuthToken } from '../lib/apiBase';
 import type { User, AuthProfile, Space, Bank, Transaction, Category, Budget, DashboardOverview } from '../types';
 
-const AUTH_STORAGE_KEY = 'findy-auth-user-id';
 const SPACE_STORAGE_KEY = 'findy-current-space-id';
 
 interface AppState {
@@ -135,13 +135,22 @@ export const useAppStore = create<AppState>()(
       authReady: false,
 
       loadAuthProfiles: async () => {
-        // On distingue « serveur injoignable » (fetch qui rejette) de « serveur
-        // qui répond en erreur » : confondre les deux avait rendu un problème
-        // de base de données indiscernable d'un backend éteint.
-        let response: Response;
-        try {
-          response = await fetch('/api/auth/profiles');
-        } catch {
+        // Le sidecar peut être en train d'achever une migration au tout premier
+        // lancement. Réessayer brièvement évite de figer l'écran de connexion
+        // sur une erreur réseau transitoire.
+        let response: Response | undefined;
+        for (let attempt = 0; attempt < 20; attempt += 1) {
+          try {
+            response = await fetch('/api/auth/profiles');
+            break;
+          } catch {
+            if (attempt === 19) {
+              throw new Error('Serveur injoignable. Vérifie que le backend tourne.');
+            }
+            await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+        }
+        if (!response) {
           throw new Error('Serveur injoignable. Vérifie que le backend tourne.');
         }
         if (!response.ok) {
@@ -162,7 +171,8 @@ export const useAppStore = create<AppState>()(
         const data = await response.json();
         if (!response.ok) throw new Error(data?.error || 'Connexion impossible');
 
-        localStorage.setItem(AUTH_STORAGE_KEY, data.id);
+        // Le jeton est la seule preuve d'identité acceptée par l'API.
+        setAuthToken(data.token ?? null);
         // Le profil connecté devient le filtre courant : on ne voit que ses données.
         set({ authUser: data, authReady: true, selectedUser: data, selectedBank: null });
         await get().loadSpaces();
@@ -179,7 +189,7 @@ export const useAppStore = create<AppState>()(
         const data = await response.json();
         if (!response.ok) throw new Error(data?.error || 'Création impossible');
 
-        localStorage.setItem(AUTH_STORAGE_KEY, data.id);
+        setAuthToken(data.token ?? null);
         set({ authUser: data, authReady: true, selectedUser: data, selectedBank: null });
         await get().loadSpaces();
         await get().loadUsers();
@@ -200,26 +210,27 @@ export const useAppStore = create<AppState>()(
       },
 
       logout: () => {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
+        setAuthToken(null);
         set({ authUser: null, authReady: true, selectedUser: null, selectedBank: null, spaces: [], currentSpace: null });
       },
 
       restoreSession: async () => {
-        const userId = localStorage.getItem(AUTH_STORAGE_KEY);
-        if (!userId) {
-          set({ authReady: true });
+        // La session repose sur le jeton, plus sur l'id de profil mémorisé :
+        // un id seul ne prouvait rien et suffisait à « restaurer » n'importe qui.
+        if (!getAuthToken()) {
+          set({ authUser: null, authReady: true });
           return;
         }
         try {
-          const response = await fetch(`/api/auth/session/${userId}`);
+          const response = await fetch('/api/auth/session');
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const user = await response.json();
           set({ authUser: user, authReady: true, selectedUser: user });
           await get().loadSpaces();
         } catch (error) {
-          // Profil supprimé ou serveur injoignable : on repart sur l'écran de connexion.
+          // Jeton expiré, profil supprimé ou serveur injoignable : retour à l'écran de connexion.
           console.error('Failed to restore session:', error);
-          localStorage.removeItem(AUTH_STORAGE_KEY);
+          setAuthToken(null);
           set({ authUser: null, authReady: true });
         }
       },
@@ -235,7 +246,8 @@ export const useAppStore = create<AppState>()(
           return;
         }
         try {
-          const response = await fetch(`/api/spaces?userId=${authUser.id}`);
+          // La portée vient du jeton côté serveur : plus besoin de l'envoyer.
+          const response = await fetch('/api/spaces');
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           const spaces: Space[] = await response.json();
 

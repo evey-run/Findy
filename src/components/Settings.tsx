@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { ArrowDownTrayIcon, ArrowUpTrayIcon, CheckCircleIcon, TrashIcon, ArrowPathIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
+import { useState, useRef, useEffect, type ChangeEvent } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowDownTrayIcon, ArrowUpTrayIcon, CheckCircleIcon, TrashIcon, ArrowPathIcon, ArrowUpIcon, PhotoIcon, BuildingLibraryIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 import { getAutoUpdateEnabled, setAutoUpdateEnabled, checkForUpdates, downloadAndInstallUpdate, type VersionInfo, type UpdateProgress } from '../utils/updates';
 import { useAppStore } from '../store';
@@ -43,6 +43,7 @@ export default function Settings() {
   // Compte connecté — le mot de passe reste optionnel, on peut l'ajouter ou le retirer ici.
   const { authUser, setPassword, logout, users, loadUsers, spaces, loadSpaces, createSpace, renameSpace } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // ── Espaces : le périmètre de partage (perso vs « Famille ») ──
   const [newSpaceName, setNewSpaceName] = useState('');
@@ -105,6 +106,9 @@ export default function Settings() {
   const [importing, setImporting] = useState(false);
   const [msg, setMsg] = useState<Msg | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mediaFileRef = useRef<HTMLInputElement>(null);
+  const [imageCount, setImageCount] = useState<number | null>(null);
+  const [restoringImages, setRestoringImages] = useState(false);
 
   // Mises à jour automatiques
   const [autoUpdate, setAutoUpdate] = useState(getAutoUpdateEnabled());
@@ -118,6 +122,9 @@ export default function Settings() {
   const [setupModal, setSetupModal] = useState<SyncProvider | null>(null);
   const [ebAppIdInput, setEbAppIdInput] = useState('');
   const [ebPrivateKeyInput, setEbPrivateKeyInput] = useState('');
+  // Nom du fichier .pem importé, s'il y en a un — la clé elle-même vit dans
+  // `ebPrivateKeyInput`, que l'on colle ou que l'on importe.
+  const [ebPemFileName, setEbPemFileName] = useState<string | null>(null);
   const [ebNgrokInput, setEbNgrokInput] = useState('');
   const [ebNgrokDomainInput, setEbNgrokDomainInput] = useState('');
   const [genericApiKeyInput, setGenericApiKeyInput] = useState('');
@@ -128,6 +135,7 @@ export default function Settings() {
   useEffect(() => {
     loadSyncSettings();
     loadTunnelUrl();
+    loadMediaStatus();
     checkForUpdates()
       .then((info) => { if (info) setVersionInfo(info); })
       .catch(() => {});
@@ -142,6 +150,7 @@ export default function Settings() {
       setSetupModal(provider);
       setEbAppIdInput('');
       setEbPrivateKeyInput('');
+      setEbPemFileName(null);
       setEbNgrokInput('');
       setEbNgrokDomainInput('');
     }
@@ -193,6 +202,83 @@ export default function Settings() {
     } catch {}
   };
 
+  const loadMediaStatus = async () => {
+    try {
+      const res = await fetch('/api/settings/media');
+      if (res.ok) setImageCount((await res.json()).imageCount ?? 0);
+    } catch {}
+  };
+
+  const handleRestoreImages = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!files.length) return;
+
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append('images', file, file.name);
+      formData.append('legacyPath', file.webkitRelativePath || file.name);
+    }
+
+    setRestoringImages(true);
+    try {
+      const res = await fetch('/api/settings/media/import', { method: 'POST', body: formData });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Restauration impossible');
+      if (typeof data?.imageCount === 'number') setImageCount(data.imageCount);
+      else await loadMediaStatus();
+      toast.success(data.imported ? `${data.imported} image(s) restaurée(s)` : 'Toutes les images étaient déjà présentes');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Impossible de restaurer les images');
+    } finally {
+      setRestoringImages(false);
+    }
+  };
+
+  /**
+   * Import d'un fichier `.pem` : le contenu remplit le même champ que la
+   * saisie manuelle. Rien n'est envoyé au serveur ici — la clé ne part qu'à
+   * l'enregistrement, comme si elle avait été collée à la main.
+   */
+  const handlePemFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // L'input est remis à zéro tout de suite : réimporter le même fichier
+    // après une correction doit redéclencher l'événement.
+    event.target.value = '';
+    if (!file) return;
+
+    // Une clé RSA PEM fait quelques kilo-octets ; au-delà, ce n'est pas une clé.
+    if (file.size > 64 * 1024) {
+      toast.error('Ce fichier est trop volumineux pour être une clé privée.');
+      return;
+    }
+
+    try {
+      const content = (await file.text()).trim();
+
+      if (/-----BEGIN [^-]*PUBLIC KEY-----/.test(content)) {
+        toast.error('Ce fichier contient une clé publique. Enable Banking attend la clé privée.');
+        return;
+      }
+      // Une clé chiffrée échouerait plus tard, à la signature du JWT, avec un
+      // message incompréhensible.
+      if (/-----BEGIN ENCRYPTED PRIVATE KEY-----/.test(content)) {
+        toast.error('Cette clé est protégée par un mot de passe. Fournissez une clé non chiffrée.');
+        return;
+      }
+      if (!/-----BEGIN [^-]*PRIVATE KEY-----/.test(content) || !/-----END [^-]*PRIVATE KEY-----/.test(content)) {
+        toast.error('Fichier illisible : aucune clé privée PEM détectée.');
+        return;
+      }
+
+      setEbPrivateKeyInput(content);
+      setEbPemFileName(file.name);
+      toast.success(`Clé importée depuis ${file.name}`);
+    } catch {
+      toast.error('Impossible de lire ce fichier.');
+    }
+  };
+
   const handleSaveApiKey = async () => {
     if (!setupModal) return;
     setSavingSync(true);
@@ -219,17 +305,35 @@ export default function Settings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error('Erreur lors de la sauvegarde');
+      if (!res.ok) {
+        const error = await res.json().catch(() => null);
+        throw new Error(error?.error || `Erreur serveur (${res.status})`);
+      }
       setSyncStatus((prev) => ({ ...prev, [setupModal.id]: { configured: true } }));
+
+      // Enable Banking refuse localhost pour le callback OAuth. Le tunnel doit
+      // donc être démarré immédiatement après l'enregistrement du token, sans
+      // obliger l'utilisateur à deviner qu'il faut relancer l'application.
+      if (setupModal.id === 'enablebanking') {
+        const tunnelRes = await fetch('/api/tunnel/restart', { method: 'POST' });
+        const tunnel = await tunnelRes.json().catch(() => null);
+        if (!tunnelRes.ok) {
+          setTunnelUrl('');
+          throw new Error(`Identifiants enregistrés, mais ${tunnel?.error || 'le tunnel HTTPS n’a pas pu démarrer.'}`);
+        }
+        setTunnelUrl(tunnel?.publicUrl || '');
+      }
       toast.success(`${setupModal.name} configuré avec succès`);
       setSetupModal(null);
       setEbAppIdInput('');
       setEbPrivateKeyInput('');
+      setEbPemFileName(null);
       setEbNgrokInput('');
       setEbNgrokDomainInput('');
       setGenericApiKeyInput('');
     } catch (err) {
-      toast.error("Erreur lors de la sauvegarde de la clé API");
+      console.error('Erreur de sauvegarde de la configuration de synchronisation:', err);
+      toast.error(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde de la clé API');
     } finally {
       setSavingSync(false);
     }
@@ -546,7 +650,7 @@ export default function Settings() {
                   {isConfigured ? (
                     <>
                       <button
-                        onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
+                        onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
                         className="px-3 py-1.5 text-xs font-medium text-zinc-300 rounded-lg border border-white/10 bg-white/[0.05] hover:bg-white/10 transition-colors"
                       >
                         Reconfigurer
@@ -560,7 +664,7 @@ export default function Settings() {
                     </>
                   ) : (
                     <button
-                      onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
+                      onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
                       className="px-3 py-1.5 text-xs font-medium text-white rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors"
                     >
                       Setup
@@ -570,6 +674,56 @@ export default function Settings() {
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* ── Images et icônes ── */}
+      <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 p-6 max-w-2xl">
+        <h3 className="text-base font-semibold text-white mb-0.5">Images et icônes</h3>
+        <p className="text-sm text-zinc-400 mb-5">
+          Les logos de banques et avatars sont conservés localement avec vos données.
+        </p>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white">Icônes des banques</p>
+              <p className="text-xs text-zinc-500 mt-0.5">Ajoutez ou remplacez le logo d’un portefeuille.</p>
+            </div>
+            <button
+              onClick={() => navigate('/banks')}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-200 rounded-lg border border-white/10 bg-white/[0.05] hover:bg-white/10 transition-colors"
+            >
+              <BuildingLibraryIcon className="h-4 w-4" />
+              Gérer
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.07]">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-white">Restaurer les images</p>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                {imageCount === null ? 'Vérification du stockage local…' : `${imageCount} image(s) disponible(s).`}
+                {' '}Sélectionnez les fichiers de votre ancien dossier <code className="text-zinc-400">uploads</code> si nécessaire.
+              </p>
+            </div>
+            <button
+              onClick={() => mediaFileRef.current?.click()}
+              disabled={restoringImages}
+              className="shrink-0 flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-white rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 transition-colors"
+            >
+              <PhotoIcon className="h-4 w-4" />
+              {restoringImages ? 'Restauration…' : 'Restaurer'}
+            </button>
+            <input
+              ref={mediaFileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="sr-only"
+              onChange={handleRestoreImages}
+            />
+          </div>
         </div>
       </div>
 
@@ -792,14 +946,46 @@ export default function Settings() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-zinc-400 mb-1.5">Clé privée RSA</label>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <label className="text-xs font-medium text-zinc-400">Clé privée RSA</label>
+                    <label
+                      className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] text-[11px] font-medium text-zinc-300 px-2 py-1 cursor-pointer transition-colors"
+                      title="Importer le fichier .pem téléchargé depuis Enable Banking"
+                    >
+                      <ArrowUpTrayIcon className="h-3 w-3" />
+                      Importer un .pem
+                      <input
+                        type="file"
+                        accept=".pem,.key,application/x-pem-file,text/plain"
+                        onChange={handlePemFile}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                   <textarea
                     value={ebPrivateKeyInput}
-                    onChange={(e) => setEbPrivateKeyInput(e.target.value)}
-                    placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                    onChange={(e) => {
+                      setEbPrivateKeyInput(e.target.value);
+                      // Édition manuelle : le contenu n'est plus celui du fichier.
+                      setEbPemFileName(null);
+                    }}
+                    placeholder="Collez la clé ici, ou importez le fichier .pem&#10;-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
                     rows={4}
                     className="w-full rounded-lg border border-white/10 bg-white/[0.04] text-sm text-white py-2.5 px-3 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 font-mono text-xs resize-none"
                   />
+                  {ebPemFileName && (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-green-400">
+                      <CheckCircleIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                      <span className="truncate">Clé chargée depuis {ebPemFileName}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setEbPrivateKeyInput(''); setEbPemFileName(null); }}
+                        className="ml-auto text-zinc-500 hover:text-zinc-300 transition-colors flex-shrink-0"
+                      >
+                        Effacer
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 mb-1.5">
@@ -833,7 +1019,8 @@ export default function Settings() {
                 </div>
                 <div className="rounded-lg bg-violet-500/10 border border-violet-500/20 p-3 space-y-2">
                   <p className="text-xs text-violet-300">
-                    Un tunnel HTTPS sera créé au lancement pour le callback OAuth.
+                    Avec un domaine réservé, le tunnel HTTPS ne s’ouvre que pendant la liaison
+                    bancaire, puis se referme. Sans domaine, il reste ouvert tant que l’app tourne.
                   </p>
                   {tunnelUrl && (
                     <div>

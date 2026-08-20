@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
 
     // Le flag `shared` est remplacé par l'appartenance à un espace : un budget
     // dans un espace partagé EST le budget partagé.
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
     if (scope) where.spaceId = { in: scope };
     
     const budgets = await prisma.budget.findMany({

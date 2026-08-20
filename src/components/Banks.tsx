@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { assetUrl } from '../lib/url';
@@ -69,10 +70,33 @@ const fmtCompact = (n: number) => {
 interface EbModal { bankId: string; bankName: string; }
 interface EbAspsp { name: string; country: string; logo: string; }
 
+/** Ouvre l'autorisation PSD2 dans le navigateur système sous Tauri. */
+async function openAuthenticationUrl(url: string): Promise<void> {
+  const target = new URL(url);
+  if (target.protocol !== 'https:' && target.protocol !== 'http:') {
+    throw new Error('Le lien d’autorisation bancaire est invalide.');
+  }
+
+  const isTauri =
+    typeof window !== 'undefined' &&
+    ('__TAURI_INTERNALS__' in window || '__TAURI__' in window || window.location.protocol === 'tauri:');
+
+  if (isTauri) {
+    // `window.open` n'ouvre pas de navigateur externe dans la WebView macOS.
+    // Le plugin Opener délègue explicitement l'URL HTTPS au navigateur système.
+    await openUrl(target.toString());
+    return;
+  }
+
+  const opened = window.open(target.toString(), '_blank', 'noopener,noreferrer');
+  if (!opened) throw new Error('Le navigateur a bloqué l’ouverture du lien bancaire.');
+}
+
 export default function Banks() {
-  const { banks, loadBanks, loadTransactions, loadUsers, users, setMeUser } = useAppStore();
+  const { banks, loadBanks, loadTransactions, loadUsers, users, authUser } = useAppStore();
   const navigate = useNavigate();
-  const meUser = users.find((u) => u.isMe);
+  // Le « Moi » est le profil connecté : plus rien à choisir ici.
+  const meId = authUser?.id ?? users.find((u) => u.isMe)?.id ?? null;
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
@@ -253,21 +277,26 @@ export default function Banks() {
     }
   };
 
-  const openEbModal = async (bankId: string, bankName: string, country: string = ebCountry) => {
-    // Enable Banking n'est pas configuré → rediriger vers les Paramètres
-    // au lieu d'ouvrir un modal qui échoue aussitôt.
+  // Enable Banking non configuré → rediriger vers les Paramètres au lieu
+  // d'ouvrir un parcours qui échouera aussitôt.
+  const ensureEbConfigured = async (): Promise<boolean> => {
     try {
       const confRes = await fetch('/api/enablebanking/configured');
       const confData = await confRes.json().catch(() => ({ configured: false }));
       if (!confData?.configured) {
         toast.error('Enable Banking n\'est pas configuré. Renseignez vos identifiants dans les Paramètres.');
         navigate('/settings?setup=enablebanking');
-        return;
+        return false;
       }
+      return true;
     } catch {
       navigate('/settings?setup=enablebanking');
-      return;
+      return false;
     }
+  };
+
+  const openEbModal = async (bankId: string, bankName: string, country: string = ebCountry) => {
+    if (!(await ensureEbConfigured())) return;
 
     setEbModal({ bankId, bankName });
     setEbStep('search');
@@ -309,37 +338,34 @@ export default function Banks() {
     ebPollBankIdRef.current = null;
   }, []);
 
-  const handleEbLink = async (aspspName: string, aspspCountry: string) => {
-    if (!ebModal) return;
+  // `target` permet de relancer une liaison sans passer par la recherche de
+  // banque : le renouvellement de consentement réutilise l'ASPSP déjà connu.
+  const handleEbLink = async (aspspName: string, aspspCountry: string, target?: EbModal) => {
+    const bank = target ?? ebModal;
+    if (!bank) return;
     try {
       const res = await fetch('/api/enablebanking/link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bankId: ebModal.bankId, aspspName, aspspCountry }),
+        body: JSON.stringify({ bankId: bank.bankId, aspspName, aspspCountry }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setEbLinkUrl(data.link);
       setEbStep('waiting');
-      ebPollBankIdRef.current = ebModal.bankId;
+      ebPollBankIdRef.current = bank.bankId;
 
-      // Open link — try Tauri shell first, fallback to window.open
-      const openUrl = async (url: string) => {
-        try {
-          // @ts-ignore — Tauri v2 window.__TAURI__
-          if (window.__TAURI__?.shell?.open) {
-            await window.__TAURI__.shell.open(url);
-          } else {
-            window.open(url, '_blank');
-          }
-        } catch {
-          window.open(url, '_blank');
-        }
-      };
-      await openUrl(data.link);
+      try {
+        await openAuthenticationUrl(data.link);
+      } catch (error) {
+        console.error('Impossible d’ouvrir le navigateur pour Enable Banking:', error);
+        toast.error('Impossible d’ouvrir le navigateur. Utilisez « Rouvrir » ou copiez le lien ci-dessous.');
+      }
 
-      // Poll for status — max 2 minutes, every 3s
-      const MAX_POLLS = 40; // 40 × 3s = 120s
+      // Poll for status — max 10 minutes, every 3s. Une sélection de compte
+      // après le consentement (ou une validation bancaire forte) peut prendre
+      // plus de deux minutes.
+      const MAX_POLLS = 200; // 200 × 3s = 10 minutes
       let polls = 0;
       ebPollRef.current = setInterval(async () => {
         polls++;
@@ -363,6 +389,25 @@ export default function Banks() {
     } catch (e: any) {
       toast.error(e.message || 'Erreur Enable Banking');
     }
+  };
+
+  /**
+   * Renouvellement du consentement : la banque est déjà connue, on repart
+   * directement sur son autorisation au lieu de refaire le parcours de
+   * recherche. Sans ASPSP mémorisé, on retombe sur le parcours complet.
+   */
+  const handleEbRenew = async (bank: Bank) => {
+    if (!bank.ebAspspName || !bank.ebAspspCountry) {
+      await openEbModal(bank.id, bank.name);
+      return;
+    }
+    if (!(await ensureEbConfigured())) return;
+
+    const target = { bankId: bank.id, bankName: bank.name };
+    setEbModal(target);
+    setEbStep('waiting');
+    setEbLinkUrl('');
+    await handleEbLink(bank.ebAspspName, bank.ebAspspCountry, target);
   };
 
   const closeEbModal = useCallback(() => {
@@ -398,12 +443,17 @@ export default function Banks() {
 
   const loadSyncStatuses = async () => {
     const statuses: Record<string, any> = {};
+    // Le serveur bascule lui-même un consentement échu en EXPIRED : il faut
+    // alors rafraîchir les comptes pour afficher le bouton de renouvellement.
+    let statusChanged = false;
+
     for (const bank of banks) {
       if (!bank.ebStatus || bank.ebStatus !== 'LINKED') continue;
       try {
         const res = await fetch(`/api/enablebanking/banks/${bank.id}/status`);
         if (res.ok) {
           const data = await res.json();
+          if (data.ebStatus && data.ebStatus !== bank.ebStatus) statusChanged = true;
           statuses[bank.id] = {
             lastSyncAt: data.ebLastSyncAt,
             consentDaysRemaining: data.consentDaysRemaining,
@@ -413,6 +463,7 @@ export default function Banks() {
       } catch {}
     }
     setSyncStatus(statuses);
+    if (statusChanged) await loadBanks();
   };
 
   const handleSync = async (bankId: string) => {
@@ -538,14 +589,9 @@ export default function Banks() {
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
       {/* ── Header (compact) ── */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex-shrink-0 flex items-center justify-between gap-4">
         <div className="flex items-baseline gap-2.5 min-w-0">
           <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Portefeuille</h2>
-          {banks.length > 0 && (
-            <span className="text-xs font-medium text-zinc-500">
-              {banks.length} compte{banks.length > 1 ? 's' : ''}
-            </span>
-          )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {users.length === 0 && (
@@ -569,7 +615,7 @@ export default function Banks() {
 
       {/* ── Global sync indicator ── */}
       {autoSyncingBanks.size > 0 && (
-        <div className="flex items-center gap-2 rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-2.5 text-sm text-violet-300">
+        <div className="flex-shrink-0 flex items-center gap-2 rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-2.5 text-sm text-violet-300">
           <ArrowPathIcon className="h-4 w-4 animate-spin flex-shrink-0" />
           <span>
             Synchronisation en cours…
@@ -580,34 +626,20 @@ export default function Banks() {
 
       {/* ── Famille (avatars) ── */}
       {users.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="flex-shrink-0">
           <div className="flex items-start gap-4 flex-wrap">
             {users.map((user) => {
-              const isMe = !!user.isMe;
-              // On peut ouvrir un tricount avec les autres personnes dès qu'un « Moi » est défini.
-              const canOpenTricount = !isMe && !!meUser;
+              const isMe = user.id === meId;
               const handleClick = () => {
                 if (isMe) return;
-                if (meUser) {
-                  navigate(`/tricount/${user.id}`);
-                } else {
-                  // Aucun « Moi » défini : le premier clic désigne cette personne.
-                  setMeUser(user.id);
-                  toast.success(`${user.name} est maintenant « Moi »`);
-                }
+                navigate(`/tricount/${user.id}`);
               };
               return (
                 <div key={user.id} className="flex flex-col items-center gap-1 w-16">
                   <button
                     type="button"
                     onClick={handleClick}
-                    title={
-                      isMe
-                        ? 'C\'est vous'
-                        : canOpenTricount
-                        ? `Ouvrir le tricount avec ${user.name}`
-                        : `Définir ${user.name} comme « Moi »`
-                    }
+                    title={isMe ? 'Vous' : `Tricount avec ${user.name}`}
                     className="relative group"
                   >
                     {user.avatar ? (
@@ -627,27 +659,10 @@ export default function Banks() {
                         {user.name ? user.name[0].toUpperCase() : '?'}
                       </div>
                     )}
-                    {isMe && (
-                      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-violet-600 text-white text-[8px] font-bold px-1.5 py-0.5 leading-none shadow">
-                        MOI
-                      </span>
-                    )}
                   </button>
-                  <span className="text-[10px] text-zinc-400 truncate max-w-[64px]">{user.name}</span>
-                  {isMe ? (
-                    <span className="text-[9px] text-violet-400/70 leading-none">vous</span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMeUser(user.id);
-                        toast.success(`${user.name} est maintenant « Moi »`);
-                      }}
-                      className="text-[9px] text-zinc-600 hover:text-violet-400 leading-none transition-colors"
-                    >
-                      définir « moi »
-                    </button>
-                  )}
+                  <span className={`text-[10px] truncate max-w-[64px] ${isMe ? 'text-violet-300' : 'text-zinc-400'}`}>
+                    {user.name}
+                  </span>
                 </div>
               );
             })}
@@ -661,21 +676,12 @@ export default function Banks() {
               <span className="text-[10px] text-zinc-500">Ajouter</span>
             </button>
           </div>
-          {!meUser ? (
-            <p className="text-[11px] text-amber-400/80">
-              Choisissez qui est « Moi » pour activer les tricounts.
-            </p>
-          ) : (
-            <p className="text-[11px] text-zinc-500">
-              Appuyez sur une personne pour ouvrir votre tricount partagé.
-            </p>
-          )}
         </div>
       )}
 
       {/* ── KPI bar ── */}
       {banks.length > 0 && (
-        <div className="grid grid-cols-2 rounded-xl bg-white/[0.04] border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden">
+        <div className="flex-shrink-0 grid grid-cols-2 rounded-xl bg-white/[0.04] border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden">
           {stats.map((s) => (
             <div key={s.label} className="px-4 py-2.5">
               <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
@@ -856,10 +862,14 @@ export default function Banks() {
 
                 {/* Row 5 — Sync status & consent warning */}
                 {bank.ebStatus === 'EXPIRED' && (
-                  <div className="mt-2 flex items-center gap-1 text-[10px] text-amber-400 bg-amber-500/10 rounded-md px-1.5 py-1">
+                  <button
+                    type="button"
+                    onClick={() => handleEbRenew(bank)}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 text-[10px] font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-md px-1.5 py-1.5 transition-colors"
+                  >
                     <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0" />
-                    <span>Session expirée — cliquez « Relier »</span>
-                  </div>
+                    <span>Connexion bancaire expirée — renouveler</span>
+                  </button>
                 )}
                 {bank.ebStatus === 'LINKED' && syncStatus[bank.id] && (
                   <div className="mt-2 space-y-1">
@@ -869,10 +879,17 @@ export default function Banks() {
                       </div>
                     )}
                     {syncStatus[bank.id].consentWarning && (
-                      <div className="flex items-center gap-1 text-[10px] text-amber-400/90 bg-amber-500/10 rounded-md px-1.5 py-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleEbRenew(bank)}
+                        title={syncStatus[bank.id].consentWarning ?? undefined}
+                        className="w-full flex items-center justify-center gap-1.5 text-[10px] font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 rounded-md px-1.5 py-1 transition-colors"
+                      >
                         <ExclamationTriangleIcon className="h-3 w-3 flex-shrink-0" />
-                        <span className="truncate">{syncStatus[bank.id].consentDaysRemaining}j avant expiration</span>
-                      </div>
+                        <span className="truncate">
+                          Expire dans {syncStatus[bank.id].consentDaysRemaining}j — renouveler
+                        </span>
+                      </button>
                     )}
                   </div>
                 )}
@@ -1188,26 +1205,33 @@ export default function Banks() {
                   <p className="text-sm font-medium text-zinc-50">Autorisation en cours</p>
                   <p className="text-xs text-zinc-500 mt-1 mb-4">
                     Complétez l'authentification dans la fenêtre ouverte.<br />
+                    Si plusieurs comptes sont autorisés, choisissez ensuite celui à synchroniser.<br />
                     La liaison sera détectée automatiquement.
                   </p>
                   {ebLinkUrl && (
-                    <button
-                      onClick={async () => {
-                        try {
-                          // @ts-ignore
-                          if (window.__TAURI__?.shell?.open) {
-                            await window.__TAURI__.shell.open(ebLinkUrl);
-                          } else {
-                            window.open(ebLinkUrl, '_blank');
-                          }
-                        } catch {
-                          window.open(ebLinkUrl, '_blank');
-                        }
-                      }}
-                      className="text-xs text-violet-400 hover:text-violet-300 underline"
-                    >
-                      Rouvrir le lien d'authentification
-                    </button>
+                    <div className="flex flex-col items-center gap-2">
+                      <button
+                        onClick={() => {
+                          openAuthenticationUrl(ebLinkUrl).catch((error) => {
+                            console.error('Impossible de rouvrir le lien Enable Banking:', error);
+                            toast.error('Impossible d’ouvrir le navigateur. Copiez le lien à la place.');
+                          });
+                        }}
+                        className="text-xs text-violet-400 hover:text-violet-300 underline"
+                      >
+                        Rouvrir le lien d'authentification
+                      </button>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(ebLinkUrl)
+                            .then(() => toast.success('Lien d’autorisation copié'))
+                            .catch(() => toast.error('Impossible de copier le lien d’autorisation'));
+                        }}
+                        className="text-xs text-zinc-400 hover:text-zinc-200 underline"
+                      >
+                        Copier le lien d'authentification
+                      </button>
+                    </div>
                   )}
                 </div>
               )}

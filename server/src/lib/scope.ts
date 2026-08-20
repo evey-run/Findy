@@ -4,9 +4,9 @@
  * Tout ce qui est scopable (banques → et donc transactions, objectifs, budgets)
  * appartient à un Espace. Une requête est filtrée par un ensemble d'ids d'espaces.
  *
- * ⚠️ Sécurité : le scope vient encore des query params, donc c'est un filtre
- * d'affichage, pas une frontière d'autorisation. Le jour où l'API est exposée
- * (tunnel ngrok), il faudra dériver `userId` d'un token de session signé.
+ * Sécurité : la portée est bornée par les espaces du profil *authentifié*
+ * (jeton signé), pas par ce que le client demande. Un `spaceId` en query ne
+ * peut que restreindre cette liste, jamais l'élargir.
  */
 import prisma from '../prisma';
 
@@ -28,24 +28,28 @@ function first(v?: string | string[]): string | undefined {
   return Array.isArray(v) ? v[0] : v;
 }
 
+/** Portée impossible à satisfaire : aucune donnée ne sort. */
+const NOTHING = ['__none__'];
+
 /**
- * Résout le filtre à appliquer.
- * - `spaceId` fourni  → cet espace précis (et seulement lui)
- * - `userId` fourni   → l'union des espaces de cet utilisateur (scope « Tout »)
- * - rien              → `null` = aucun filtre (vue globale)
+ * Résout le filtre à appliquer pour le profil authentifié.
+ * - `spaceId` fourni et autorisé → cet espace précis
+ * - `spaceId` fourni non autorisé → rien
+ * - rien → l'union des espaces du profil
+ *
+ * Sans identité (jeton absent ou invalide), la réponse est vide : aucune route
+ * scopée ne doit plus répondre à un appelant anonyme.
  */
-export async function resolveScope(query: ScopeQuery): Promise<string[] | null> {
+export async function resolveScope(query: ScopeQuery, authUserId?: string | null): Promise<string[]> {
+  if (!authUserId) return NOTHING;
+
+  const allowed = await spaceIdsForUser(authUserId);
+  if (allowed.length === 0) return NOTHING;
+
   const spaceId = first(query.spaceId);
-  if (spaceId) return [spaceId];
+  if (spaceId) return allowed.includes(spaceId) ? [spaceId] : NOTHING;
 
-  const userId = first(query.userId);
-  if (userId) {
-    const ids = await spaceIdsForUser(userId);
-    // Un utilisateur sans espace ne doit rien voir — surtout pas tout.
-    return ids.length > 0 ? ids : ['__none__'];
-  }
-
-  return null;
+  return allowed;
 }
 
 /** Clause Prisma pour les entités portant directement un `spaceId`. */

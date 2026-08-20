@@ -66,7 +66,7 @@ router.get('/', async (req, res) => {
     let whereClause: any = {};
 
     // Portée : un espace précis (spaceId) ou l'union des espaces de l'utilisateur (userId)
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
     if (scope) {
       whereClause.spaceId = { in: scope };
     }

@@ -71,12 +71,13 @@ export interface Bank {
   // Computed fields for convenience
   users?: User[];
   // Enable Banking integration
-  ebStatus?: 'PENDING' | 'LINKED' | 'EXPIRED' | null;
+  ebStatus?: 'PENDING' | 'SELECTING_ACCOUNT' | 'LINKED' | 'EXPIRED' | null;
   ebLinkedAt?: string | null;
   ebExpiresAt?: string | null;
   ebLastSyncAt?: string | null;
   ebAccountUid?: string | null;
   ebAspspName?: string | null;
+  ebAspspCountry?: string | null;
 }
 
 export interface Category {

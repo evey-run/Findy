@@ -92,27 +92,217 @@ function DonutChart({ data, centerLabel, centerValue }: {
 
 // ─── MonthlyFlux (barres revenus/dépenses) ──────────────────────────────────
 
-function MonthlyFlux({ data }: { data: { label: string; income: number; expense: number }[] }) {
-  const max = Math.max(...data.flatMap(d => [d.income, d.expense]), 1);
+type FluxPoint = {
+  label: string;
+  income: number;
+  expense: number;
+  cumulativeIncome: number;
+  cumulativeExpense: number;
+  cumulativeBalance: number;
+};
+
+function signedAmount(amount: number) {
+  if (amount === 0) return fmt(0);
+  return `${amount > 0 ? '+' : '−'}${fmt(Math.abs(amount))}`;
+}
+
+// Aperçu au survol : uniquement le montant, sans libellé ni cartouche.
+function FluxValueTooltip({ amount, tone }: { amount: number; tone: 'positive' | 'negative' | 'neutral' }) {
+  const color = tone === 'positive' ? 'text-green-300' : tone === 'negative' ? 'text-red-300' : 'text-zinc-100';
   return (
-    <div className="flex items-end justify-between gap-2 h-full w-full px-1">
-      {data.map((m, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end min-w-0">
-          <div className="flex items-end justify-center gap-1 h-full w-full">
-            <div
-              className="w-2.5 rounded-t bg-green-500/80 transition-all duration-500"
-              style={{ height: `${(m.income / max) * 100}%` }}
-              title={`Revenus : ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(m.income)}`}
-            />
-            <div
-              className="w-2.5 rounded-t bg-red-500/70 transition-all duration-500"
-              style={{ height: `${(m.expense / max) * 100}%` }}
-              title={`Dépenses : ${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(m.expense)}`}
-            />
+    <span className={`whitespace-nowrap text-[11px] font-semibold tabular-nums [text-shadow:0_1px_3px_rgb(9_9_11)] ${color}`}>
+      {signedAmount(amount)}
+    </span>
+  );
+}
+
+function MonthlyFlux({
+  data,
+  cumulative = false,
+}: {
+  data: { label: string; income: number; expense: number }[];
+  cumulative?: boolean;
+}) {
+  const [hoveredValue, setHoveredValue] = useState<{ index: number; kind: 'income' | 'expense' | 'balance' } | null>(null);
+  const points = useMemo<FluxPoint[]>(() => {
+    let cumulativeIncome = 0;
+    let cumulativeExpense = 0;
+    return data.map((point) => {
+      cumulativeIncome += point.income;
+      cumulativeExpense += point.expense;
+      return {
+        ...point,
+        cumulativeIncome,
+        cumulativeExpense,
+        cumulativeBalance: cumulativeIncome - cumulativeExpense,
+      };
+    });
+  }, [data]);
+
+  const monthlyMax = Math.max(...points.flatMap((point) => [point.income, point.expense]), 1);
+  const cumulativeMax = Math.max(...points.map((point) => Math.abs(point.cumulativeBalance)), 1);
+  const cumulativeGraphPoints = points.map((point, index) => ({
+    point,
+    index,
+    x: ((index + 0.5) / Math.max(points.length, 1)) * 100,
+    // La ligne reste éloignée des bords et croise le zéro au centre du graphe.
+    y: 50 - (point.cumulativeBalance / cumulativeMax) * 42,
+  }));
+  const cumulativeLinePath = cumulativeGraphPoints.reduce((path, current, index) => {
+    if (index === 0) return `M ${current.x} ${current.y}`;
+    const previous = cumulativeGraphPoints[index - 1];
+    const controlX = (previous.x + current.x) / 2;
+    return `${path} C ${controlX} ${previous.y}, ${controlX} ${current.y}, ${current.x} ${current.y}`;
+  }, '');
+  const cumulativeAreaPath = cumulativeGraphPoints.length > 0
+    ? `${cumulativeLinePath} L ${cumulativeGraphPoints[cumulativeGraphPoints.length - 1].x} 50 L ${cumulativeGraphPoints[0].x} 50 Z`
+    : '';
+
+  const isHovered = (index: number, kind: 'income' | 'expense' | 'balance') => (
+    hoveredValue?.index === index && hoveredValue.kind === kind
+  );
+
+  const hoverHandlers = (index: number, kind: 'income' | 'expense' | 'balance') => ({
+    onMouseEnter: () => setHoveredValue({ index, kind }),
+    onMouseLeave: () => setHoveredValue(null),
+    onFocus: () => setHoveredValue({ index, kind }),
+    onBlur: () => setHoveredValue(null),
+  });
+
+  if (cumulative) {
+    return (
+      <div className="flex h-full min-h-0 w-full flex-col">
+        <div className="relative min-h-0 flex-1">
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <defs>
+              <linearGradient id="cumulative-flux-fill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0" stopColor="#8b5cf6" stopOpacity="0.24" />
+                <stop offset="1" stopColor="#8b5cf6" stopOpacity="0.01" />
+              </linearGradient>
+            </defs>
+            <line x1="0" x2="100" y1="50" y2="50" stroke="#ffffff" strokeOpacity="0.13" strokeDasharray="2 2" />
+            {cumulativeAreaPath && <path d={cumulativeAreaPath} fill="url(#cumulative-flux-fill)" />}
+            {cumulativeLinePath && (
+              <path
+                d={cumulativeLinePath}
+                fill="none"
+                stroke="#a78bfa"
+                strokeWidth="1.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            )}
+          </svg>
+          <div className="absolute inset-0 flex px-1">
+            {cumulativeGraphPoints.map(({ point, index, y }) => {
+              const isPositive = point.cumulativeBalance >= 0;
+              // Le montant se pose au-dessus du point, sauf près du haut du graphe où il passe dessous.
+              const tooltipBelow = y < 16;
+              const tone = point.cumulativeBalance > 0 ? 'positive' : point.cumulativeBalance < 0 ? 'negative' : 'neutral';
+              return (
+                <div
+                  key={`${point.label}-${index}`}
+                  {...hoverHandlers(index, 'balance')}
+                  tabIndex={0}
+                  className="relative flex-1 min-w-0 cursor-default rounded-sm outline-none focus-visible:ring-1 focus-visible:ring-violet-400/70"
+                  aria-label={`${point.label} : solde cumulé ${signedAmount(point.cumulativeBalance)}`}
+                >
+                  {isHovered(index, 'balance') && (
+                    <div
+                      className={`pointer-events-none absolute left-1/2 z-20 -translate-x-1/2 ${
+                        tooltipBelow ? 'mt-2.5' : '-mt-2.5 -translate-y-full'
+                      }`}
+                      style={{ top: `${y}%` }}
+                      role="tooltip"
+                    >
+                      <FluxValueTooltip amount={point.cumulativeBalance} tone={tone} />
+                    </div>
+                  )}
+                  <span
+                    className={`pointer-events-none absolute left-1/2 z-10 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-zinc-950 shadow-sm transition-all duration-200 ${
+                      isPositive ? 'bg-green-400' : 'bg-red-400'
+                    } ${isHovered(index, 'balance') ? 'scale-125' : ''}`}
+                    style={{ top: `${y}%` }}
+                  />
+                </div>
+              );
+            })}
           </div>
-          <span className="text-[10px] text-zinc-500 capitalize truncate">{m.label}</span>
         </div>
-      ))}
+        <div className="mt-1.5 flex justify-between gap-2 px-1">
+          {points.map((point, index) => (
+            <span key={`${point.label}-${index}`} className="min-w-0 flex-1 truncate text-center text-[10px] capitalize text-zinc-500">
+              {point.label}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col">
+      <div className="flex min-h-0 flex-1 items-end justify-between gap-2 px-1">
+        {points.map((point, index) => {
+          const incomeRatio = point.income / monthlyMax;
+          const expenseRatio = point.expense / monthlyMax;
+          const incomeHeight = point.income === 0 ? '0%' : `${Math.max(incomeRatio * 100, 3)}%`;
+          const expenseHeight = point.expense === 0 ? '0%' : `${Math.max(expenseRatio * 100, 3)}%`;
+          const incomeTooltipStyle = incomeRatio > 0.82
+            ? { top: 0 }
+            : { bottom: `calc(${Math.max(incomeRatio * 100, 3)}% + 4px)` };
+          const expenseTooltipStyle = expenseRatio > 0.82
+            ? { top: 0 }
+            : { bottom: `calc(${Math.max(expenseRatio * 100, 3)}% + 4px)` };
+          return (
+            <div
+              key={`${point.label}-${index}`}
+              className="relative flex h-full flex-1 min-w-0 items-end justify-center gap-1"
+            >
+              <div className="relative h-full w-2.5">
+                {isHovered(index, 'income') && (
+                  <div className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2" style={incomeTooltipStyle} role="tooltip">
+                    <FluxValueTooltip amount={point.income} tone="positive" />
+                  </div>
+                )}
+                <div
+                  {...hoverHandlers(index, 'income')}
+                  tabIndex={0}
+                  className="absolute bottom-0 left-0 w-full cursor-default rounded-t bg-green-500/80 outline-none transition-all duration-500 focus-visible:ring-1 focus-visible:ring-violet-400/70"
+                  style={{ height: incomeHeight }}
+                  aria-label={`${point.label} : revenus ${signedAmount(point.income)}`}
+                />
+              </div>
+              <div className="relative h-full w-2.5">
+                {isHovered(index, 'expense') && (
+                  <div className="pointer-events-none absolute left-1/2 z-20 -translate-x-1/2" style={expenseTooltipStyle} role="tooltip">
+                    <FluxValueTooltip amount={-point.expense} tone="negative" />
+                  </div>
+                )}
+                <div
+                  {...hoverHandlers(index, 'expense')}
+                  tabIndex={0}
+                  className="absolute bottom-0 left-0 w-full cursor-default rounded-t bg-red-500/70 outline-none transition-all duration-500 focus-visible:ring-1 focus-visible:ring-violet-400/70"
+                  style={{ height: expenseHeight }}
+                  aria-label={`${point.label} : dépenses ${signedAmount(-point.expense)}`}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex justify-between gap-2 px-1">
+        {points.map((point, index) => (
+          <span key={`${point.label}-${index}`} className="min-w-0 flex-1 truncate text-center text-[10px] capitalize text-zinc-500">
+            {point.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -168,6 +358,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [previousData, setPreviousData] = useState({ income: 0, expense: 0, savings: 0, investment: 0 });
   const [fluxData, setFluxData] = useState<{ label: string; income: number; expense: number }[]>([]);
+  const [fluxCumulative, setFluxCumulative] = useState(false);
 
   // ── period helpers ─────────────────────────────────────────────────────────
 
@@ -478,15 +669,37 @@ export default function Dashboard() {
         <div className="lg:col-span-7 flex flex-col min-h-0 rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10 overflow-hidden">
           <div className="flex-shrink-0 flex items-center justify-between px-5 py-3 border-b border-white/[0.06]">
             <span className="text-xs font-medium uppercase tracking-widest text-violet-400">
-              Flux sur 6 {periodType === 'week' ? 'semaines' : periodType === 'year' ? 'ans' : 'mois'}
+              {fluxCumulative ? 'Flux cumulé' : 'Flux'} sur 6 {periodType === 'week' ? 'semaines' : periodType === 'year' ? 'ans' : 'mois'}
             </span>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="flex items-center gap-1.5 text-zinc-400">
-                <span className="inline-block h-2 w-2 rounded-full bg-green-500/80" /> Revenus
-              </span>
-              <span className="flex items-center gap-1.5 text-zinc-400">
-                <span className="inline-block h-2 w-2 rounded-full bg-red-500/70" /> Dépenses
-              </span>
+            <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
+              <button
+                type="button"
+                onClick={() => setFluxCumulative((value) => !value)}
+                aria-pressed={fluxCumulative}
+                title={fluxCumulative ? 'Afficher les flux mensuels' : 'Afficher le solde cumulé'}
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-medium transition-colors ${
+                  fluxCumulative
+                    ? 'border-violet-400/40 bg-violet-500/15 text-violet-200'
+                    : 'border-white/10 bg-white/[0.03] text-zinc-400 hover:border-violet-400/30 hover:text-zinc-200'
+                }`}
+              >
+                <ArrowTrendingUpIcon className="h-3.5 w-3.5" />
+                Cumulé
+              </button>
+              {fluxCumulative ? (
+                <span className="flex items-center gap-1.5 text-zinc-400">
+                  <span className="inline-block h-2 w-2 rounded-full bg-violet-400" /> Solde cumulé
+                </span>
+              ) : (
+                <>
+                  <span className="flex items-center gap-1.5 text-zinc-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-green-500/80" /> Revenus
+                  </span>
+                  <span className="flex items-center gap-1.5 text-zinc-400">
+                    <span className="inline-block h-2 w-2 rounded-full bg-red-500/70" /> Dépenses
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex-1 min-h-0 p-4">
@@ -495,7 +708,7 @@ export default function Dashboard() {
                 <p className="text-sm text-zinc-600">Aucune donnée</p>
               </div>
             ) : (
-              <MonthlyFlux data={fluxData} />
+              <MonthlyFlux data={fluxData} cumulative={fluxCumulative} />
             )}
           </div>
         </div>

@@ -6,6 +6,7 @@ import { API_BASE } from './apiBase';
 /** Construit l'URL d'un asset servi par le backend (images uploadées). */
 export function assetUrl(path?: string | null): string {
   if (!path) return '';
-  if (path.startsWith('http')) return path; // URL déjà absolue (cas externe)
-  return `${API_BASE}${path}`;              // '' + '/uploads/x.png' => relatif
+  if (/^(https?:|data:|blob:)/i.test(path)) return path; // URL déjà absolue (cas externe)
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${API_BASE}${normalizedPath}`;    // '' + '/uploads/x.png' => relatif
 }

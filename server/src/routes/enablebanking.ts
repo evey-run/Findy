@@ -1,18 +1,16 @@
 import express from 'express';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import prisma from '../prisma';
 import { getPublicBaseUrl } from '../publicUrl';
 import { initialBalanceFor } from '../lib/balance';
+import path from 'node:path';
+import { SYNC_SETTINGS_PATH, PERSISTENCE_DIR, ensurePersistenceDir } from '../lib/persistence';
+import { ensureTunnel, keepTunnelWarm } from '../lib/tunnel';
+import { consentWarning, normalizeTransaction, planReconciliation } from '../lib/ebTransactions';
 
 const router = express.Router();
 const EB_BASE = 'https://api.enablebanking.com';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const SYNC_SETTINGS_PATH = path.resolve(__dirname, '..', '..', '..', 'data', 'sync-settings.json');
 
 // ─── Credential resolution: env vars → sync-settings.json ──
 function readSyncSettings(): Record<string, any> {
@@ -100,44 +98,305 @@ async function ebFetch(path: string, options: RequestInit = {}): Promise<any> {
 
 // ─── Helpers ───────────────────────────────────────────────
 
-function hashTransactionFallback(date: string, amount: number, description: string): string {
-  return crypto.createHash('sha256').update(`${date}|${amount}|${description}`).digest('hex').slice(0, 32);
+/**
+ * Vérifie que l'URL de retour est bien déclarée dans l'application Enable
+ * Banking. `registered: null` = impossible de savoir (API injoignable), auquel
+ * cas on laisse passer : mieux vaut un parcours qui tente sa chance qu'un
+ * blocage sur un diagnostic incertain.
+ */
+async function checkRedirectRegistered(callbackUrl: string): Promise<{ registered: boolean | null; urls: string[] }> {
+  try {
+    const application = await ebFetch('/application');
+    const urls: string[] = Array.isArray(application?.redirect_urls)
+      ? application.redirect_urls.filter((url: unknown): url is string => typeof url === 'string')
+      : [];
+    if (urls.length === 0) return { registered: null, urls };
+
+    const normalize = (url: string) => url.trim().replace(/\/+$/, '').toLowerCase();
+    return { registered: urls.some((url) => normalize(url) === normalize(callbackUrl)), urls };
+  } catch (error) {
+    console.warn('[EB] Lecture de l’application impossible, vérification du callback ignorée:', error);
+    return { registered: null, urls: [] };
+  }
 }
 
-interface NormalizedTransaction {
-  externalId: string;
-  amount: number;
-  date: Date;
-  description: string;
-  currency: string | null;
-  balanceAfterTransaction: number | null;
-  status: 'BOOK' | 'PENDING';
+interface EbAccountChoice {
+  uid: string;
+  name: string;
+  kind: string;
+  identifiers: string[];
+  description: string | null;
 }
 
-function normalizeTransaction(t: any): NormalizedTransaction | null {
-  const rawId = t.entry_reference ?? t.transaction_id;
-  const rawAmount = parseFloat(t.transaction_amount?.amount ?? t.amount ?? '0');
-  const amount = t.credit_debit_indicator === 'CRDT' ? rawAmount : -rawAmount;
-  const date = new Date(t.booking_date ?? t.transaction_date ?? t.value_date ?? new Date());
-  const description =
-    (Array.isArray(t.remittance_information) ? t.remittance_information.join(' ') : t.remittance_information) ??
-    t.creditor?.name ??
-    t.debtor?.name ??
-    'Transaction';
+function accountUid(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim() || null;
+  if (!value || typeof value !== 'object') return null;
 
-  // PSD2: transactions can be BOOK (settled) or PENDING (not yet settled)
-  const status: 'BOOK' | 'PENDING' = t.booking_date ? 'BOOK' : 'PENDING';
+  // Selon l'ASPSP et la version d'API, l'identifiant technique du compte
+  // n'arrive pas toujours sous la même clé.
+  const record = value as Record<string, unknown>;
+  for (const key of ['uid', 'account_uid', 'accountUid', 'resource_id', 'resourceId', 'id']) {
+    const candidate = record[key];
+    if (typeof candidate === 'string' && candidate.trim()) return candidate.trim();
+  }
+  return null;
+}
 
-  // Build externalId: use API id if available, otherwise hash fallback
-  const externalId = rawId || hashTransactionFallback(date.toISOString(), amount, description);
-  if (!externalId) return null;
+/** Les deux formats sont documentés par Enable Banking selon la version d'API. */
+function sessionAccountUids(sessionData: any): string[] {
+  const accounts = [
+    ...(Array.isArray(sessionData?.accounts) ? sessionData.accounts : []),
+    ...(Array.isArray(sessionData?.accounts_data) ? sessionData.accounts_data : []),
+  ];
 
-  const currency = t.transaction_amount?.currency ?? null;
+  return [...new Set(accounts.map(accountUid).filter((uid): uid is string => uid !== null))];
+}
 
-  const balAfter = t.balance_after_transaction?.amount;
-  const balanceAfterTransaction = balAfter != null ? parseFloat(balAfter) : null;
+function sessionStatus(sessionData: any): string | null {
+  return nonEmptyString(sessionData?.status) ?? nonEmptyString(sessionData?.session_status);
+}
 
-  return { externalId, amount, date, description, currency, balanceAfterTransaction, status };
+/**
+ * Certains ASPSP (Revolut notamment) renvoient une session sans comptes juste
+ * après l'échange du code : la liste n'est publiée qu'une fois le consentement
+ * propagé côté banque. On relit alors la session avant d'abandonner.
+ */
+async function resolveSessionAccounts(sessionId: string, sessionData: any): Promise<{ data: any; uids: string[]; attempts: any[] }> {
+  let data = sessionData;
+  let uids = sessionAccountUids(data);
+  const attempts: any[] = [{ source: 'POST /sessions', payload: data }];
+  if (uids.length > 0 || !sessionId) return { data, uids, attempts };
+
+  for (const delayMs of [1000, 3000, 6000]) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
+      data = await ebFetch(`/sessions/${encodeURIComponent(sessionId)}`);
+      attempts.push({ source: `GET /sessions/{id} (+${delayMs}ms)`, payload: data });
+    } catch (error: any) {
+      console.warn(`[EB] Relecture de la session ${sessionId} impossible:`, error);
+      attempts.push({ source: `GET /sessions/{id} (+${delayMs}ms)`, error: String(error?.message ?? error) });
+      break;
+    }
+    uids = sessionAccountUids(data);
+    if (uids.length > 0) break;
+  }
+
+  return { data, uids, attempts };
+}
+
+/**
+ * Trace de secours pour la liaison bancaire : dans l'app packagée, la sortie du
+ * sidecar est jetée, donc le payload d'Enable Banking n'existe nulle part.
+ */
+function writeEbDebug(label: string, payload: unknown): string | null {
+  try {
+    ensurePersistenceDir();
+    const file = path.join(PERSISTENCE_DIR, 'enablebanking-debug.json');
+    // Ce fichier contient des identifiants de comptes bancaires : mêmes
+    // permissions restreintes que les identifiants de synchronisation.
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ at: new Date().toISOString(), label, payload }, null, 2),
+      { encoding: 'utf-8', mode: 0o600 },
+    );
+    fs.chmodSync(file, 0o600);
+    return file;
+  } catch (error) {
+    console.warn('[EB] Impossible d’écrire le fichier de diagnostic:', error);
+    return null;
+  }
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' ? value as Record<string, unknown> : null;
+}
+
+function identifierLabel(scheme: unknown): string {
+  const normalized = nonEmptyString(scheme)?.toUpperCase() || '';
+  if (normalized.includes('IBAN')) return 'IBAN';
+  if (normalized.includes('PAN') || normalized.includes('CARD')) return 'Carte';
+  if (normalized.includes('BBAN')) return 'Compte';
+  return normalized ? `Réf. ${normalized}` : 'Référence';
+}
+
+function addMaskedIdentifier(identifiers: string[], label: string, value: unknown): void {
+  const raw = nonEmptyString(value);
+  if (!raw) return;
+
+  const compact = raw.replace(/\s/g, '');
+  const display = compact.length > 4 ? `${label} ••••${compact.slice(-4)}` : `${label} masqué`;
+  if (!identifiers.includes(display)) identifiers.push(display);
+}
+
+function accountIdentifiers(details: any): string[] {
+  const identifiers: string[] = [];
+  const accountId = asRecord(details?.account_id);
+
+  addMaskedIdentifier(identifiers, 'IBAN', accountId?.iban ?? details?.iban);
+  addMaskedIdentifier(identifiers, 'Carte', accountId?.masked_pan ?? accountId?.pan ?? accountId?.card_number);
+
+  const identifiedAccounts = [
+    ...(Array.isArray(details?.all_account_ids) ? details.all_account_ids : []),
+    ...(Array.isArray(details?.identifications) ? details.identifications : []),
+  ];
+  for (const item of identifiedAccounts) {
+    const identifier = asRecord(item);
+    if (!identifier) continue;
+    addMaskedIdentifier(
+      identifiers,
+      identifierLabel(identifier.scheme_name ?? identifier.schemeName),
+      identifier.identification ?? identifier.value,
+    );
+  }
+
+  const other = asRecord(accountId?.other);
+  if (other) {
+    addMaskedIdentifier(
+      identifiers,
+      identifierLabel(other.scheme_name ?? other.schemeName),
+      other.identification,
+    );
+  }
+
+  return identifiers;
+}
+
+function accountKind(details: any, identifiers: string[]): string {
+  const kindCode = nonEmptyString(details?.cash_account_type)?.toUpperCase();
+  const labels: Record<string, string> = {
+    CACC: 'Compte courant',
+    CASH: 'Compte espèces',
+    CARD: 'Carte',
+    SVGS: 'Épargne',
+  };
+  if (kindCode && labels[kindCode]) return labels[kindCode];
+  if (identifiers.some((identifier) => identifier.startsWith('Carte '))) return 'Carte';
+  return kindCode ? `Compte (${kindCode})` : 'Compte';
+}
+
+function accountDescription(details: any, name: string): string | null {
+  const values = [details?.product, details?.details, details?.currency]
+    .map(nonEmptyString)
+    .filter((value): value is string => Boolean(value) && value !== name);
+  return [...new Set(values)].join(' · ') || null;
+}
+
+async function describeSessionAccounts(accountUids: string[]): Promise<EbAccountChoice[]> {
+  return Promise.all(accountUids.map(async (uid, index) => {
+    try {
+      const details = await ebFetch(`/accounts/${encodeURIComponent(uid)}/details`);
+      const identifiers = accountIdentifiers(details);
+      const kind = accountKind(details, identifiers);
+      const name = [details.name, details.product, details.details]
+        .map(nonEmptyString)
+        .find((value): value is string => Boolean(value)) || `Compte ${index + 1}`;
+      return {
+        uid,
+        name,
+        kind,
+        identifiers: identifiers.length ? identifiers : [`Référence ••••${uid.slice(-6)}`],
+        description: accountDescription(details, name),
+      };
+    } catch (error) {
+      // Un ASPSP peut accepter la session mais ne pas fournir les détails. Le
+      // choix reste possible grâce à un identifiant de compte raccourci.
+      console.warn(`[EB] Impossible de lire les détails du compte ${uid}:`, error);
+      return {
+        uid,
+        name: `Compte ${index + 1}`,
+        kind: 'Compte',
+        identifiers: [`Référence ••••${uid.slice(-6)}`],
+        description: null,
+      };
+    }
+  }));
+}
+
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function callbackHtml(body: string): string {
+  return `<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center;padding:48px 20px;background:#111;color:#fff}
+    h2{color:#a78bfa;margin:0 0 12px}.panel{max-width:480px;margin:0 auto}.account{width:100%;text-align:left;margin:10px 0;padding:16px;border:1px solid #3f3f46;border-radius:12px;background:#18181b;color:#fff;cursor:pointer}.account:hover{border-color:#8b5cf6;background:#27272a}.account-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.account strong{font-size:15px}.account .kind{display:inline-block;flex-shrink:0;padding:3px 7px;border-radius:99px;background:#27272a;color:#c4b5fd;font-size:11px}.account .identifier{display:block;margin-top:7px;font-size:13px;color:#e4e4e7}.account .description{display:block;margin-top:5px;font-size:12px;color:#a1a1aa}
+  </style></head><body>${body}</body></html>`;
+}
+
+function linkedAccountHtml(bankName: string): string {
+  return callbackHtml(`
+    <div class="panel">
+      <div style="font-size:56px;margin-bottom:16px">✅</div>
+      <h2>Compte lié avec succès !</h2>
+      <p style="color:#a0aec0"><strong style="color:#fff">${escapeHtml(bankName)}</strong> est maintenant connecté à Enable Banking.</p>
+      <p style="color:#a0aec0">Les transactions sont synchronisées automatiquement.</p>
+      <script>setTimeout(()=>window.close(),4000)</script>
+    </div>
+  `);
+}
+
+function selectAccountHtml(bankId: string, state: string, bankName: string, accounts: EbAccountChoice[]): string {
+  const action = `${getPublicBaseUrl()}/api/enablebanking/select-account`;
+  const choices = accounts.map((account) => `
+    <form method="post" action="${escapeHtml(action)}">
+      <input type="hidden" name="bankId" value="${escapeHtml(bankId)}">
+      <input type="hidden" name="state" value="${escapeHtml(state)}">
+      <input type="hidden" name="accountUid" value="${escapeHtml(account.uid)}">
+      <button class="account" type="submit">
+        <span class="account-head"><strong>${escapeHtml(account.name)}</strong><span class="kind">${escapeHtml(account.kind)}</span></span>
+        ${account.identifiers.map((identifier) => `<span class="identifier">${escapeHtml(identifier)}</span>`).join('')}
+        ${account.description ? `<span class="description">${escapeHtml(account.description)}</span>` : ''}
+      </button>
+    </form>
+  `).join('');
+
+  return callbackHtml(`
+    <div class="panel">
+      <div style="font-size:48px;margin-bottom:16px">🏦</div>
+      <h2>Choisis le compte à synchroniser</h2>
+      <p style="color:#a0aec0;margin-bottom:22px">Boursobank a autorisé plusieurs comptes pour <strong style="color:#fff">${escapeHtml(bankName)}</strong>. Choisis celui qui correspond à ce portefeuille Findy.</p>
+      ${choices}
+      <p style="color:#a1a1aa;font-size:12px;margin-top:18px">« IBAN » identifie le compte. « Carte » désigne une carte transmise par la banque. Les numéros sont volontairement masqués.</p>
+      <p style="color:#71717a;font-size:12px;margin-top:18px">Les opérations déjà importées depuis un ancien compte ne sont pas supprimées automatiquement.</p>
+    </div>
+  `);
+}
+
+async function linkSelectedAccount(bankId: string, sessionId: string, accountUid: string) {
+  const now = new Date();
+  const bank = await prisma.bank.update({
+    where: { id: bankId },
+    data: {
+      ebState: null,
+      ebSessionId: sessionId,
+      ebAccountUid: accountUid,
+      ebStatus: 'LINKED',
+      ebLinkedAt: now,
+      ebExpiresAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+      ebLastSyncAt: null,
+    },
+  });
+
+  // Le backfill ne commence qu'après le choix : les opérations d'un autre
+  // compte Boursobank ne peuvent plus être importées par défaut.
+  syncBackfill(bank.id)
+    .then((result) => {
+      console.log(`[EB] Backfill completed for ${bank.name}: ${result.imported} imported, ${result.skipped} skipped`);
+    })
+    .catch((err) => {
+      console.error(`[EB] Backfill failed for ${bank.name}:`, err.message);
+    });
+
+  return bank;
 }
 
 async function fetchAllTransactions(accountUid: string, dateFrom?: string): Promise<any[]> {
@@ -293,7 +552,7 @@ export async function syncIncremental(bankId: string): Promise<SyncResult> {
   });
 
   // Check consent expiration
-  result.consentWarning = checkConsentExpiration(bank);
+  result.consentWarning = consentWarning(bank);
 
   return result;
 }
@@ -302,119 +561,64 @@ export async function syncIncremental(bankId: string): Promise<SyncResult> {
  * Shared upsert logic: deduplicate, insert new txs, reconcile PENDING→BOOK.
  */
 async function upsertTransactions(bankId: string, rawTransactions: any[]): Promise<SyncResult> {
-  let imported = 0;
-  let updated = 0;
-  let skipped = 0;
-  let pendingReconciled = 0;
+  // Ce que la banque envoie, une fois traduit vers le modèle interne.
+  const incoming = rawTransactions
+    .map((raw) => normalizeTransaction(raw))
+    .filter((tx): tx is NonNullable<typeof tx> => tx !== null);
 
-  // Pre-fetch existing transactions for this bank for batch dedup
-  const existingTxs = await prisma.transaction.findMany({
+  const existing = await prisma.transaction.findMany({
     where: { bankId, externalId: { not: null } },
     select: { id: true, externalId: true, status: true, balanceAfterTransaction: true },
   });
-  const existingByExternalId = new Map(existingTxs.map((t) => [t.externalId!, t]));
 
-  // Batch inserts for performance
-  const toCreate: Array<{
-    bankId: string;
-    amount: number;
-    description: string;
-    date: Date;
-    externalId: string;
-    currency: string | null;
-    balanceAfterTransaction: number | null;
-    status: string;
-  }> = [];
-  const toUpdate: Array<{ id: string; status?: string; balanceAfterTransaction?: number | null }> = [];
+  // La décision (créer / réconcilier / ignorer) est prise hors base : c'est la
+  // partie qui produit des doublons quand elle se trompe, elle est testée.
+  const plan = planReconciliation(incoming, existing);
 
-  for (const raw of rawTransactions) {
-    const normalized = normalizeTransaction(raw);
-    if (!normalized) continue;
-
-    const existing = existingByExternalId.get(normalized.externalId);
-
-    if (existing) {
-      // Reconcile: PENDING → BOOK transition
-      if (existing.status === 'PENDING' && normalized.status === 'BOOK') {
-        toUpdate.push({ id: existing.id, status: 'BOOK' });
-        pendingReconciled++;
-      }
-      // Backfill balanceAfterTransaction if missing
-      if (existing.balanceAfterTransaction == null && normalized.balanceAfterTransaction != null) {
-        toUpdate.push({ id: existing.id, balanceAfterTransaction: normalized.balanceAfterTransaction });
-      }
-      skipped++;
-      continue;
-    }
-
-    toCreate.push({
+  let imported = 0;
+  if (plan.toCreate.length > 0) {
+    const rows = plan.toCreate.map((tx) => ({
       bankId,
-      amount: normalized.amount,
-      description: normalized.description,
-      date: normalized.date,
-      externalId: normalized.externalId,
-      currency: normalized.currency,
-      balanceAfterTransaction: normalized.balanceAfterTransaction,
-      status: normalized.status,
-    });
-  }
+      amount: tx.amount,
+      description: tx.description,
+      date: tx.date,
+      externalId: tx.externalId,
+      currency: tx.currency,
+      balanceAfterTransaction: tx.balanceAfterTransaction,
+      status: tx.status,
+    }));
 
-  // Execute batch create
-  if (toCreate.length > 0) {
     try {
-      await prisma.transaction.createMany({ data: toCreate });
+      await prisma.transaction.createMany({ data: rows });
     } catch (err: any) {
-      // If batch fails (e.g. unique constraint), insert one by one
+      // Contrainte d'unicité : on retombe sur des insertions unitaires pour ne
+      // pas perdre tout le lot à cause d'une seule opération déjà présente.
       if (err.code === 'P2002' || err.message?.includes('Unique constraint')) {
-        for (const tx of toCreate) {
+        for (const row of rows) {
           try {
-            await prisma.transaction.create({ data: tx });
-          } catch { /* skip duplicate */ }
+            await prisma.transaction.create({ data: row });
+          } catch { /* doublon ignoré */ }
         }
       } else throw err;
     }
-    imported = toCreate.length;
+    imported = rows.length;
   }
 
-  // Execute batch status updates (PENDING → BOOK, balanceAfterTransaction backfill)
-  for (const u of toUpdate) {
+  for (const update of plan.toUpdate) {
     const data: any = {};
-    if (u.status) data.status = u.status;
-    if (u.balanceAfterTransaction != null) data.balanceAfterTransaction = u.balanceAfterTransaction;
-    await prisma.transaction.update({ where: { id: u.id }, data });
+    if (update.status) data.status = update.status;
+    if (update.balanceAfterTransaction != null) data.balanceAfterTransaction = update.balanceAfterTransaction;
+    await prisma.transaction.update({ where: { id: update.id }, data });
   }
 
   return {
     imported,
-    updated,
-    skipped,
-    pendingReconciled,
+    updated: plan.toUpdate.length,
+    skipped: plan.skipped,
+    pendingReconciled: plan.pendingReconciled,
     total: rawTransactions.length,
     consentWarning: null,
   };
-}
-
-/**
- * Check if consent is expiring soon (within 7 days).
- */
-function checkConsentExpiration(bank: {
-  ebExpiresAt: Date | null;
-  ebStatus: string | null;
-  name: string;
-}): string | null {
-  if (bank.ebStatus !== 'LINKED' || !bank.ebExpiresAt) return null;
-
-  const daysUntilExpiry = Math.ceil(
-    (bank.ebExpiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)
-  );
-
-  if (daysUntilExpiry <= 0) {
-    return `Le consentement de ${bank.name} a expiré. Veuillez réauthentifier.`;
-  }
-  if (daysUntilExpiry <= 7) {
-    return `Le consentement de ${bank.name} expire dans ${daysUntilExpiry} jour(s). Réauthentifiez bientôt.`;
-  }
-  return null;
 }
 
 // ─── Manual Sync Cooldown ──────────────────────────────────
@@ -470,9 +674,29 @@ router.post('/link', async (req, res) => {
       return res.status(400).json({ error: 'bankId, aspspName and aspspCountry required' });
     }
 
+    // Le retour d'autorisation arrive par le tunnel : il doit être ouvert
+    // avant de demander l'URL de consentement, pas seulement au démarrage.
+    const tunnel = await ensureTunnel();
+    if (!tunnel.active && tunnel.error) {
+      return res.status(422).json({ error: tunnel.error });
+    }
+
     const state = crypto.randomUUID();
     const baseUrl = getPublicBaseUrl();
     const callbackUrl = `${baseUrl}/api/enablebanking/callback`;
+
+    // Une URL de callback non déclarée chez Enable Banking fait échouer le
+    // parcours *après* l'authentification bancaire, sans message exploitable.
+    // Autant le dire avant d'envoyer l'utilisateur chez sa banque.
+    const registration = await checkRedirectRegistered(callbackUrl);
+    if (registration.registered === false) {
+      return res.status(422).json({
+        error: `L’URL de retour n’est pas déclarée dans votre application Enable Banking. `
+          + `Ajoutez-la dans « Redirect URLs » : ${callbackUrl}`,
+        callbackUrl,
+        registeredUrls: registration.urls,
+      });
+    }
     const validUntil = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
 
     const authData = await ebFetch('/auth', {
@@ -497,29 +721,61 @@ router.post('/link', async (req, res) => {
         ebAccountUid: null,
         ebLinkedAt: null,
         ebExpiresAt: null,
+        ebLastSyncAt: null,
       },
     });
 
-    const redirectLink = `${baseUrl}/api/enablebanking-redirect?${new URLSearchParams({
-      bankId,
-      aspspName: aspspName.toUpperCase(),
-      aspspCountry: aspspCountry.toUpperCase(),
-      redirectUrl: authData.url,
-    }).toString()}`;
-
-    res.json({ link: authData.url, redirectLink });
+    res.json({ link: authData.url });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/enablebanking/select-account — choix explicite après consentement
+router.post('/select-account', async (req, res) => {
+  const html = (body: string) => callbackHtml(body);
+  keepTunnelWarm();
+  try {
+    const bankId = typeof req.body?.bankId === 'string' ? req.body.bankId : '';
+    const state = typeof req.body?.state === 'string' ? req.body.state : '';
+    const accountUid = typeof req.body?.accountUid === 'string' ? req.body.accountUid : '';
+    if (!bankId || !state || !accountUid) {
+      return res.status(400).send(html('<h2>Erreur</h2><p>Choix de compte incomplet.</p>'));
+    }
+
+    // `state` est l'anti-CSRF imprévisible fourni lors du démarrage OAuth. Le
+    // compte choisi est ensuite revérifié auprès d'Enable Banking avant tout
+    // enregistrement local.
+    const bank = await prisma.bank.findFirst({
+      where: { id: bankId, ebState: state, ebStatus: 'SELECTING_ACCOUNT' },
+    });
+    if (!bank?.ebSessionId) {
+      return res.status(404).send(html('<h2>Erreur</h2><p>Cette sélection a expiré. Relancez la liaison depuis Findy.</p>'));
+    }
+
+    const sessionData = await ebFetch(`/sessions/${encodeURIComponent(bank.ebSessionId)}`);
+    if (!sessionAccountUids(sessionData).includes(accountUid)) {
+      return res.status(400).send(html('<h2>Erreur</h2><p>Ce compte ne fait pas partie de la session autorisée.</p>'));
+    }
+
+    const linkedBank = await linkSelectedAccount(bank.id, bank.ebSessionId, accountUid);
+    return res.send(linkedAccountHtml(linkedBank.name));
+  } catch (err: any) {
+    console.error('[EB] Account selection failed:', err);
+    return res.status(500).send(html(`<h2>Erreur</h2><p>${escapeHtml(err.message || 'Impossible de sélectionner ce compte.')}</p>`));
   }
 });
 
 // GET /api/enablebanking/callback?code=...&state=...
 router.get('/callback', async (req, res) => {
   const { code, state } = req.query as { code?: string; state?: string };
-  const html = (body: string) =>
-    `<html><head><meta charset="utf-8"><style>body{font-family:sans-serif;text-align:center;padding:60px;background:#111;color:#fff}h2{color:#7c3aed}</style></head><body>${body}</body></html>`;
+  const html = (body: string) => callbackHtml(body);
 
   if (!code || !state) return res.send(html('<h2>Erreur</h2><p>Paramètres manquants.</p>'));
+
+  // Le parcours n'est pas fini (choix du compte à venir) : on garde le tunnel
+  // ouvert encore quelques minutes avant de le refermer.
+  keepTunnelWarm();
 
   try {
     const bank = await prisma.bank.findFirst({ where: { ebState: state } });
@@ -530,42 +786,66 @@ router.get('/callback', async (req, res) => {
       body: JSON.stringify({ code }),
     });
 
-    const sessionId: string = sessionData.session_id;
-    const firstAccount = sessionData.accounts?.[0];
-    const accountUid: string = firstAccount?.uid ?? firstAccount;
+    const sessionId = typeof sessionData.session_id === 'string' ? sessionData.session_id : '';
+    if (!sessionId) {
+      console.error('[EB] Session sans identifiant:', JSON.stringify(sessionData));
+      throw new Error("Enable Banking n'a pas renvoyé de session pour cette autorisation.");
+    }
 
-    const now = new Date();
+    const { data: resolvedSession, uids, attempts } = await resolveSessionAccounts(sessionId, sessionData);
+    if (uids.length === 0) {
+      // Les logs du sidecar sont muets dans l'app packagée : le diagnostic doit
+      // être lisible sur la page de retour et laissé sur disque.
+      const debug = {
+        aspsp: { name: bank.ebAspspName, country: bank.ebAspspCountry },
+        sessionId,
+        attempts,
+      };
+      console.error(`[EB] Session ${sessionId} sans compte exploitable:`, JSON.stringify(debug));
+      const debugFile = writeEbDebug('callback:no-accounts', debug);
+      // La session reste rattachée au portefeuille : elle est encore
+      // consultable pour diagnostic tant que le consentement est valide.
+      await prisma.bank.update({ where: { id: bank.id }, data: { ebSessionId: sessionId } });
+      const status = sessionStatus(resolvedSession) ?? 'non communiqué';
+      return res.send(html(
+        '<h2>Erreur</h2>'
+        + '<p>La banque a autorisé la connexion mais Enable Banking n’a renvoyé aucun compte.</p>'
+        + '<p style="font-size:13px;color:#d4d4d8">Cause la plus fréquente : votre application Enable Banking est en mode '
+        + '<em>restreint</em> (activée via « Activate by linking accounts »). Elle ne peut lire que les comptes '
+        + 'explicitement liés dans le panneau Enable Banking ; tout autre compte est retiré de la réponse. '
+        + 'Liez-y ce compte, ou demandez la levée de la restriction, puis relancez la liaison.</p>'
+        + '<p style="font-size:12px"><a style="color:#a78bfa" href="https://enablebanking.com/docs/api/linked-accounts/" target="_blank" rel="noreferrer">Documentation : lier ses propres comptes</a></p>'
+        + `<p style="font-size:12px;color:#a1a1aa">${escapeHtml(bank.ebAspspName ?? 'ASPSP inconnu')}`
+        + ` · statut de session : ${escapeHtml(status)} · session ${escapeHtml(sessionId.slice(0, 8))}…</p>`
+        + '<details style="text-align:left;margin-top:16px"><summary style="cursor:pointer;color:#a78bfa;font-size:13px">Détails techniques</summary>'
+        + `<pre style="white-space:pre-wrap;word-break:break-word;font-size:11px;color:#e4e4e7;background:#18181b;border:1px solid #3f3f46;border-radius:12px;padding:12px">${escapeHtml(JSON.stringify(debug, null, 2))}</pre>`
+        + (debugFile ? `<p style="font-size:11px;color:#71717a">Copie enregistrée dans ${escapeHtml(debugFile)}</p>` : '')
+        + '</details>',
+      ));
+    }
+
+    const accounts = await describeSessionAccounts(uids);
+
+    if (accounts.length === 1) {
+      const linkedBank = await linkSelectedAccount(bank.id, sessionId, accounts[0].uid);
+      return res.send(linkedAccountHtml(linkedBank.name));
+    }
+
     await prisma.bank.update({
       where: { id: bank.id },
       data: {
         ebSessionId: sessionId,
-        ebAccountUid: accountUid,
-        ebStatus: 'LINKED',
-        ebLinkedAt: now,
-        ebExpiresAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+        ebAccountUid: null,
+        ebStatus: 'SELECTING_ACCOUNT',
+        ebLinkedAt: null,
+        ebExpiresAt: null,
+        ebLastSyncAt: null,
       },
     });
 
-    // Trigger backfill immediately after successful link (background, don't block response)
-    syncBackfill(bank.id)
-      .then((result) => {
-        console.log(`[EB] Backfill completed for ${bank.name}: ${result.imported} imported, ${result.skipped} skipped`);
-      })
-      .catch((err) => {
-        console.error(`[EB] Backfill failed for ${bank.name}:`, err.message);
-      });
-
-    res.send(html(`
-      <div style="max-width:420px;margin:0 auto">
-        <div style="font-size:56px;margin-bottom:16px">✅</div>
-        <h2>Compte lié avec succès !</h2>
-        <p style="color:#a0aec0"><strong style="color:#fff">${bank.name}</strong> est maintenant connecté à Enable Banking.</p>
-        <p style="color:#a0aec0">Les transactions sont synchronisées automatiquement.</p>
-        <script>setTimeout(()=>window.close(),4000)</script>
-      </div>
-    `));
+    return res.send(selectAccountHtml(bank.id, state, bank.name, accounts));
   } catch (err: any) {
-    res.send(html(`<h2>Erreur</h2><p>${err.message}</p>`));
+    res.send(html(`<h2>Erreur</h2><p>${escapeHtml(err.message || 'Impossible de finaliser la liaison bancaire.')}</p>`));
   }
 });
 
@@ -580,21 +860,29 @@ router.get('/banks/:bankId/status', async (req, res) => {
         ebExpiresAt: true,
         ebLastSyncAt: true,
         ebAspspName: true,
+        ebAspspCountry: true,
         name: true,
       },
     });
     if (!bank) return res.status(404).json({ error: 'Bank not found' });
 
-    const consentWarning = checkConsentExpiration(bank);
-    const isExpired = bank.ebExpiresAt && bank.ebExpiresAt.getTime() < Date.now();
+    const warning = consentWarning(bank);
+    const isExpired = !!bank.ebExpiresAt && bank.ebExpiresAt.getTime() < Date.now();
+
+    // Un consentement échu ne redevient jamais valide : on fige le statut pour
+    // que l'interface propose le renouvellement sans attendre une sync ratée.
+    if (isExpired && bank.ebStatus === 'LINKED') {
+      await prisma.bank.update({ where: { id: req.params.bankId }, data: { ebStatus: 'EXPIRED' } });
+    }
 
     res.json({
-      ebStatus: bank.ebStatus,
+      ebStatus: isExpired ? 'EXPIRED' : bank.ebStatus,
       ebLinkedAt: bank.ebLinkedAt,
       ebExpiresAt: bank.ebExpiresAt,
       ebLastSyncAt: bank.ebLastSyncAt,
       ebAspspName: bank.ebAspspName,
-      consentWarning,
+      ebAspspCountry: bank.ebAspspCountry,
+      consentWarning: warning,
       isExpired,
       consentDaysRemaining: bank.ebExpiresAt
         ? Math.max(0, Math.ceil((bank.ebExpiresAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))

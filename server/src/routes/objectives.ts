@@ -10,7 +10,7 @@ router.get('/', async (req, res) => {
   try {
     // Portée : un objectif appartient à un espace. « Famille » = partagé,
     // l'espace perso = privé. Sans filtre, on renvoie tout (vue globale).
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
     const objectives = await prisma.objective.findMany({
       where: scope ? { spaceId: { in: scope } } : {},
       include: { space: { select: { id: true, name: true, kind: true } } },

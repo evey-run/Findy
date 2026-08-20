@@ -7,11 +7,10 @@
   ],
   "permissions": [
     "core:default",
+    "allow-api-base",
     "core:window:allow-start-dragging",
-    "shell:allow-execute",
-    "shell:allow-spawn",
-    "shell:allow-kill",
     "updater:default",
-    "process:default"
+    "process:default",
+    "opener:default"
   ]
 }
