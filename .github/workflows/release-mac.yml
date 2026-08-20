@@ -61,6 +61,9 @@ jobs:
     needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      # La clé a été générée sans mot de passe : la variable doit tout de
+      # même exister, sinon le bundler refuse de signer.
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -105,12 +108,23 @@ jobs:
       - name: Build Tauri (arm64)
         run: npm run tauri build
 
-      - name: Upload DMG + signature arm64
+      # L'updater macOS ne consomme pas le DMG : il télécharge l'archive
+      # `.app.tar.gz` produite dans bundle/macos/. Les deux architectures
+      # produisent le même nom de fichier, d'où le suffixe.
+      - name: Renommer l'artefact d'update (arm64)
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          mv Findy.app.tar.gz Findy_aarch64.app.tar.gz
+          mv Findy.app.tar.gz.sig Findy_aarch64.app.tar.gz.sig
+          ls -l
+
+      - name: Upload DMG + artefact d'update arm64
         uses: softprops/action-gh-release@v2
         with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/dmg/*.sig
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
 
   # ─── 2b. Build x64 (Intel) ─────────────────────────────────────────────────
   build-x64:
@@ -124,6 +138,9 @@ jobs:
     needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      # La clé a été générée sans mot de passe : la variable doit tout de
+      # même exister, sinon le bundler refuse de signer.
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
       - uses: actions/checkout@v4
@@ -168,12 +185,20 @@ jobs:
       - name: Build Tauri (x64)
         run: npm run tauri build
 
-      - name: Upload DMG + signature x64
+      - name: Renommer l'artefact d'update (x64)
+        run: |
+          cd src-tauri/target/release/bundle/macos
+          mv Findy.app.tar.gz Findy_x64.app.tar.gz
+          mv Findy.app.tar.gz.sig Findy_x64.app.tar.gz.sig
+          ls -l
+
+      - name: Upload DMG + artefact d'update x64
         uses: softprops/action-gh-release@v2
         with:
           files: |
             src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/dmg/*.sig
+            src-tauri/target/release/bundle/macos/*.app.tar.gz
+            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
 
   # ─── 3. Générer latest.json pour l'updater ────────────────────────────────
   generate-updater-json:
@@ -182,73 +207,67 @@ jobs:
     needs: [build-arm64, build-x64]
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      # La clé a été générée sans mot de passe : la variable doit tout de
+      # même exister, sinon le bundler refuse de signer.
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
-      - name: Download release assets
+      # L'updater télécharge l'archive `.app.tar.gz`, pas le DMG : c'est elle
+      # qui est signée et c'est elle que doit référencer latest.json.
+      - name: Download update archives
         uses: robinraju/release-downloader@v1
         with:
           tag: ${{ github.ref_name }}
-          fileName: "*.dmg"
+          fileName: "*.app.tar.gz"
           out-file-path: assets
 
       - name: Download signatures
         uses: robinraju/release-downloader@v1
         with:
           tag: ${{ github.ref_name }}
-          fileName: "*.sig"
+          fileName: "*.app.tar.gz.sig"
           out-file-path: assets
 
       - name: Generate latest.json
         run: |
+          set -euo pipefail
           VERSION="${GITHUB_REF_NAME#v}"
-          REPO="avialleguerin/Findy"
+          REPO="${GITHUB_REPOSITORY}"
           TAG="${GITHUB_REF_NAME}"
 
-          # Trouver les fichiers DMG et SIG
-          ARM64_DMG=$(ls assets/*_aarch64.dmg 2>/dev/null | head -1)
-          X64_DMG=$(ls assets/*_x64.dmg 2>/dev/null | head -1)
-          ARM64_SIG=$(ls assets/*_aarch64.dmg.sig 2>/dev/null | head -1)
-          X64_SIG=$(ls assets/*_x64.dmg.sig 2>/dev/null | head -1)
+          ARM64_ARCHIVE=$(ls assets/*_aarch64.app.tar.gz 2>/dev/null | head -1 || true)
+          X64_ARCHIVE=$(ls assets/*_x64.app.tar.gz 2>/dev/null | head -1 || true)
+          ARM64_SIG=$(ls assets/*_aarch64.app.tar.gz.sig 2>/dev/null | head -1 || true)
+          X64_SIG=$(ls assets/*_x64.app.tar.gz.sig 2>/dev/null | head -1 || true)
 
-          # Construire le JSON
-          cat > latest.json << 'TEMPLATE'
-          {
-            "version": "PLACEHOLDER_VERSION",
-            "notes": "Mise à jour vers la version PLACEHOLDER_VERSION",
-            "pub_date": "PLACEHOLDER_DATE",
-            "platforms": {}
-          }
-          TEMPLATE
+          # Une plateforme manquante rendrait la mise à jour silencieusement
+          # impossible pour la moitié des utilisateurs : on préfère échouer.
+          for f in "$ARM64_ARCHIVE" "$X64_ARCHIVE" "$ARM64_SIG" "$X64_SIG"; do
+            if [ -z "$f" ]; then
+              echo "::error::Artefact d'update manquant. Contenu de assets/ :"
+              ls -l assets/
+              exit 1
+            fi
+          done
 
-          # Remplacer les placeholders
           PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          sed -i "s|PLACEHOLDER_VERSION|${VERSION}|g" latest.json
-          sed -i "s|PLACEHOLDER_DATE|${PUB_DATE}|g" latest.json
+          BASE_URL="https://github.com/${REPO}/releases/download/${TAG}"
 
-          # Ajouter les plateformes
-          if [ -n "$ARM64_DMG" ] && [ -n "$ARM64_SIG" ]; then
-            ARM64_DMG_NAME=$(basename "$ARM64_DMG")
-            ARM64_SIG_CONTENT=$(cat "$ARM64_SIG")
-            ARM64_URL="https://github.com/${REPO}/releases/download/${TAG}/${ARM64_DMG_NAME}"
-            python3 -c "
+          python3 - "$VERSION" "$PUB_DATE" "$BASE_URL" \
+            "$(basename "$ARM64_ARCHIVE")" "$(cat "$ARM64_SIG")" \
+            "$(basename "$X64_ARCHIVE")" "$(cat "$X64_SIG")" <<'PYEOF' > latest.json
           import json, sys
-          with open('latest.json') as f: data = json.load(f)
-          data['platforms']['darwin-aarch64'] = {'url': sys.argv[1], 'signature': sys.argv[2]}
-          with open('latest.json', 'w') as f: json.dump(data, f, indent=2)
-          " "$ARM64_URL" "$ARM64_SIG_CONTENT"
-          fi
-
-          if [ -n "$X64_DMG" ] && [ -n "$X64_SIG" ]; then
-            X64_DMG_NAME=$(basename "$X64_DMG")
-            X64_SIG_CONTENT=$(cat "$X64_SIG")
-            X64_URL="https://github.com/${REPO}/releases/download/${TAG}/${X64_DMG_NAME}"
-            python3 -c "
-          import json, sys
-          with open('latest.json') as f: data = json.load(f)
-          data['platforms']['darwin-x86_64'] = {'url': sys.argv[1], 'signature': sys.argv[2]}
-          with open('latest.json', 'w') as f: json.dump(data, f, indent=2)
-          " "$X64_URL" "$X64_SIG_CONTENT"
-          fi
+          version, pub_date, base, arm_name, arm_sig, x64_name, x64_sig = sys.argv[1:8]
+          json.dump({
+              "version": version,
+              "notes": f"Mise à jour vers la version {version}",
+              "pub_date": pub_date,
+              "platforms": {
+                  "darwin-aarch64": {"url": f"{base}/{arm_name}", "signature": arm_sig},
+                  "darwin-x86_64": {"url": f"{base}/{x64_name}", "signature": x64_sig},
+              },
+          }, sys.stdout, indent=2, ensure_ascii=False)
+          PYEOF
 
           echo "=== latest.json ==="
           cat latest.json
