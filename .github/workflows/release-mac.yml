@@ -61,9 +61,9 @@ jobs:
     needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      # La clé a été générée sans mot de passe : la variable doit tout de
-      # même exister, sinon le bundler refuse de signer.
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+      # La clé est protégée par un mot de passe : sans lui, le bundler
+      # produit bien l'archive mais échoue à la signer.
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -138,9 +138,9 @@ jobs:
     needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      # La clé a été générée sans mot de passe : la variable doit tout de
-      # même exister, sinon le bundler refuse de signer.
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+      # La clé est protégée par un mot de passe : sans lui, le bundler
+      # produit bien l'archive mais échoue à la signer.
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -207,9 +207,9 @@ jobs:
     needs: [build-arm64, build-x64]
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      # La clé a été générée sans mot de passe : la variable doit tout de
-      # même exister, sinon le bundler refuse de signer.
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+      # La clé est protégée par un mot de passe : sans lui, le bundler
+      # produit bien l'archive mais échoue à la signer.
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
     steps:
       # L'updater télécharge l'archive `.app.tar.gz`, pas le DMG : c'est elle
