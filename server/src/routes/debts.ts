@@ -1,10 +1,13 @@
 import express from 'express';
 import prisma from '../prisma';
+import { netBalance } from '../lib/debtBalance';
 
 const router = express.Router();
 
-// Récupère l'utilisateur marqué « Moi ».
-async function getMe() {
+// Le « Moi » d'un tricount est le profil connecté. Le flag `isMe` en base ne
+// sert plus que de repli pour d'anciennes sessions sans jeton.
+async function getMe(authUserId?: string) {
+  if (authUserId) return prisma.user.findUnique({ where: { id: authUserId } });
   return prisma.user.findFirst({ where: { isMe: true } });
 }
 
@@ -29,7 +32,7 @@ router.get('/', async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
-    const me = await getMe();
+    const me = await getMe(req.authUserId);
     if (!me) {
       return res.status(400).json({ error: 'NO_ME_USER', message: 'Aucun utilisateur « Moi » défini.' });
     }
@@ -52,15 +55,7 @@ router.get('/', async (req, res) => {
       orderBy: { date: 'desc' }
     });
 
-    // Solde net calculé sur les dettes non réglées.
-    let balance = 0;
-    for (const d of debts) {
-      if (d.settled) continue;
-      if (d.fromUserId === other.id) balance += d.amount; // X me doit
-      else balance -= d.amount; // je dois à X
-    }
-
-    res.json({ me, other, debts, balance });
+    res.json({ me, other, debts, balance: netBalance(debts, me.id, other.id) });
   } catch (error) {
     console.error('Error fetching debts:', error);
     res.status(500).json({ error: 'Failed to fetch debts' });
@@ -77,7 +72,7 @@ router.get('/transfers', async (req, res) => {
       return res.status(400).json({ error: 'userId is required' });
     }
 
-    const me = await getMe();
+    const me = await getMe(req.authUserId);
     if (!me) {
       return res.status(400).json({ error: 'NO_ME_USER', message: 'Aucun utilisateur « Moi » défini.' });
     }
