@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import prisma from '../prisma';
+import { issueToken } from '../lib/authTokens';
 
 const router = express.Router();
 
@@ -49,10 +50,13 @@ router.get('/profiles', async (_req, res) => {
   }
 });
 
-// GET /api/auth/session/:id — rehydrate la session côté client (inclut hasPassword)
-router.get('/session/:id', async (req, res) => {
+// GET /api/auth/session — rehydrate la session à partir du jeton porté par la
+// requête. L'ancienne version prenait l'id du profil dans l'URL : n'importe qui
+// pouvait donc « restaurer » la session de n'importe quel profil.
+router.get('/session', async (req, res) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.params.id }, include: userInclude });
+    if (!req.authUserId) return res.status(401).json({ error: 'Session expirée ou absente.' });
+    const user = await prisma.user.findUnique({ where: { id: req.authUserId }, include: userInclude });
     if (!user) return res.status(404).json({ error: 'Profil introuvable' });
     res.json(sanitize(user));
   } catch (error) {
@@ -86,7 +90,7 @@ router.post('/login', async (req, res) => {
     ]);
 
     const fresh = await prisma.user.findUnique({ where: { id: user.id }, include: userInclude });
-    res.json(sanitize(fresh!));
+    res.json({ ...sanitize(fresh!), token: issueToken(user.id) });
   } catch (error) {
     console.error('Error during login:', error);
     res.status(500).json({ error: 'Failed to log in' });
@@ -128,7 +132,7 @@ router.post('/register', async (req, res) => {
     ]);
 
     const fresh = await prisma.user.findUnique({ where: { id: user.id }, include: userInclude });
-    res.status(201).json(sanitize(fresh!));
+    res.status(201).json({ ...sanitize(fresh!), token: issueToken(user.id) });
   } catch (error) {
     console.error('Error during register:', error);
     res.status(500).json({ error: 'Failed to register' });
@@ -141,6 +145,11 @@ router.put('/password', async (req, res) => {
   try {
     const { userId, currentPassword, newPassword } = req.body ?? {};
     if (!userId) return res.status(400).json({ error: 'userId is required' });
+    // Un profil sans mot de passe ne doit pas pouvoir être « verrouillé » par
+    // quelqu'un d'autre : on ne modifie que le profil connecté.
+    if (req.authUserId !== userId) {
+      return res.status(403).json({ error: 'Vous ne pouvez modifier que votre propre mot de passe.' });
+    }
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) return res.status(404).json({ error: 'Profil introuvable' });

@@ -16,7 +16,7 @@ router.get('/overview', async (req, res) => {
     }
 
     // Portée : les transactions héritent de l'espace de leur banque.
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
     const userFilter = scope ? { bank: { spaceId: { in: scope } } } : {};
     const transactionWhere = {
       ...userFilter,
@@ -207,7 +207,7 @@ router.get('/monthly-trends', async (req, res) => {
     // était à la fois inopérant (chaîne littérale) et injectable. On passe par
     // Prisma, qui paramètre correctement — et la jointure user_banks disparaît :
     // la portée est désormais une simple colonne `banks.spaceId`.
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
 
     const rows = await prisma.transaction.findMany({
       where: {
@@ -246,7 +246,7 @@ router.get('/budget-status', async (req, res) => {
     
     // Budget n'a jamais eu de `userId` : l'ancien filtre faisait planter Prisma
     // dès qu'un userId était passé. On filtre par espace, ce qui est le sens voulu.
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
 
     const budgets = await prisma.budget.findMany({
       where: {

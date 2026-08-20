@@ -53,7 +53,7 @@ router.get('/', async (req, res) => {
 
     // Portée : la transaction hérite de l'espace de sa banque (pas de spaceId
     // propre — la banque est l'unique source de vérité de qui voit quoi).
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
     if (scope) {
       where.bank = { ...(where.bank || {}), spaceId: { in: scope } };
     }
@@ -148,7 +148,7 @@ router.get('/stats/summary', async (req, res) => {
 
     const where: any = {};
     if (bankId) where.bankId = bankId;
-    const scope = await resolveScope(req.query as any);
+    const scope = await resolveScope(req.query as any, req.authUserId);
     if (scope) {
       where.bank = { ...(where.bank || {}), spaceId: { in: scope } };
     }

@@ -18,13 +18,12 @@ function shape(space: any) {
   };
 }
 
-// GET /api/spaces?userId=X — les espaces visibles par un utilisateur
-// (sans userId : tous les espaces, pour l'écran de gestion)
+// GET /api/spaces — les espaces dont le profil connecté est membre.
+// L'identité vient du jeton : un `userId` en query ne prouve rien.
 router.get('/', async (req, res) => {
   try {
-    const { userId } = req.query as { userId?: string };
     const spaces = await prisma.space.findMany({
-      where: userId ? { members: { some: { userId } } } : undefined,
+      where: { members: { some: { userId: req.authUserId } } },
       include: withMembers,
       // Perso d'abord, puis les partagés, dans l'ordre de création.
       orderBy: [{ kind: 'asc' }, { createdAt: 'asc' }]
@@ -49,6 +48,11 @@ router.post('/', async (req, res) => {
     }
     const found = await prisma.user.count({ where: { id: { in: unique } } });
     if (found !== unique.length) return res.status(400).json({ error: 'Membre inconnu' });
+    // On ne crée pas un espace partagé auquel on n'appartient pas : ce serait
+    // une porte d'entrée vers les données des autres profils.
+    if (!req.authUserId || !unique.includes(req.authUserId)) {
+      return res.status(403).json({ error: 'Vous devez faire partie de l’espace que vous créez.' });
+    }
 
     const space = await prisma.space.create({
       data: {
@@ -72,8 +76,11 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { name, memberIds } = req.body ?? {};
 
-    const space = await prisma.space.findUnique({ where: { id } });
+    const space = await prisma.space.findUnique({ where: { id }, include: { members: true } });
     if (!space) return res.status(404).json({ error: 'Espace introuvable' });
+    if (!space.members.some((member) => member.userId === req.authUserId)) {
+      return res.status(403).json({ error: 'Espace inaccessible.' });
+    }
 
     if (Array.isArray(memberIds)) {
       const unique = [...new Set<string>(memberIds)];
@@ -105,6 +112,9 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+
+    const membership = await prisma.spaceMember.findFirst({ where: { spaceId: id, userId: req.authUserId } });
+    if (!membership) return res.status(403).json({ error: 'Espace inaccessible.' });
 
     const [banks, objectives, budgets, categories] = await Promise.all([
       prisma.bank.count({ where: { spaceId: id } }),
