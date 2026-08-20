@@ -1,19 +1,52 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import multer from 'multer';
 import { fileURLToPath } from 'url';
 import prisma from '../prisma';
+import { ensurePersistenceDir, SYNC_SETTINGS_PATH } from '../lib/persistence';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(PROJECT_ROOT, 'public/uploads');
+const IMAGE_EXTENSION = /\.(avif|gif|jpe?g|png|webp)$/i;
 
-const SYNC_SETTINGS_PATH = path.resolve(__dirname, '..', '..', '..', 'data', 'sync-settings.json');
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 200 },
+  fileFilter: (_req, file, callback) => {
+    callback(null, file.mimetype.startsWith('image/') && IMAGE_EXTENSION.test(file.originalname));
+  },
+});
+
+function countImages(directory: string): number {
+  try {
+    return fs.readdirSync(directory, { withFileTypes: true }).reduce((count, entry) => {
+      if (entry.isDirectory()) return count + countImages(path.join(directory, entry.name));
+      return count + (IMAGE_EXTENSION.test(entry.name) ? 1 : 0);
+    }, 0);
+  } catch {
+    return 0;
+  }
+}
+
+/** Préserve uniquement le nom de fichier et, pour les avatars, leur sous-dossier. */
+function mediaRelativePath(candidate: unknown, fallbackName: string): string | null {
+  const raw = typeof candidate === 'string' && candidate.trim() ? candidate : fallbackName;
+  const parts = raw.replace(/\\/g, '/').split('/').filter(Boolean);
+  const avatarIndex = parts.lastIndexOf('avatars');
+  const relativePath = avatarIndex >= 0
+    ? parts.slice(avatarIndex).join('/')
+    : path.basename(parts[parts.length - 1] || fallbackName);
+
+  return IMAGE_EXTENSION.test(relativePath) ? relativePath : null;
+}
 
 function ensureDir() {
-  const dir = path.dirname(SYNC_SETTINGS_PATH);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  ensurePersistenceDir();
 }
 
 function readSyncSettings(): Record<string, any> {
@@ -24,7 +57,11 @@ function readSyncSettings(): Record<string, any> {
 
 function writeSyncSettings(data: Record<string, any>) {
   ensureDir();
-  fs.writeFileSync(SYNC_SETTINGS_PATH, JSON.stringify(data, null, 2));
+  fs.writeFileSync(SYNC_SETTINGS_PATH, JSON.stringify(data, null, 2), { mode: 0o600 });
+  // Une ancienne installation peut avoir créé le fichier avec les permissions
+  // par défaut de l'umask. Les identifiants ne doivent être lisibles que par
+  // l'utilisateur courant.
+  fs.chmodSync(SYNC_SETTINGS_PATH, 0o600);
 }
 
 const d = (val: any): Date | null => (val ? new Date(val) : null);
@@ -61,6 +98,55 @@ router.get('/version', (req, res) => {
   const current = getCurrentVersion();
   const latest = getLatestVersion(current);
   res.json({ current, latest });
+});
+
+// GET /api/settings/media — état des images locales (logos de banques et avatars)
+router.get('/media', (_req, res) => {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  res.json({ imageCount: countImages(UPLOADS_DIR) });
+});
+
+// POST /api/settings/media/import — restaure des images d'une ancienne installation.
+// Les fichiers existants ne sont jamais remplacés : l'opération est sûre à répéter.
+router.post('/media/import', mediaUpload.array('images', 200), (req, res) => {
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    const suppliedPaths = Array.isArray(req.body?.legacyPath)
+      ? req.body.legacyPath
+      : req.body?.legacyPath ? [req.body.legacyPath] : [];
+    const uploadsRoot = path.resolve(UPLOADS_DIR);
+    fs.mkdirSync(uploadsRoot, { recursive: true });
+
+    let imported = 0;
+    let skipped = 0;
+    for (const [index, file] of files.entries()) {
+      const relativePath = mediaRelativePath(suppliedPaths[index], file.originalname);
+      if (!relativePath) {
+        skipped += 1;
+        continue;
+      }
+
+      const destination = path.resolve(uploadsRoot, relativePath);
+      if (!destination.startsWith(`${uploadsRoot}${path.sep}`)) {
+        skipped += 1;
+        continue;
+      }
+
+      if (fs.existsSync(destination)) {
+        skipped += 1;
+        continue;
+      }
+
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, file.buffer, { flag: 'wx' });
+      imported += 1;
+    }
+
+    res.status(201).json({ imported, skipped, imageCount: countImages(uploadsRoot) });
+  } catch (error) {
+    console.error('Image restoration error:', error);
+    res.status(500).json({ error: 'Impossible de restaurer les images.' });
+  }
 });
 
 // GET /api/settings/export
@@ -407,7 +493,7 @@ router.put('/sync/:provider', (req, res) => {
     res.json({ configured: true, provider });
   } catch (error) {
     console.error('Error saving sync settings:', error);
-    res.status(500).json({ error: 'Failed to save sync settings' });
+    res.status(500).json({ error: "Impossible d’enregistrer la configuration locale." });
   }
 });
 

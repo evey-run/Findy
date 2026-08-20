@@ -6,6 +6,7 @@ import { fr } from 'date-fns/locale';
 import { useCryptoPrices, extractTickerFromDescription } from '../hooks/useCryptoPrices';
 import { useMarketPrices } from '../hooks/useMarketPrices';
 import type { Transaction } from '../types';
+import { otherBankOwnersSuffix } from '../lib/bankOwners';
 
 interface AssetGroup {
   key: string;
@@ -36,6 +37,7 @@ export default function Investissement() {
     addTransaction,
     removeTransaction,
     requestConfirm,
+    authUser,
   } = useAppStore();
 
   const [localSelectedBank, setLocalSelectedBank] = useState<any>(null);
@@ -1257,8 +1259,7 @@ export default function Investissement() {
                 >
                   <option value="">Sélectionnez un compte...</option>
                   {banks.filter(bank => bank.accountType === 'INVESTMENT').map(bank => {
-                    const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
-                    const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+                    const bankUsersText = otherBankOwnersSuffix(bank.users, authUser?.id);
                     return (
                       <option key={bank.id} value={bank.id}>{bank.name}{bankUsersText}</option>
                     );

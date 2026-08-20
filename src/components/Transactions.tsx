@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../store';
 import { assetUrl } from '../lib/url';
+import { otherBankOwnersSuffix } from '../lib/bankOwners';
 import type { Bank } from '../types';
 import Papa from 'papaparse';
 import { useLocation } from 'react-router-dom';
@@ -81,7 +82,8 @@ export default function Transactions({
     setTransactions,
     pageFilters,
     setPageFilter,
-    requestConfirm
+    requestConfirm,
+    authUser,
   } = useAppStore();
   
   // États pour l'import CSV
@@ -1152,8 +1154,7 @@ export default function Transactions({
       </div>
 
       {/* Filters */}
-      <div className="rounded-2xl bg-white/5 backdrop-blur-xl border border-white/10">
-        <div className="flex flex-wrap items-center gap-2 p-3">
+      <div className="flex flex-wrap items-center gap-2 px-1 py-1">
           <select
             name="bank-filter-select"
             value={selectedBank?.id || ''}
@@ -1166,8 +1167,7 @@ export default function Transactions({
           >
             <option value="" style={{ backgroundColor: '#18191c' }}>Portefeuille</option>
             {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
-              const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
-              const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+              const bankUsersText = otherBankOwnersSuffix(bank.users, authUser?.id);
               return (
                 <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
                   {bank.name}{bankUsersText}
@@ -1238,7 +1238,6 @@ export default function Transactions({
             <option value="true" style={{ backgroundColor: '#18191c' }}>Oui</option>
             <option value="false" style={{ backgroundColor: '#18191c' }}>Non</option>
           </select>
-        </div>
       </div>
 
       {/* Transactions Table */}
@@ -1327,8 +1326,7 @@ export default function Transactions({
                 >
                   <option value="" style={{ backgroundColor: '#1e2024' }}>Sélectionnez un portefeuille</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
-                    const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
-                    const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+                    const bankUsersText = otherBankOwnersSuffix(bank.users, authUser?.id);
                     
                     return (
                       <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1e2024' }}>
@@ -1557,9 +1555,9 @@ export default function Transactions({
                       <div className="ml-2">
                         <div className="font-medium text-white text-xs">
                           {transaction.bank.name}
-                          {transaction.bank.users && transaction.bank.users.length > 0 && (
+                          {otherBankOwnersSuffix(transaction.bank.users, authUser?.id) && (
                             <span className="text-xs text-zinc-400 ml-2">
-                              ({transaction.bank.users.map((u) => u.name).filter(Boolean).join(', ')})
+                              {otherBankOwnersSuffix(transaction.bank.users, authUser?.id)}
                             </span>
                           )}
                         </div>
@@ -1746,8 +1744,7 @@ export default function Transactions({
                 >
                   <option value="">Sélectionnez un portefeuille...</option>
                   {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
-                    const bankUsers = bank.users?.map(u => u.name).filter(Boolean) || [];
-                    const bankUsersText = bankUsers.length > 0 ? ` (${bankUsers.join(', ')})` : '';
+                    const bankUsersText = otherBankOwnersSuffix(bank.users, authUser?.id);
                     return (
                       <option key={bank.id} value={bank.id}>{bank.name}{bankUsersText}</option>
                     );

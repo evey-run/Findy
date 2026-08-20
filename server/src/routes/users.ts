@@ -10,6 +10,17 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 const PROJECT_ROOT = path.resolve(__dirname, '..', '..', '..');
+const UPLOADS_DIR = process.env.UPLOADS_DIR || path.join(PROJECT_ROOT, 'public/uploads');
+const AVATARS_DIR = path.join(UPLOADS_DIR, 'avatars');
+
+/** Résout une URL interne sans jamais sortir du dossier d'uploads. */
+function uploadedFilePath(assetUrl: string | null | undefined): string | null {
+  if (!assetUrl?.startsWith('/uploads/')) return null;
+  const relativePath = assetUrl.slice('/uploads/'.length);
+  const uploadsRoot = path.resolve(UPLOADS_DIR);
+  const resolvedPath = path.resolve(uploadsRoot, relativePath);
+  return resolvedPath.startsWith(`${uploadsRoot}${path.sep}`) ? resolvedPath : null;
+}
 
 /**
  * Le hash du mot de passe ne doit jamais sortir de l'API : on expose juste
@@ -31,11 +42,10 @@ function sanitizeUser<T extends { passwordHash?: string | null; spaceMembers?: a
 // Configuration multer pour upload d'avatar
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadsDir = path.join(PROJECT_ROOT, 'public/uploads/avatars');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
+    if (!fs.existsSync(AVATARS_DIR)) {
+      fs.mkdirSync(AVATARS_DIR, { recursive: true });
     }
-    cb(null, uploadsDir);
+    cb(null, AVATARS_DIR);
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -200,8 +210,8 @@ router.put('/:id', upload.single('avatar'), async (req, res) => {
         select: { avatar: true }
       });
       
-      if (existingUser?.avatar) {
-        const oldAvatarPath = path.join(PROJECT_ROOT, 'public', existingUser.avatar);
+      const oldAvatarPath = uploadedFilePath(existingUser?.avatar);
+      if (oldAvatarPath) {
         if (fs.existsSync(oldAvatarPath)) {
           fs.unlinkSync(oldAvatarPath);
         }
@@ -238,8 +248,8 @@ router.delete('/:id', async (req, res) => {
       select: { avatar: true }
     });
     
-    if (existingUser?.avatar) {
-      const avatarPath = path.join(PROJECT_ROOT, 'public', existingUser.avatar);
+    const avatarPath = uploadedFilePath(existingUser?.avatar);
+    if (avatarPath) {
       if (fs.existsSync(avatarPath)) {
         fs.unlinkSync(avatarPath);
       }
