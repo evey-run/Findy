@@ -115,7 +115,12 @@ jobs:
   # ─── 2b. Build x64 (Intel) ─────────────────────────────────────────────────
   build-x64:
     name: Build x64 (Intel)
-    runs-on: macos-13
+    # macos-13 a été retiré en décembre 2025 : le job restait en file
+    # d'attente indéfiniment, ce qui bloquait `generate-updater-json` et
+    # laissait chaque release sans DMG Intel ni latest.json.
+    # `macos-15-intel` est le dernier runner x86_64 (supporté jusqu'à
+    # l'automne 2027).
+    runs-on: macos-15-intel
     needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
