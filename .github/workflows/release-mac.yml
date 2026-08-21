@@ -61,8 +61,10 @@ jobs:
     needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      # La clé a été générée sans mot de passe : la variable doit tout de
-      # même exister, sinon le bundler refuse de signer.
+      # Paire de clés régénérée le 2026-08-21, sans mot de passe : le mot de
+      # passe de la précédente était perdu, et une clé chiffrée dont personne
+      # ne détient le secret ne signe plus rien. La variable doit tout de même
+      # exister, sinon le bundler refuse de signer.
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
@@ -138,8 +140,10 @@ jobs:
     needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      # La clé a été générée sans mot de passe : la variable doit tout de
-      # même exister, sinon le bundler refuse de signer.
+      # Paire de clés régénérée le 2026-08-21, sans mot de passe : le mot de
+      # passe de la précédente était perdu, et une clé chiffrée dont personne
+      # ne détient le secret ne signe plus rien. La variable doit tout de même
+      # exister, sinon le bundler refuse de signer.
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
@@ -207,8 +211,10 @@ jobs:
     needs: [build-arm64, build-x64]
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      # La clé a été générée sans mot de passe : la variable doit tout de
-      # même exister, sinon le bundler refuse de signer.
+      # Paire de clés régénérée le 2026-08-21, sans mot de passe : le mot de
+      # passe de la précédente était perdu, et une clé chiffrée dont personne
+      # ne détient le secret ne signe plus rien. La variable doit tout de même
+      # exister, sinon le bundler refuse de signer.
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
