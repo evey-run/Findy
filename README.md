@@ -9,7 +9,7 @@
 Application de gestion financière personnelle.  
 Locale, rapide, sans abonnement. Vos données ne quittent jamais votre machine.
 
-[![Download](https://img.shields.io/badge/Download-macOS-blue?style=flat&logo=apple)](https://github.com/avialleguerin/Findy/releases/latest) [![GitHub Stars](https://img.shields.io/github/stars/avialleguerin/Findy?style=flat&logo=github)](https://github.com/avialleguerin/Findy) [![License](https://img.shields.io/badge/License-ELv2-orange?style=flat)](LICENSE)
+[![Download](https://img.shields.io/badge/Download-macOS-blue?style=flat&logo=apple)](https://github.com/evey-run/Findy/releases/latest) [![GitHub Stars](https://img.shields.io/github/stars/evey-run/Findy?style=flat&logo=github)](https://github.com/evey-run/Findy) [![License](https://img.shields.io/badge/License-ELv2-orange?style=flat)](LICENSE)
 
 <img src="https://img.shields.io/badge/React-19-61DAFB?style=flat&logo=react" alt="React" /> <img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat&logo=typescript" alt="TypeScript" /> <img src="https://img.shields.io/badge/Tauri-2-FFC131?style=flat&logo=tauri" alt="Tauri" /> <img src="https://img.shields.io/badge/SQLite-003B57?style=flat&logo=sqlite" alt="SQLite" /> <img src="https://img.shields.io/badge/Prisma-6-2D3748?style=flat&logo=prisma" alt="Prisma" /> <img src="https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=flat&logo=tailwindcss" alt="Tailwind" /> <img src="https://img.shields.io/badge/Vite-7-646CFF?style=flat&logo=vite" alt="Vite" /> <img src="https://img.shields.io/badge/Express-5-000000?style=flat&logo=express" alt="Express" />
 
@@ -66,6 +66,6 @@ Findy tourne sur votre Mac. Tout est stocké localement. Vous contrôlez tout.
 
 Licence [Elastic License 2.0](LICENSE) — gratuit pour usage personnel, interdiction de redistribution en tant que service.
 
-[Contribuer](CONTRIBUTING.md) · [Releases](https://github.com/avialleguerin/Findy/releases) · [Issues](https://github.com/avialleguerin/Findy/issues)
+[Contribuer](CONTRIBUTING.md) · [Releases](https://github.com/evey-run/Findy/releases) · [Issues](https://github.com/evey-run/Findy/issues)
 
 </div>

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Findy",
-  "version": "0.5.6",
+  "version": "0.5.7",
   "identifier": "com.evey.finance",
   "build": {
     "frontendDist": "../dist",
@@ -56,6 +56,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
+        "https://github.com/evey-run/Findy/releases/latest/download/latest.json",
         "https://github.com/avialleguerin/Findy/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEFDMDlGOEY2RUQxQjlDMDgKUldRSW5CdnQ5dmdKck91WlZPY3hvMFMzUGhhQkw2Y1VGc1V0MjRDMUthc3plOWNNTy9jRUJOMUkK"

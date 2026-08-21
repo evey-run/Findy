@@ -237,7 +237,15 @@ fn api_base(state: State<ServerProcess>) -> Result<String, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
+        .plugin(
+            tauri_plugin_log::Builder::default()
+                .level(log::LevelFilter::Info)
+                // Le chemin de téléchargement/installation de l'updater ne
+                // journalise qu'en debug : à Info, un échec de signature ou de
+                // remplacement du bundle ne laissait aucune trace exploitable.
+                .level_for("tauri_plugin_updater", log::LevelFilter::Trace)
+                .build(),
+        )
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_opener::init())
@@ -258,11 +266,17 @@ pub fn run() {
             let engine_arm64 = resource_dir.join("libquery_engine-darwin-arm64.dylib.node");
             let engine_x64 = resource_dir.join("libquery_engine-darwin.dylib.node");
 
-            let engine_path = if engine_arm64.exists() {
-                engine_arm64
+            // Le bundle embarque les DEUX moteurs, quelle que soit l'architecture
+            // construite. Choisir « celui qui existe » revenait donc à toujours
+            // prendre l'arm64 : sur un Mac Intel, le sidecar x86_64 ne pouvait pas
+            // charger cette bibliothèque et l'application ne démarrait pas. C'est
+            // l'architecture de compilation qui tranche, pas la présence du fichier.
+            let (engine_path, engine_fallback) = if cfg!(target_arch = "aarch64") {
+                (engine_arm64, engine_x64)
             } else {
-                engine_x64
+                (engine_x64, engine_arm64)
             };
+            let engine_path = if engine_path.exists() { engine_path } else { engine_fallback };
 
             log::info!("DB: {}", database_url);
             log::info!("Uploads: {}", uploads_dir.display());

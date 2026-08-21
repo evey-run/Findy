@@ -4,6 +4,44 @@ Toutes les évolutions notables de Findy. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le projet respecte
 le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [0.5.7] — 2026-08-21
+
+### Corrigé
+
+- **La chaîne de mise à jour automatique fonctionne enfin.** La release n'est
+  plus publiée vide au début du build : elle n'apparaît qu'une fois les deux
+  architectures et le manifeste `latest.json` prêts. Pendant les dix minutes de
+  compilation, `releases/latest/download/latest.json` répondait 404 à tout le
+  monde, et un build raté laissait durablement « latest » sur une release sans
+  manifeste — donc aucune mise à jour possible pour personne.
+- **L'application démarre sur Mac Intel.** Le moteur Prisma était choisi par
+  présence de fichier ; le bundle contenant les deux moteurs, l'arm64 était
+  toujours retenu et le sidecar x86_64 ne pouvait pas le charger.
+- L'échec d'une mise à jour affiche sa cause réelle. Le plugin Tauri rejette
+  avec une chaîne, jamais avec un objet `Error` : le test `err instanceof Error`
+  jetait systématiquement le message et le remplaçait par « Erreur lors de la
+  mise à jour ».
+- Une vérification impossible n'est plus présentée comme « vous utilisez la
+  dernière version disponible », et la version installée s'affiche toujours au
+  lieu de « Chargement de la version… ».
+
+### Modifié
+
+- L'updater interroge le dépôt sous son nom actuel, avec l'ancien en repli : la
+  mise à jour ne dépend plus d'une redirection que GitHub supprimerait si le
+  nom d'origine était réenregistré.
+- Le module `tauri_plugin_updater` journalise en Trace : le chemin de
+  téléchargement et d'installation ne trace qu'en debug, un échec de signature
+  ne laissait donc aucune trace exploitable.
+
+### Supprimé
+
+- Le workflow `release.yml`, déclenchable à la main : il publiait un
+  `latest.json` pointant sur le DMG au lieu de l'archive de mise à jour, ne
+  déclarait qu'Apple Silicon, ne fournissait pas le mot de passe de signature,
+  et poussait un tag qui déclenchait le vrai workflow en parallèle — les deux
+  écrivant alors un manifeste concurrent.
+
 ## [0.5.6] — 2026-08-20
 
 ### Sécurité
