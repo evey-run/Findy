@@ -29,6 +29,14 @@ const IDLE_CLOSE_MS = 15 * 60 * 1000;
 let listener: any = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
 let starting: Promise<TunnelResult> | null = null;
+/**
+ * Raison du dernier échec d'ouverture, conservée pour l'interface.
+ *
+ * Sans elle, les réglages ne pouvaient qu'afficher « aucun tunnel actif » et
+ * conseiller au hasard de vérifier le token — alors que la cause exacte
+ * (session déjà utilisée, token refusé, domaine occupé) était connue.
+ */
+let lastError: string | null = null;
 
 function port(): number {
   return Number(process.env.PORT || 36321);
@@ -89,11 +97,8 @@ async function openTunnel(): Promise<TunnelResult> {
     const publicUrl = localBaseUrl();
     setPublicBaseUrl(publicUrl);
     console.log('[Tunnel] Aucun token ngrok — pas de callback HTTPS disponible');
-    return {
-      active: false,
-      publicUrl,
-      error: 'Ajoutez un token ngrok valide : Enable Banking n’accepte pas les URL localhost.',
-    };
+    lastError = 'Ajoutez un token ngrok valide : Enable Banking n’accepte pas les URL localhost.';
+    return { active: false, publicUrl, error: lastError };
   }
 
   try {
@@ -120,13 +125,11 @@ async function openTunnel(): Promise<TunnelResult> {
       await closeTunnel();
       const publicUrl = localBaseUrl();
       setPublicBaseUrl(publicUrl);
-      return {
-        active: false,
-        publicUrl,
-        error: 'ngrok n’a pas fourni de tunnel HTTPS utilisable par Enable Banking.',
-      };
+      lastError = 'ngrok n’a pas fourni de tunnel HTTPS utilisable par Enable Banking.';
+      return { active: false, publicUrl, error: lastError };
     }
     setPublicBaseUrl(url);
+    lastError = null;
     console.log(`[Tunnel] Ouvert: ${url}${domain ? ` (domaine réservé: ${domain})` : ''}`);
     return { active: true, publicUrl: url };
   } catch (err: any) {
@@ -135,7 +138,8 @@ async function openTunnel(): Promise<TunnelResult> {
     console.error('[Tunnel] Ouverture impossible:', err?.errorCode ?? '', err?.message ?? err);
     const publicUrl = localBaseUrl();
     setPublicBaseUrl(publicUrl);
-    return { active: false, publicUrl, error: describeNgrokFailure(err) };
+    lastError = describeNgrokFailure(err);
+    return { active: false, publicUrl, error: lastError };
   }
 }
 
@@ -203,5 +207,8 @@ export function tunnelStatus() {
     open: !!listener,
     onDemand: hasStableDomain(),
     status: reachable ? 'ready' : 'no_tunnel',
+    // `null` quand tout va bien : l'interface peut alors distinguer « pas
+    // encore configuré » de « configuré mais refusé, et voici pourquoi ».
+    error: reachable ? null : lastError,
   };
 }

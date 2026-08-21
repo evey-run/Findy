@@ -125,11 +125,22 @@ export default function Settings() {
   // Nom du fichier .pem importé, s'il y en a un — la clé elle-même vit dans
   // `ebPrivateKeyInput`, que l'on colle ou que l'on importe.
   const [ebPemFileName, setEbPemFileName] = useState<string | null>(null);
+  // Une clé privée RSA affichée en clair finit tôt ou tard dans une capture
+  // d'écran envoyée à quelqu'un. Elle reste donc masquée par défaut, et n'est
+  // révélée que sur demande explicite.
+  const [ebKeyRevealed, setEbKeyRevealed] = useState(false);
+  const [ebKeyFingerprint, setEbKeyFingerprint] = useState('');
   const [ebNgrokInput, setEbNgrokInput] = useState('');
   const [ebNgrokDomainInput, setEbNgrokDomainInput] = useState('');
   const [genericApiKeyInput, setGenericApiKeyInput] = useState('');
   const [savingSync, setSavingSync] = useState(false);
   const [tunnelUrl, setTunnelUrl] = useState('');
+  // `ready` ou non, et la raison de l'échec quand il y en a une. L'URL seule ne
+  // permettait pas de distinguer « pas de tunnel » de « tunnel refusé, voici
+  // pourquoi » — et une URL localhost était présentée comme l'URL à déclarer
+  // chez Enable Banking, qui la refuse.
+  const [tunnelStatus, setTunnelStatus] = useState<{ status?: string; error?: string | null; onDemand?: boolean }>({});
+  const [restartingTunnel, setRestartingTunnel] = useState(false);
   const [removeModal, setRemoveModal] = useState<SyncProvider | null>(null);
 
   useEffect(() => {
@@ -151,6 +162,8 @@ export default function Settings() {
       setEbAppIdInput('');
       setEbPrivateKeyInput('');
       setEbPemFileName(null);
+      setEbKeyRevealed(false);
+      setEbKeyFingerprint('');
       setEbNgrokInput('');
       setEbNgrokDomainInput('');
     }
@@ -196,11 +209,35 @@ export default function Settings() {
   const loadTunnelUrl = async () => {
     try {
       const res = await fetch('/api/tunnel');
-      if (res.ok) {
-        const data = await res.json();
-        setTunnelUrl(data.publicUrl);
-      }
+      if (!res.ok) return;
+      const data = await res.json();
+      // Une URL localhost n'est pas un callback exploitable : on ne la propose
+      // pas à la copie, on affiche la cause à la place.
+      setTunnelUrl(data.status === 'ready' ? data.publicUrl : '');
+      setTunnelStatus({ status: data.status, error: data.error ?? null, onDemand: data.onDemand });
     } catch {}
+  };
+
+  /** Relance le tunnel à la demande et remonte la raison exacte d'un échec. */
+  const handleRestartTunnel = async () => {
+    setRestartingTunnel(true);
+    try {
+      const res = await fetch('/api/tunnel/restart', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setTunnelUrl('');
+        setTunnelStatus({ status: 'no_tunnel', error: data?.error ?? 'Le tunnel HTTPS n’a pas pu démarrer.' });
+        toast.error(data?.error ?? 'Le tunnel HTTPS n’a pas pu démarrer.', { duration: 9000 });
+        return;
+      }
+      setTunnelUrl(data?.status === 'ready' ? data.publicUrl : '');
+      setTunnelStatus({ status: data?.status, error: data?.error ?? null, onDemand: data?.onDemand });
+      toast.success('Tunnel HTTPS actif');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Le tunnel HTTPS n’a pas pu démarrer.');
+    } finally {
+      setRestartingTunnel(false);
+    }
   };
 
   const loadMediaStatus = async () => {
@@ -241,6 +278,21 @@ export default function Settings() {
    * saisie manuelle. Rien n'est envoyé au serveur ici — la clé ne part qu'à
    * l'enregistrement, comme si elle avait été collée à la main.
    */
+  /** Empreinte courte : reconnaître la clé chargée sans en révéler le contenu. */
+  const fingerprintKey = async (key: string): Promise<string> => {
+    if (!key.trim() || !globalThis.crypto?.subtle) return '';
+    try {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key.trim()));
+      const hex = Array.from(new Uint8Array(digest))
+        .slice(0, 6)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      return hex.replace(/(.{4})/g, '$1 ').trim();
+    } catch {
+      return '';
+    }
+  };
+
   const handlePemFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     // L'input est remis à zéro tout de suite : réimporter le même fichier
@@ -274,6 +326,9 @@ export default function Settings() {
 
       setEbPrivateKeyInput(content);
       setEbPemFileName(file.name);
+      // Rien à relire : une clé importée n'a aucune raison d'être affichée.
+      setEbKeyRevealed(false);
+      setEbKeyFingerprint(await fingerprintKey(content));
       toast.success(`Clé importée depuis ${file.name}`);
     } catch {
       toast.error('Impossible de lire ce fichier.');
@@ -329,6 +384,8 @@ export default function Settings() {
       setEbAppIdInput('');
       setEbPrivateKeyInput('');
       setEbPemFileName(null);
+      setEbKeyRevealed(false);
+      setEbKeyFingerprint('');
       setEbNgrokInput('');
       setEbNgrokDomainInput('');
       setGenericApiKeyInput('');
@@ -651,7 +708,7 @@ export default function Settings() {
                   {isConfigured ? (
                     <>
                       <button
-                        onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
+                        onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbKeyRevealed(false); setEbKeyFingerprint(''); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
                         className="px-3 py-1.5 text-xs font-medium text-zinc-300 rounded-lg border border-white/10 bg-white/[0.05] hover:bg-white/10 transition-colors"
                       >
                         Reconfigurer
@@ -665,7 +722,7 @@ export default function Settings() {
                     </>
                   ) : (
                     <button
-                      onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
+                      onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbKeyRevealed(false); setEbKeyFingerprint(''); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
                       className="px-3 py-1.5 text-xs font-medium text-white rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors"
                     >
                       Setup
@@ -968,29 +1025,68 @@ export default function Settings() {
                       />
                     </label>
                   </div>
-                  <textarea
-                    value={ebPrivateKeyInput}
-                    onChange={(e) => {
-                      setEbPrivateKeyInput(e.target.value);
-                      // Édition manuelle : le contenu n'est plus celui du fichier.
-                      setEbPemFileName(null);
-                    }}
-                    placeholder="Collez la clé ici, ou importez le fichier .pem&#10;-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
-                    rows={4}
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.04] text-sm text-white py-2.5 px-3 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 font-mono text-xs resize-none"
-                  />
-                  {ebPemFileName && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-green-400">
-                      <CheckCircleIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span className="truncate">Clé chargée depuis {ebPemFileName}</span>
-                      <button
-                        type="button"
-                        onClick={() => { setEbPrivateKeyInput(''); setEbPemFileName(null); }}
-                        className="ml-auto text-zinc-500 hover:text-zinc-300 transition-colors flex-shrink-0"
-                      >
-                        Effacer
-                      </button>
+                  {ebPrivateKeyInput && !ebKeyRevealed ? (
+                    // Clé déjà chargée : on montre qu'elle est là, pas ce qu'elle contient.
+                    <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                      <div className="flex items-center gap-1.5 text-[11px] text-green-400">
+                        <CheckCircleIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="truncate">
+                          {ebPemFileName ? `Clé chargée depuis ${ebPemFileName}` : 'Clé privée chargée'}
+                        </span>
+                      </div>
+                      <div className="mt-1 font-mono text-[11px] text-zinc-500">
+                        ••••••••••••••••••••••••••••
+                        {ebKeyFingerprint && <span className="ml-2 text-zinc-600">empreinte {ebKeyFingerprint}</span>}
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-3 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setEbKeyRevealed(true)}
+                          className="text-zinc-400 hover:text-zinc-200 transition-colors"
+                        >
+                          Afficher
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEbPrivateKeyInput('');
+                            setEbPemFileName(null);
+                            setEbKeyFingerprint('');
+                            setEbKeyRevealed(false);
+                          }}
+                          className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                        >
+                          Effacer
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      <textarea
+                        value={ebPrivateKeyInput}
+                        onChange={(e) => {
+                          setEbPrivateKeyInput(e.target.value);
+                          // Édition manuelle : le contenu n'est plus celui du fichier.
+                          setEbPemFileName(null);
+                          setEbKeyFingerprint('');
+                        }}
+                        placeholder="Collez la clé ici, ou importez le fichier .pem&#10;-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                        rows={4}
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.04] text-sm text-white py-2.5 px-3 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 font-mono text-xs resize-none"
+                      />
+                      {ebPrivateKeyInput && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setEbKeyFingerprint(await fingerprintKey(ebPrivateKeyInput));
+                            setEbKeyRevealed(false);
+                          }}
+                          className="mt-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                        >
+                          Masquer la clé
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
                 <div>
@@ -1030,7 +1126,10 @@ export default function Settings() {
                   </p>
                   {tunnelUrl && (
                     <div>
-                      <p className="text-[10px] text-zinc-500 mb-1">Ajoutez cette URL dans Enable Banking → Redirect URIs :</p>
+                      <p className="text-[10px] text-zinc-500 mb-1">
+                        Ajoutez cette URL dans Enable Banking → Redirect URIs :
+                        {tunnelStatus.onDemand && ' (domaine réservé, elle ne changera plus)'}
+                      </p>
                       <div className="flex items-center gap-1.5">
                         <code className="flex-1 text-[10px] text-zinc-300 bg-black/30 rounded px-2 py-1.5 truncate select-all">
                           {tunnelUrl}/api/enablebanking/callback
@@ -1051,9 +1150,30 @@ export default function Settings() {
                     </div>
                   )}
                   {!tunnelUrl && (
-                    <p className="text-[10px] text-amber-400/80">
-                      ⚠ Aucun tunnel actif — le lien bancaire ne fonctionnera pas. Configurez le token et/ou le domaine ngrok ci-dessus.
-                    </p>
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] text-amber-400/90">
+                        ⚠ Aucun tunnel HTTPS actif — la liaison bancaire ne fonctionnera pas.
+                      </p>
+                      {tunnelStatus.error ? (
+                        // La cause exacte remonte de ngrok : session déjà prise,
+                        // token refusé, domaine occupé… Sans elle, l'utilisateur
+                        // ne pouvait que vérifier son token au hasard.
+                        <p className="text-[10px] text-zinc-400 break-words">{tunnelStatus.error}</p>
+                      ) : (
+                        <p className="text-[10px] text-zinc-500">
+                          Renseignez un token ngrok ci-dessus, puis enregistrez.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleRestartTunnel}
+                        disabled={restartingTunnel}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-40 text-[11px] font-medium text-zinc-300 px-2 py-1 transition-colors"
+                      >
+                        <ArrowPathIcon className={`h-3 w-3 ${restartingTunnel ? 'animate-spin' : ''}`} />
+                        {restartingTunnel ? 'Ouverture…' : 'Réessayer maintenant'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>

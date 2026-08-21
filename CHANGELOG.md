@@ -4,6 +4,28 @@ Toutes les évolutions notables de Findy. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le projet respecte
 le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Sécurité
+
+- La clé privée RSA d'Enable Banking n'est plus affichée en clair dans les
+  réglages. Une clé importée ou déjà saisie apparaît masquée, accompagnée d'une
+  empreinte SHA-256 courte qui suffit à savoir laquelle est chargée ; un bouton
+  « Afficher » la révèle sur demande explicite. Le champ était un simple
+  `textarea` : le contenu se retrouvait lisible sur toute capture d'écran de
+  cette fenêtre, alors que le token ngrok juste en dessous était masqué.
+
+### Corrigé
+
+- Les réglages n'affichent plus une URL `localhost` comme URL de retour à
+  déclarer chez Enable Banking : elle y est refusée, et la proposer à la copie
+  envoyait l'utilisateur dans le mur.
+- Quand le tunnel HTTPS ne s'ouvre pas, les réglages affichent la cause exacte
+  renvoyée par ngrok — session déjà utilisée ailleurs, token refusé, domaine
+  occupé — au lieu du conseil au hasard « configurez le token et/ou le
+  domaine ». Un bouton « Réessayer maintenant » relance l'ouverture sans avoir
+  à ré-enregistrer les identifiants.
+
 ## [0.5.7] — 2026-08-21
 
 ### Corrigé
