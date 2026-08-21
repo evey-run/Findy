@@ -135,6 +135,12 @@ export default function Settings() {
   const [genericApiKeyInput, setGenericApiKeyInput] = useState('');
   const [savingSync, setSavingSync] = useState(false);
   const [tunnelUrl, setTunnelUrl] = useState('');
+  // `ready` ou non, et la raison de l'échec quand il y en a une. L'URL seule ne
+  // permettait pas de distinguer « pas de tunnel » de « tunnel refusé, voici
+  // pourquoi » — et une URL localhost était présentée comme l'URL à déclarer
+  // chez Enable Banking, qui la refuse.
+  const [tunnelStatus, setTunnelStatus] = useState<{ status?: string; error?: string | null; onDemand?: boolean }>({});
+  const [restartingTunnel, setRestartingTunnel] = useState(false);
   const [removeModal, setRemoveModal] = useState<SyncProvider | null>(null);
 
   useEffect(() => {
@@ -203,11 +209,35 @@ export default function Settings() {
   const loadTunnelUrl = async () => {
     try {
       const res = await fetch('/api/tunnel');
-      if (res.ok) {
-        const data = await res.json();
-        setTunnelUrl(data.publicUrl);
-      }
+      if (!res.ok) return;
+      const data = await res.json();
+      // Une URL localhost n'est pas un callback exploitable : on ne la propose
+      // pas à la copie, on affiche la cause à la place.
+      setTunnelUrl(data.status === 'ready' ? data.publicUrl : '');
+      setTunnelStatus({ status: data.status, error: data.error ?? null, onDemand: data.onDemand });
     } catch {}
+  };
+
+  /** Relance le tunnel à la demande et remonte la raison exacte d'un échec. */
+  const handleRestartTunnel = async () => {
+    setRestartingTunnel(true);
+    try {
+      const res = await fetch('/api/tunnel/restart', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setTunnelUrl('');
+        setTunnelStatus({ status: 'no_tunnel', error: data?.error ?? 'Le tunnel HTTPS n’a pas pu démarrer.' });
+        toast.error(data?.error ?? 'Le tunnel HTTPS n’a pas pu démarrer.', { duration: 9000 });
+        return;
+      }
+      setTunnelUrl(data?.status === 'ready' ? data.publicUrl : '');
+      setTunnelStatus({ status: data?.status, error: data?.error ?? null, onDemand: data?.onDemand });
+      toast.success('Tunnel HTTPS actif');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Le tunnel HTTPS n’a pas pu démarrer.');
+    } finally {
+      setRestartingTunnel(false);
+    }
   };
 
   const loadMediaStatus = async () => {
@@ -1096,7 +1126,10 @@ export default function Settings() {
                   </p>
                   {tunnelUrl && (
                     <div>
-                      <p className="text-[10px] text-zinc-500 mb-1">Ajoutez cette URL dans Enable Banking → Redirect URIs :</p>
+                      <p className="text-[10px] text-zinc-500 mb-1">
+                        Ajoutez cette URL dans Enable Banking → Redirect URIs :
+                        {tunnelStatus.onDemand && ' (domaine réservé, elle ne changera plus)'}
+                      </p>
                       <div className="flex items-center gap-1.5">
                         <code className="flex-1 text-[10px] text-zinc-300 bg-black/30 rounded px-2 py-1.5 truncate select-all">
                           {tunnelUrl}/api/enablebanking/callback
@@ -1117,9 +1150,30 @@ export default function Settings() {
                     </div>
                   )}
                   {!tunnelUrl && (
-                    <p className="text-[10px] text-amber-400/80">
-                      ⚠ Aucun tunnel actif — le lien bancaire ne fonctionnera pas. Configurez le token et/ou le domaine ngrok ci-dessus.
-                    </p>
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] text-amber-400/90">
+                        ⚠ Aucun tunnel HTTPS actif — la liaison bancaire ne fonctionnera pas.
+                      </p>
+                      {tunnelStatus.error ? (
+                        // La cause exacte remonte de ngrok : session déjà prise,
+                        // token refusé, domaine occupé… Sans elle, l'utilisateur
+                        // ne pouvait que vérifier son token au hasard.
+                        <p className="text-[10px] text-zinc-400 break-words">{tunnelStatus.error}</p>
+                      ) : (
+                        <p className="text-[10px] text-zinc-500">
+                          Renseignez un token ngrok ci-dessus, puis enregistrez.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleRestartTunnel}
+                        disabled={restartingTunnel}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-40 text-[11px] font-medium text-zinc-300 px-2 py-1 transition-colors"
+                      >
+                        <ArrowPathIcon className={`h-3 w-3 ${restartingTunnel ? 'animate-spin' : ''}`} />
+                        {restartingTunnel ? 'Ouverture…' : 'Réessayer maintenant'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
