@@ -4,6 +4,17 @@ Toutes les évolutions notables de Findy. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le projet respecte
 le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Sécurité
+
+- La clé privée RSA d'Enable Banking n'est plus affichée en clair dans les
+  réglages. Une clé importée ou déjà saisie apparaît masquée, accompagnée d'une
+  empreinte SHA-256 courte qui suffit à savoir laquelle est chargée ; un bouton
+  « Afficher » la révèle sur demande explicite. Le champ était un simple
+  `textarea` : le contenu se retrouvait lisible sur toute capture d'écran de
+  cette fenêtre, alors que le token ngrok juste en dessous était masqué.
+
 ## [0.5.7] — 2026-08-21
 
 ### Corrigé

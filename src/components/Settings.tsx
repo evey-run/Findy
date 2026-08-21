@@ -125,6 +125,11 @@ export default function Settings() {
   // Nom du fichier .pem importé, s'il y en a un — la clé elle-même vit dans
   // `ebPrivateKeyInput`, que l'on colle ou que l'on importe.
   const [ebPemFileName, setEbPemFileName] = useState<string | null>(null);
+  // Une clé privée RSA affichée en clair finit tôt ou tard dans une capture
+  // d'écran envoyée à quelqu'un. Elle reste donc masquée par défaut, et n'est
+  // révélée que sur demande explicite.
+  const [ebKeyRevealed, setEbKeyRevealed] = useState(false);
+  const [ebKeyFingerprint, setEbKeyFingerprint] = useState('');
   const [ebNgrokInput, setEbNgrokInput] = useState('');
   const [ebNgrokDomainInput, setEbNgrokDomainInput] = useState('');
   const [genericApiKeyInput, setGenericApiKeyInput] = useState('');
@@ -151,6 +156,8 @@ export default function Settings() {
       setEbAppIdInput('');
       setEbPrivateKeyInput('');
       setEbPemFileName(null);
+      setEbKeyRevealed(false);
+      setEbKeyFingerprint('');
       setEbNgrokInput('');
       setEbNgrokDomainInput('');
     }
@@ -241,6 +248,21 @@ export default function Settings() {
    * saisie manuelle. Rien n'est envoyé au serveur ici — la clé ne part qu'à
    * l'enregistrement, comme si elle avait été collée à la main.
    */
+  /** Empreinte courte : reconnaître la clé chargée sans en révéler le contenu. */
+  const fingerprintKey = async (key: string): Promise<string> => {
+    if (!key.trim() || !globalThis.crypto?.subtle) return '';
+    try {
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(key.trim()));
+      const hex = Array.from(new Uint8Array(digest))
+        .slice(0, 6)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+      return hex.replace(/(.{4})/g, '$1 ').trim();
+    } catch {
+      return '';
+    }
+  };
+
   const handlePemFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     // L'input est remis à zéro tout de suite : réimporter le même fichier
@@ -274,6 +296,9 @@ export default function Settings() {
 
       setEbPrivateKeyInput(content);
       setEbPemFileName(file.name);
+      // Rien à relire : une clé importée n'a aucune raison d'être affichée.
+      setEbKeyRevealed(false);
+      setEbKeyFingerprint(await fingerprintKey(content));
       toast.success(`Clé importée depuis ${file.name}`);
     } catch {
       toast.error('Impossible de lire ce fichier.');
@@ -329,6 +354,8 @@ export default function Settings() {
       setEbAppIdInput('');
       setEbPrivateKeyInput('');
       setEbPemFileName(null);
+      setEbKeyRevealed(false);
+      setEbKeyFingerprint('');
       setEbNgrokInput('');
       setEbNgrokDomainInput('');
       setGenericApiKeyInput('');
@@ -651,7 +678,7 @@ export default function Settings() {
                   {isConfigured ? (
                     <>
                       <button
-                        onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
+                        onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbKeyRevealed(false); setEbKeyFingerprint(''); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
                         className="px-3 py-1.5 text-xs font-medium text-zinc-300 rounded-lg border border-white/10 bg-white/[0.05] hover:bg-white/10 transition-colors"
                       >
                         Reconfigurer
@@ -665,7 +692,7 @@ export default function Settings() {
                     </>
                   ) : (
                     <button
-                      onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
+                      onClick={() => { setSetupModal(provider); setEbAppIdInput(''); setEbPrivateKeyInput(''); setEbPemFileName(null); setEbKeyRevealed(false); setEbKeyFingerprint(''); setEbNgrokInput(''); setEbNgrokDomainInput(''); setGenericApiKeyInput(''); }}
                       className="px-3 py-1.5 text-xs font-medium text-white rounded-lg bg-violet-600 hover:bg-violet-500 transition-colors"
                     >
                       Setup
@@ -968,29 +995,68 @@ export default function Settings() {
                       />
                     </label>
                   </div>
-                  <textarea
-                    value={ebPrivateKeyInput}
-                    onChange={(e) => {
-                      setEbPrivateKeyInput(e.target.value);
-                      // Édition manuelle : le contenu n'est plus celui du fichier.
-                      setEbPemFileName(null);
-                    }}
-                    placeholder="Collez la clé ici, ou importez le fichier .pem&#10;-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
-                    rows={4}
-                    className="w-full rounded-lg border border-white/10 bg-white/[0.04] text-sm text-white py-2.5 px-3 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 font-mono text-xs resize-none"
-                  />
-                  {ebPemFileName && (
-                    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-green-400">
-                      <CheckCircleIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                      <span className="truncate">Clé chargée depuis {ebPemFileName}</span>
-                      <button
-                        type="button"
-                        onClick={() => { setEbPrivateKeyInput(''); setEbPemFileName(null); }}
-                        className="ml-auto text-zinc-500 hover:text-zinc-300 transition-colors flex-shrink-0"
-                      >
-                        Effacer
-                      </button>
+                  {ebPrivateKeyInput && !ebKeyRevealed ? (
+                    // Clé déjà chargée : on montre qu'elle est là, pas ce qu'elle contient.
+                    <div className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2.5">
+                      <div className="flex items-center gap-1.5 text-[11px] text-green-400">
+                        <CheckCircleIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                        <span className="truncate">
+                          {ebPemFileName ? `Clé chargée depuis ${ebPemFileName}` : 'Clé privée chargée'}
+                        </span>
+                      </div>
+                      <div className="mt-1 font-mono text-[11px] text-zinc-500">
+                        ••••••••••••••••••••••••••••
+                        {ebKeyFingerprint && <span className="ml-2 text-zinc-600">empreinte {ebKeyFingerprint}</span>}
+                      </div>
+                      <div className="mt-1.5 flex items-center gap-3 text-[11px]">
+                        <button
+                          type="button"
+                          onClick={() => setEbKeyRevealed(true)}
+                          className="text-zinc-400 hover:text-zinc-200 transition-colors"
+                        >
+                          Afficher
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEbPrivateKeyInput('');
+                            setEbPemFileName(null);
+                            setEbKeyFingerprint('');
+                            setEbKeyRevealed(false);
+                          }}
+                          className="text-zinc-500 hover:text-zinc-300 transition-colors"
+                        >
+                          Effacer
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    <>
+                      <textarea
+                        value={ebPrivateKeyInput}
+                        onChange={(e) => {
+                          setEbPrivateKeyInput(e.target.value);
+                          // Édition manuelle : le contenu n'est plus celui du fichier.
+                          setEbPemFileName(null);
+                          setEbKeyFingerprint('');
+                        }}
+                        placeholder="Collez la clé ici, ou importez le fichier .pem&#10;-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
+                        rows={4}
+                        className="w-full rounded-lg border border-white/10 bg-white/[0.04] text-sm text-white py-2.5 px-3 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 font-mono text-xs resize-none"
+                      />
+                      {ebPrivateKeyInput && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setEbKeyFingerprint(await fingerprintKey(ebPrivateKeyInput));
+                            setEbKeyRevealed(false);
+                          }}
+                          className="mt-1.5 text-[11px] text-zinc-400 hover:text-zinc-200 transition-colors"
+                        >
+                          Masquer la clé
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
                 <div>
