@@ -10,55 +10,10 @@ permissions:
   contents: write
 
 jobs:
-  # ─── 1. Créer la release GitHub (vide) ─────────────────────────────────────
-  create-release:
-    name: Créer la release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create.outputs.upload_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Créer la release GitHub
-        id: create
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "Findy ${{ github.ref_name }}"
-          draft: false
-          prerelease: false
-          body: |
-            ## Findy ${{ github.ref_name }}
-
-            ### Téléchargement
-            | Fichier | Architecture |
-            |---------|-------------|
-            | `Findy_*_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
-            | `Findy_*_x64.dmg` | Intel Mac |
-
-            ### Mise à jour automatique
-            Depuis l'application, allez dans **Paramètres → Mises à jour** et cliquez sur **Vérifier**.
-            L'application téléchargera et installera la mise à jour automatiquement.
-
-            ### Installation manuelle
-            1. Ouvrir le `.dmg` correspondant à ton Mac
-            2. Glisser **Finance.app** dans `/Applications`
-            3. **Contourner Gatekeeper** (app non signée) — une seule fois :
-               ```bash
-               xattr -rd com.apple.quarantine /Applications/Findy.app
-               ```
-               ou double-cliquer sur **`fix-quarantine.command`** ci-joint.
-
-            ### Données persistantes
-            Base de données et images stockées dans :
-            `~/Library/Application Support/com.evey.finance/`
-          files: scripts/fix-quarantine.command
-
   # ─── 2a. Build arm64 (Apple Silicon M1/M2/M3/M4) ──────────────────────────
   build-arm64:
     name: Build arm64 (Apple Silicon)
     runs-on: macos-14
-    needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       # Paire de clés régénérée le 2026-08-21, sans mot de passe : le mot de
@@ -119,23 +74,34 @@ jobs:
             npm run tauri build
           }
 
-      # L'updater macOS ne consomme pas le DMG : il télécharge l'archive
-      # `.app.tar.gz` produite dans bundle/macos/. Les deux architectures
-      # produisent le même nom de fichier, d'où le suffixe.
-      - name: Renommer l'artefact d'update (arm64)
+      # L'updater macOS ne consomme pas le DMG mais l'archive `.app.tar.gz`.
+      # Les deux architectures produisent le même nom de fichier, d'où le
+      # suffixe. Tout est rassemblé à plat dans dist-release/ : `upload-artifact`
+      # conserve l'arborescence commune, et un `bundle/dmg/…` imbriqué ferait
+      # échouer les globs du job de publication.
+      - name: Préparer les artefacts arm64
         run: |
+          set -euo pipefail
           cd src-tauri/target/release/bundle/macos
           mv Findy.app.tar.gz Findy_aarch64.app.tar.gz
           mv Findy.app.tar.gz.sig Findy_aarch64.app.tar.gz.sig
-          ls -l
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p dist-release
+          cp src-tauri/target/release/bundle/dmg/*.dmg dist-release/
+          cp src-tauri/target/release/bundle/macos/*.app.tar.gz dist-release/
+          cp src-tauri/target/release/bundle/macos/*.app.tar.gz.sig dist-release/
+          ls -l dist-release/
 
-      - name: Upload DMG + artefact d'update arm64
-        uses: softprops/action-gh-release@v2
+      # Les artefacts transitent par le stockage du workflow : rien n'est
+      # publié tant que les DEUX architectures et le manifeste ne sont pas
+      # prêts (voir le job « release »).
+      - name: Publier les artefacts arm64 dans le workflow
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app.tar.gz
-            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+          name: bundles-arm64
+          if-no-files-found: error
+          retention-days: 1
+          path: dist-release/*
 
   # ─── 2b. Build x64 (Intel) ─────────────────────────────────────────────────
   build-x64:
@@ -146,7 +112,6 @@ jobs:
     # `macos-15-intel` est le dernier runner x86_64 (supporté jusqu'à
     # l'automne 2027).
     runs-on: macos-15-intel
-    needs: create-release
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       # Paire de clés régénérée le 2026-08-21, sans mot de passe : le mot de
@@ -207,50 +172,55 @@ jobs:
             npm run tauri build
           }
 
-      - name: Renommer l'artefact d'update (x64)
+      # L'updater macOS ne consomme pas le DMG mais l'archive `.app.tar.gz`.
+      # Les deux architectures produisent le même nom de fichier, d'où le
+      # suffixe. Tout est rassemblé à plat dans dist-release/ : `upload-artifact`
+      # conserve l'arborescence commune, et un `bundle/dmg/…` imbriqué ferait
+      # échouer les globs du job de publication.
+      - name: Préparer les artefacts x64
         run: |
+          set -euo pipefail
           cd src-tauri/target/release/bundle/macos
           mv Findy.app.tar.gz Findy_x64.app.tar.gz
           mv Findy.app.tar.gz.sig Findy_x64.app.tar.gz.sig
-          ls -l
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p dist-release
+          cp src-tauri/target/release/bundle/dmg/*.dmg dist-release/
+          cp src-tauri/target/release/bundle/macos/*.app.tar.gz dist-release/
+          cp src-tauri/target/release/bundle/macos/*.app.tar.gz.sig dist-release/
+          ls -l dist-release/
 
-      - name: Upload DMG + artefact d'update x64
-        uses: softprops/action-gh-release@v2
+      # Les artefacts transitent par le stockage du workflow : rien n'est
+      # publié tant que les DEUX architectures et le manifeste ne sont pas
+      # prêts (voir le job « release »).
+      - name: Publier les artefacts x64 dans le workflow
+        uses: actions/upload-artifact@v4
         with:
-          files: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app.tar.gz
-            src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+          name: bundles-x64
+          if-no-files-found: error
+          retention-days: 1
+          path: dist-release/*
 
-  # ─── 3. Générer latest.json pour l'updater ────────────────────────────────
-  generate-updater-json:
-    name: Générer latest.json
+  # ─── 3. Publier la release complète ───────────────────────────────────────
+  # La release n'est créée qu'ici, avec TOUS ses fichiers d'un coup. Elle était
+  # auparavant publiée vide au tout début : pendant les ~10 minutes de build,
+  # `releases/latest/download/latest.json` répondait 404 à tous les utilisateurs,
+  # et un build raté laissait durablement « latest » sur une release sans
+  # manifeste — donc plus aucune mise à jour possible pour personne.
+  release:
+    name: Publier la release
     runs-on: ubuntu-latest
     needs: [build-arm64, build-x64]
-    env:
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      # Paire de clés régénérée le 2026-08-21, sans mot de passe : le mot de
-      # passe de la précédente était perdu, et une clé chiffrée dont personne
-      # ne détient le secret ne signe plus rien. La variable doit tout de même
-      # exister, sinon le bundler refuse de signer.
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
 
     steps:
-      # L'updater télécharge l'archive `.app.tar.gz`, pas le DMG : c'est elle
-      # qui est signée et c'est elle que doit référencer latest.json.
-      - name: Download update archives
-        uses: robinraju/release-downloader@v1
-        with:
-          tag: ${{ github.ref_name }}
-          fileName: "*.app.tar.gz"
-          out-file-path: assets
+      - uses: actions/checkout@v4
 
-      - name: Download signatures
-        uses: robinraju/release-downloader@v1
+      - name: Récupérer les bundles des deux architectures
+        uses: actions/download-artifact@v4
         with:
-          tag: ${{ github.ref_name }}
-          fileName: "*.app.tar.gz.sig"
-          out-file-path: assets
+          pattern: bundles-*
+          merge-multiple: true
+          path: assets
 
       - name: Generate latest.json
         run: |
@@ -258,6 +228,8 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           REPO="${GITHUB_REPOSITORY}"
           TAG="${GITHUB_REF_NAME}"
+
+          ls -l assets/
 
           ARM64_ARCHIVE=$(ls assets/*_aarch64.app.tar.gz 2>/dev/null | head -1 || true)
           X64_ARCHIVE=$(ls assets/*_x64.app.tar.gz 2>/dev/null | head -1 || true)
@@ -279,7 +251,7 @@ jobs:
 
           python3 - "$VERSION" "$PUB_DATE" "$BASE_URL" \
             "$(basename "$ARM64_ARCHIVE")" "$(cat "$ARM64_SIG")" \
-            "$(basename "$X64_ARCHIVE")" "$(cat "$X64_SIG")" <<'PYEOF' > latest.json
+            "$(basename "$X64_ARCHIVE")" "$(cat "$X64_SIG")" <<'PYEOF' > assets/latest.json
           import json, sys
           version, pub_date, base, arm_name, arm_sig, x64_name, x64_sig = sys.argv[1:8]
           json.dump({
@@ -294,9 +266,46 @@ jobs:
           PYEOF
 
           echo "=== latest.json ==="
-          cat latest.json
+          cat assets/latest.json
 
-      - name: Upload latest.json
+      - name: Créer la release GitHub avec tous ses fichiers
         uses: softprops/action-gh-release@v2
         with:
-          files: latest.json
+          name: "Findy ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          body: |
+            ## Findy ${{ github.ref_name }}
+
+            ### Téléchargement
+            | Fichier | Architecture |
+            |---------|-------------|
+            | `Findy_*_aarch64.dmg` | Apple Silicon (M1/M2/M3/M4) |
+            | `Findy_*_x64.dmg` | Intel Mac |
+
+            ### Mise à jour automatique
+            Depuis l'application, allez dans **Paramètres → Mises à jour** et cliquez sur **Vérifier**.
+            L'application téléchargera et installera la mise à jour automatiquement.
+
+            ### Installation manuelle
+            1. Ouvrir le `.dmg` correspondant à ton Mac
+            2. Glisser **Findy.app** dans `/Applications` — l'app doit être lancée
+               depuis `/Applications`, pas depuis le volume monté, sinon les mises
+               à jour suivantes échoueront
+            3. **Contourner Gatekeeper** (app non signée) — une seule fois, APRÈS
+               la copie :
+               ```bash
+               xattr -rd com.apple.quarantine /Applications/Findy.app
+               ```
+               ou double-cliquer sur **`fix-quarantine.command`** ci-joint.
+
+            ### Données persistantes
+            Base de données et images stockées dans :
+            `~/Library/Application Support/com.evey.finance/`
+          files: |
+            assets/*.dmg
+            assets/*.app.tar.gz
+            assets/*.app.tar.gz.sig
+            assets/latest.json
+            scripts/fix-quarantine.command

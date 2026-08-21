@@ -137,7 +137,7 @@ export default function Settings() {
     loadTunnelUrl();
     loadMediaStatus();
     checkForUpdates()
-      .then((info) => { if (info) setVersionInfo(info); })
+      .then(setVersionInfo)
       .catch(() => {});
   }, []);
 
@@ -167,7 +167,8 @@ export default function Settings() {
     setCheckingUpdate(true);
     try {
       const info = await checkForUpdates();
-      if (info) setVersionInfo(info);
+      setVersionInfo(info);
+      if (info.error) toast.error(`Vérification impossible : ${info.error}`, { duration: 8000 });
     } finally {
       setCheckingUpdate(false);
     }
@@ -770,10 +771,15 @@ export default function Settings() {
             <p className="text-xs text-zinc-500 mt-0.5">
               {versionInfo?.updateAvailable
                 ? `Nouvelle version disponible : v${versionInfo.latest}`
+                : versionInfo?.error
+                ? 'Impossible de vérifier les mises à jour.'
                 : 'Vous utilisez la dernière version disponible.'}
             </p>
             {versionInfo?.notes && (
               <p className="text-xs text-zinc-500 mt-1 max-w-md">{versionInfo.notes}</p>
+            )}
+            {versionInfo?.error && (
+              <p className="text-xs text-amber-400/90 mt-1 max-w-md break-words">{versionInfo.error}</p>
             )}
           </div>
           {versionInfo?.updateAvailable && !downloading ? (

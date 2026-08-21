@@ -4,7 +4,7 @@ Merci de vouloir contribuer ! Voici comment :
 
 ## Signaler un bug
 
-- Ouvrez une [issue](https://github.com/avialleguerin/Findy/issues/new) avec :
+- Ouvrez une [issue](https://github.com/evey-run/Findy/issues/new) avec :
   - Un titre clair
   - Les étapes pour reproduire
   - Le comportement attendu vs observé
@@ -25,7 +25,7 @@ Merci de vouloir contribuer ! Voici comment :
 ## Setup dev
 
 ```bash
-git clone https://github.com/avialleguerin/Findy.git
+git clone https://github.com/evey-run/Findy.git
 cd Findy
 npm install
 npm run db:generate && npm run db:migrate
