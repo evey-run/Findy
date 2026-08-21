@@ -108,7 +108,16 @@ jobs:
         run: npm run build
 
       - name: Build Tauri (arm64)
-        run: npm run tauri build
+        # `bundle_dmg.sh` échoue par intermittence sur les runners macOS :
+        # hdiutil et Finder travaillent mal en session sans interface. Le même
+        # runner a produit ce DMG sans broncher au build précédent. Une
+        # seconde tentative suffit ; deux échecs d'affilée restent une erreur.
+        run: |
+          npm run tauri build || {
+            echo "::warning::Bundling échoué, nouvelle tentative dans 20 s"
+            sleep 20
+            npm run tauri build
+          }
 
       # L'updater macOS ne consomme pas le DMG : il télécharge l'archive
       # `.app.tar.gz` produite dans bundle/macos/. Les deux architectures
@@ -187,7 +196,16 @@ jobs:
         run: npm run build
 
       - name: Build Tauri (x64)
-        run: npm run tauri build
+        # `bundle_dmg.sh` échoue par intermittence sur les runners macOS :
+        # hdiutil et Finder travaillent mal en session sans interface. Le même
+        # runner a produit ce DMG sans broncher au build précédent. Une
+        # seconde tentative suffit ; deux échecs d'affilée restent une erreur.
+        run: |
+          npm run tauri build || {
+            echo "::warning::Bundling échoué, nouvelle tentative dans 20 s"
+            sleep 20
+            npm run tauri build
+          }
 
       - name: Renommer l'artefact d'update (x64)
         run: |
