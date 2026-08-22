@@ -52,20 +52,7 @@ const emptyForm: FormData = {
 };
 
 const fmt = (n: number) =>
-  `${Math.round(n).toLocaleString('fr-FR')} €`;
-
-const fmtCompact = (n: number) => {
-  const abs = Math.abs(n);
-  if (abs >= 1000000) {
-    const v = n / 1000000;
-    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} M€`;
-  }
-  if (abs >= 1000) {
-    const v = n / 1000;
-    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} k€`;
-  }
-  return fmt(n);
-};
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n);
 
 interface EbModal { bankId: string; bankName: string; }
 interface EbAspsp { name: string; country: string; logo: string; }
@@ -583,7 +570,7 @@ export default function Banks() {
   const totalBalance = banks.reduce((sum, b) => sum + b.balance, 0);
   const stats = [
     { label: 'Comptes', value: banks.length.toString(), icon: '🏦' },
-    { label: 'Solde total', value: fmtCompact(totalBalance), icon: '💰' },
+    { label: 'Solde total', value: fmt(totalBalance), icon: '💰' },
   ];
 
   return (
@@ -852,7 +839,7 @@ export default function Banks() {
 
                 {/* Row 3 — balance (emphasis) */}
                 <div className="mt-2 text-lg font-bold text-zinc-50 tabular-nums">
-                  {fmtCompact(bank.balance)}
+                  {fmt(bank.balance)}
                 </div>
 
                 {/* Row 4 — IBAN compact */}
