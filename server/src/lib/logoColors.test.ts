@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import zlib from 'node:zlib';
-import { decodePng, dominantColors, logoPalette, type Rgba } from './logoColors';
+import { decodePng, dominantColors, isLightLogo, logoPalette, type Rgba } from './logoColors';
 
 /** Construit un PNG 8 bits RGBA non entrelacé, sans filtre, pour les tests. */
 function makePng(width: number, height: number, pixelAt: (x: number, y: number) => Rgba): Buffer {
@@ -97,4 +97,22 @@ test('une couleur saturée l’emporte sur une couleur terne plus fréquente', (
     ...Array(45).fill([255, 0, 128, 255] as Rgba),    // magenta franc
   ];
   assert.equal(dominantColors(pixels)[0], '#ff0080');
+});
+
+test('un lettrage sombre réclame une plaque claire', () => {
+  const dark: Rgba[] = Array(100).fill([22, 33, 89, 255]);   // bleu nuit Boursorama
+  const light: Rgba[] = Array(100).fill([245, 245, 245, 255]);
+  const transparent: Rgba[] = Array(100).fill([0, 0, 0, 0]);
+
+  assert.equal(isLightLogo(dark), false, 'du bleu nuit disparaîtrait sur la carte');
+  assert.equal(isLightLogo(light), true);
+  assert.equal(isLightLogo(transparent), null, 'aucun pixel opaque : on ne sait pas');
+});
+
+test('un logotype bicolore tranche sur la moyenne de ses pixels opaques', () => {
+  const mixed: Rgba[] = [
+    ...Array(80).fill([10, 10, 10, 255] as Rgba),
+    ...Array(20).fill([255, 255, 255, 255] as Rgba),
+  ];
+  assert.equal(isLightLogo(mixed), false);
 });

@@ -221,3 +221,36 @@ function distance(a: Rgba, b: Rgba): number {
 export function logoPalette(buffer: Buffer, count = 3): string[] {
   return dominantColors(decodePng(buffer), count);
 }
+
+/**
+ * Vrai si le logotype est clair, donc lisible tel quel sur un fond sombre.
+ *
+ * Les lettrages fournis par Enable Banking sont posés sur du transparent :
+ * celui de Boursorama est bleu nuit, invisible sur une carte sombre. Il faut
+ * alors le poser sur une plaque blanche, comme le font les vraies cartes. On ne
+ * regarde que les pixels opaques, les seuls qui portent le dessin.
+ */
+export function isLightLogo(pixels: Rgba[]): boolean | null {
+  let total = 0;
+  let count = 0;
+
+  for (const [r, g, b, a] of pixels) {
+    if (a < 160) continue;
+    total += relativeLuminance([r, g, b, 255]);
+    count += 1;
+  }
+
+  if (count === 0) return null;
+  // Seuil bas : dans le doute, la plaque blanche ne nuit à personne, alors
+  // qu'un lettrage sombre sans plaque disparaît complètement.
+  return total / count > 0.45;
+}
+
+/** Luminance relative WCAG, exposée pour `isLightLogo`. */
+export function relativeLuminance([r, g, b]: Rgba): number {
+  const [lr, lg, lb] = [r, g, b].map((v) => {
+    const s = v / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+}

@@ -86,6 +86,8 @@ export interface Bank {
   brandLogo?: string | null;
   /** Couleurs dominantes du logotype, en JSON. */
   brandColors?: string | null;
+  /** Logotype clair, donc lisible sans plaque sur la carte sombre. */
+  brandLogoLight?: boolean | null;
 }
 
 export interface Category {

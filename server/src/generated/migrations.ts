@@ -1,5 +1,5 @@
 // Généré par scripts/generate-migrations-bundle.mjs — ne pas éditer à la main.
-// Régénéré à chaque build du serveur ; 31 migration(s).
+// Régénéré à chaque build du serveur ; 32 migration(s).
 
 export interface EmbeddedMigration {
   name: string;
@@ -162,5 +162,10 @@ export const MIGRATIONS: EmbeddedMigration[] = [
     "name": "20260822230000_add_bank_brand_colors",
     "checksum": "3739a803e31a4f3b95527d05f39367cc331d7731edb88237c9271fa74eb88fac",
     "sql": "-- Couleurs dominantes du logotype, extraites une fois et stockées en JSON.\nALTER TABLE \"banks\" ADD COLUMN \"brandColors\" TEXT;\n"
+  },
+  {
+    "name": "20260822233000_add_bank_brand_logo_light",
+    "checksum": "b056f2adccb794be94f9bbf0cc120b37cd7ee766adeff45766ed8c0bbe2bfc65",
+    "sql": "-- Le logotype est-il clair ? Sinon, la carte le pose sur une plaque blanche.\nALTER TABLE \"banks\" ADD COLUMN \"brandLogoLight\" BOOLEAN;\n"
   }
 ];

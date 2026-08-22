@@ -746,7 +746,13 @@ export default function Banks() {
                 <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
                 <span className="text-xs text-zinc-600">{sectionBanks.length}</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {/* Une carte paysage se lit très bien en petit : on en met une
+                  de plus par ligne que les tuiles classiques. */}
+              <div className={`grid gap-3 ${
+                type === 'CURRENT'
+                  ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
+                  : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
+              }`}>
           {sectionBanks.map((bank) => {
             const typeInfo = getAccountTypeInfo(bank.accountType);
 
@@ -762,7 +768,7 @@ export default function Banks() {
                 // « connexion expirée » fait grandir la carte au lieu d'être rogné.
                 className={
                   isCard
-                    ? 'group relative flex flex-col rounded-2xl p-4 aspect-[1.586] text-white shadow-lg ring-1 ring-white/10 transition-all duration-200 hover:ring-white/20'
+                    ? 'group relative flex flex-col rounded-xl p-3.5 aspect-[1.586] text-white shadow-md ring-1 ring-white/10 transition-all duration-200 hover:ring-white/20'
                     : 'group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]'
                 }
                 style={isCard ? { backgroundImage: surface.background } : undefined}
@@ -809,22 +815,35 @@ export default function Banks() {
                 <div className="flex items-center gap-2.5">
                   {/* Bank image */}
                   {isCard && bank.brandLogo ? (
-                    /* Logotype officiel récupéré via Enable Banking : un
-                       lettrage large, qu'on cadre par la hauteur. */
-                    <img
-                      src={assetUrl(bank.brandLogo)}
-                      alt={bank.name}
-                      className="h-5 max-w-[104px] flex-shrink-0 object-contain object-left drop-shadow"
-                    />
+                    /* Logotype officiel : un lettrage large, cadré par la
+                       hauteur. Ceux qui sont sombres — Boursorama est en bleu
+                       nuit sur transparent — disparaîtraient sur la carte : on
+                       les pose alors sur une plaque claire, comme le font les
+                       vraies cartes. */
+                    <div
+                      className={`flex-shrink-0 ${
+                        bank.brandLogoLight
+                          ? ''
+                          : 'rounded-md bg-white/95 px-1.5 py-1 shadow-sm ring-1 ring-black/5'
+                      }`}
+                    >
+                      <img
+                        src={assetUrl(bank.brandLogo)}
+                        alt={bank.name}
+                        className={`max-w-[92px] object-contain object-left ${
+                          bank.brandLogoLight ? 'h-4 drop-shadow' : 'h-3.5'
+                        }`}
+                      />
+                    </div>
                   ) : bank.image ? (
                     <img
                       src={assetUrl(bank.image)}
                       alt={bank.name}
-                      className={`rounded-xl object-cover flex-shrink-0 ${isCard ? 'h-8 w-8 ring-1 ring-white/25' : 'h-10 w-10'}`}
+                      className={`rounded-xl object-cover flex-shrink-0 ${isCard ? 'h-7 w-7 ring-1 ring-white/25' : 'h-10 w-10'}`}
                     />
                   ) : (
                     <div className={`rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
-                      isCard ? 'h-8 w-8 bg-white/15 ring-1 ring-white/20' : 'h-10 w-10 bg-violet-500/15'
+                      isCard ? 'h-7 w-7 bg-white/15 ring-1 ring-white/20' : 'h-10 w-10 bg-violet-500/15'
                     }`}>
                       🏦
                     </div>
@@ -930,20 +949,20 @@ export default function Banks() {
                   /* Sur une carte : le solde en bas à gauche, les quatre
                      derniers chiffres et le code court sur la dernière ligne.
                      Pas de mention « compte courant » — la section le dit déjà. */
-                  <div className="relative mt-auto pt-3">
+                  <div className="relative mt-auto pt-2">
                     {/* Un solde à sept chiffres déborderait : la taille cède
                         avant que le texte ne soit tronqué. */}
                     <p className={`font-bold leading-none tabular-nums text-white drop-shadow-sm ${
-                      fmtExact(bank.balance).length > 13 ? 'text-lg' : 'text-xl'
+                      fmtExact(bank.balance).length > 13 ? 'text-base' : 'text-lg'
                     }`}>
                       {fmtExact(bank.balance)}
                     </p>
                     <div className="mt-2 flex items-end justify-between gap-3">
-                      <span className="font-mono text-[11px] tracking-[0.18em] text-white/70">
+                      <span className="font-mono text-[10px] tracking-[0.16em] text-white/70">
                         ••••&nbsp;{bank.cardLast4 || '••••'}
                       </span>
                       {bank.shortName && (
-                        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
                           {bank.shortName}
                         </span>
                       )}

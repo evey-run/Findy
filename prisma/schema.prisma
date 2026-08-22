@@ -114,6 +114,10 @@ model Bank {
   /// Extraites une fois à la récupération du logo : la carte prend les
   /// couleurs de la marque au lieu d'une teinte choisie au hasard.
   brandColors  String?
+  /// Vrai si le logotype est clair, donc lisible tel quel sur la carte sombre.
+  /// Faux ou absent : il est posé sur une plaque blanche, sinon un lettrage
+  /// bleu nuit sur fond transparent devient invisible.
+  brandLogoLight Boolean?
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

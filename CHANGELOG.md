@@ -16,6 +16,10 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
   paysage, couleur du compte, logo, solde et quatre derniers chiffres dessus,
   au même gabarit que les autres tuiles. Les livrets et les comptes
   d'investissement gardent la tuile classique.
+- Les logotypes sombres sur fond transparent — celui de Boursorama est en bleu
+  nuit, celui de Revolut en noir — sont posés sur une plaque claire : sans elle,
+  ils disparaissaient purement et simplement sur la carte. Les logotypes déjà
+  clairs restent posés à même la carte.
 - **Logotype officiel de la banque** récupéré via Enable Banking et copié dans
   le dossier des images : la carte porte le vrai lettrage de l'établissement au
   lieu d'une icône générique. Les comptes déjà liés le récupèrent à la
