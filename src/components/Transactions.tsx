@@ -108,8 +108,8 @@ function Columns() {
  */
 const HEADER_GLASS =
   'sticky top-0 z-20 border-b border-white/10 bg-zinc-950/95 '
-  + 'shadow-[0_10px_24px_-14px_rgba(0,0,0,0.95)] backdrop-blur-2xl backdrop-saturate-150 '
-  + 'supports-[backdrop-filter]:bg-zinc-950/80';
+  + 'shadow-[0_10px_24px_-14px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 '
+  + 'supports-[backdrop-filter]:bg-zinc-950/60';
 
 /**
  * Pastille d'un commerçant.
@@ -1197,7 +1197,12 @@ export default function Transactions({
       </div>
 
       {/* Transactions Table */}
-      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 flex flex-col">
+      {/* La carte ne porte volontairement pas de `backdrop-blur` : un ancêtre
+          filtré devient une racine d'arrière-plan, et le flou de l'en-tête
+          cesse alors de remplacer ce qu'il recouvre — il n'ajoute qu'un halo
+          par-dessus des lignes restées nettes. La carte repose de toute façon
+          sur un fond uni, où le flou ne se voyait pas. */}
+      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 border border-white/10 flex flex-col">
         <div
           ref={scrollContainerRef}
           className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
