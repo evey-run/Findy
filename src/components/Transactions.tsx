@@ -74,29 +74,44 @@ const HEADER_CONTROL =
 /**
  * Cellule d'en-tête, collée en haut du tableau.
  *
- * L'adhérence est portée par les cellules et non par le `thead` : c'est le seul
- * moyen d'y ancrer un calque de flou (voir `HeaderGlass`).
+ * Hauteur imposée plutôt que déduite du contenu : le calque de verre est un
+ * bloc séparé (voir `HeaderGlass`) et doit couvrir exactement la même bande.
+ * Une seule valeur pour les deux, et ils ne peuvent pas diverger.
  */
-const HEADER_CELL = 'sticky top-0 z-10 px-3 py-1.5';
+const HEADER_HEIGHT = 'h-9';
+/** Tire le tableau vers le haut d'exactement `HEADER_HEIGHT` : à changer ensemble. */
+const HEADER_PULL = '-mb-9';
+const HEADER_CELL = `sticky top-0 z-10 px-3 ${HEADER_HEIGHT}`;
 
 /**
  * Fond en verre dépoli de l'en-tête.
  *
- * Le flou est porté par un calque absolu — une boîte de bloc ordinaire — et
- * non par le `thead` ou le `th` : WebKit applique `backdrop-filter` de façon
- * fiable sur un bloc, beaucoup moins sur une boîte de tableau. L'ombre porte
- * au passage le filet de séparation, qui suivrait le `thead` hors de l'écran
- * s'il y restait attaché.
+ * Trois raisons à cette forme, chacune tirée d'un essai raté.
  *
- * Ce calque ne suffit pas à lui seul : tant que la carte englobante portait un
- * `backdrop-blur`, elle formait une racine d'arrière-plan et ce flou-ci ne
+ * C'est un bloc, pas le `thead` ni un `th` : WebKit applique `backdrop-filter`
+ * de façon fiable sur une boîte de bloc, beaucoup moins sur une boîte de
+ * tableau.
+ *
+ * C'est un seul calque, pas un par cellule : `backdrop-filter` est rogné à la
+ * boîte qui le porte, donc six calques échantillonnent six voisinages
+ * différents et laissent une couture verticale à chaque frontière de colonne.
+ *
+ * C'est un frère du tableau et non son enfant : un calque assez large pour
+ * couvrir toutes les colonnes depuis l'intérieur d'une cellule débordait du
+ * conteneur, qui devenait défilable latéralement. Ici la largeur est celle du
+ * conteneur, sans débordement. La marge négative annule la place qu'il prend
+ * dans le flux : le tableau démarre où il démarrait, et l'en-tête se pose
+ * dessus — les cellules viennent après dans le document, donc au-dessus.
+ *
+ * Reste que rien de tout cela n'opérait tant que la carte englobante portait un
+ * `backdrop-blur` : elle formait une racine d'arrière-plan et ce flou-ci ne
  * remplaçait plus rien (voir le commentaire sur la carte, plus bas).
  */
 function HeaderGlass() {
   return (
-    <span
+    <div
       aria-hidden
-      className="pointer-events-none absolute inset-0 -z-10 bg-zinc-800/95 shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_8px_20px_-14px_rgba(0,0,0,0.9)] backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-800/80"
+      className={`pointer-events-none sticky top-0 z-10 ${HEADER_HEIGHT} ${HEADER_PULL} bg-zinc-800/95 shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_8px_20px_-14px_rgba(0,0,0,0.9)] backdrop-blur-lg backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-800/85`}
     />
   );
 }
@@ -1198,6 +1213,7 @@ export default function Transactions({
           className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
           onScroll={handleScroll}
         >
+          <HeaderGlass />
           <table className="w-full divide-y divide-zinc-800">
           {/* En-tête en verre dépoli : il reste lisible pendant que les lignes
               défilent dessous, sans les masquer complètement. La saturation
@@ -1205,7 +1221,6 @@ export default function Transactions({
           <thead>
             <tr>
               <th className={`${HEADER_CELL} text-left w-8`}>
-                <HeaderGlass />
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -1216,7 +1231,6 @@ export default function Transactions({
               {/* Toutes les cellules d'en-tête partagent la même typographie et
                   la même hauteur : contrôles et intitulés se ressemblent. */}
               <th className={`${HEADER_CELL} w-64 text-left`}>
-                <HeaderGlass />
                 <input
                   type="text"
                   placeholder="Rechercher…"
@@ -1227,7 +1241,6 @@ export default function Transactions({
                 />
               </th>
               <th className={`${HEADER_CELL} w-32 text-left`}>
-                <HeaderGlass />
                 <select
                   value={filters.categoryId}
                   onChange={(e) => applyFilters({ ...filters, categoryId: e.target.value })}
@@ -1241,7 +1254,6 @@ export default function Transactions({
                 </select>
               </th>
               <th className={`${HEADER_CELL} w-56 text-left`}>
-                <HeaderGlass />
                 <select
                   value={selectedBank?.id || ''}
                   onChange={(e) => {
@@ -1258,8 +1270,8 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className={`${HEADER_CELL} w-28 text-right ${HEADER_LABEL}`}><HeaderGlass />Montant</th>
-              <th className={`${HEADER_CELL} w-16 text-center ${HEADER_LABEL}`}><HeaderGlass />Actions</th>
+              <th className={`${HEADER_CELL} w-28 text-right ${HEADER_LABEL}`}>Montant</th>
+              <th className={`${HEADER_CELL} w-16 text-center ${HEADER_LABEL}`}>Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
