@@ -1162,7 +1162,10 @@ export default function Transactions({
           onScroll={handleScroll}
         >
           <table className="w-full divide-y divide-zinc-800">
-          <thead className="sticky top-0 z-10 bg-zinc-900/80 backdrop-blur">
+          {/* En-tête en verre dépoli : il reste lisible pendant que les lignes
+              défilent dessous, sans les masquer complètement. La saturation
+              rattrape la désaturation qu'un flou seul provoque. */}
+          <thead className="sticky top-0 z-10 border-b border-white/10 bg-zinc-950/55 shadow-[0_1px_0_0_rgba(255,255,255,0.06),0_8px_24px_-12px_rgba(0,0,0,0.9)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-950/45">
             <tr>
               <th className="px-3 py-2 text-left w-8">
                 <input
@@ -1367,8 +1370,13 @@ export default function Transactions({
                           className="w-8 h-8 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.bank.color }}>
-                          {transaction.bank.shortName}
+                        // Sans code court — c'est le cas de plusieurs comptes —
+                        // le cercle restait vide : on retombe sur les initiales.
+                        <div
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                          style={{ backgroundColor: transaction.bank.color || '#3b82f6' }}
+                        >
+                          {transaction.bank.shortName || merchantInitials(transaction.bank.name)}
                         </div>
                       )}
                       <div className="ml-2">
