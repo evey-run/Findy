@@ -14,8 +14,10 @@ import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
   UserGroupIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import ImportCsvModal from './ImportCsvModal';
 
 const formatIBAN = (iban: string): string => {
   const clean = iban.replace(/\s+/g, '');
@@ -126,6 +128,9 @@ export default function Banks() {
   // Delete confirmation modal
   const [deleteModal, setDeleteModal] = useState<{ bankId: string; bankName: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Compte ciblé par l'import CSV (ouvre la fenêtre d'import quand défini).
+  const [importBank, setImportBank] = useState<Bank | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -889,6 +894,13 @@ export default function Banks() {
                             Modifier
                           </button>
                           <button
+                            onClick={() => { setOpenMenuId(null); setImportBank(bank); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <ArrowUpTrayIcon className="h-4 w-4 text-zinc-500" />
+                            Importer CSV
+                          </button>
+                          <button
                             onClick={() => handleDelete(bank.id, bank.name)}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
                           >
@@ -1412,6 +1424,19 @@ export default function Banks() {
             </div>
           </form>
         </div>
+      )}
+
+      {importBank && (
+        <ImportCsvModal
+          bankId={importBank.id}
+          bankName={importBank.name}
+          accountType={importBank.accountType}
+          onClose={() => setImportBank(null)}
+          onImported={async () => {
+            await loadBanks();
+            await loadTransactions({ forceRefresh: true });
+          }}
+        />
       )}
     </div>
   );
