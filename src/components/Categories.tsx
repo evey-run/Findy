@@ -15,7 +15,6 @@ interface EditingCategory {
   name: string;
   type: 'INCOME' | 'EXPENSE' | 'FIXED';
   color: string;
-  keywords?: string[];
   budget?: {
     amount: string;
     period: 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
@@ -49,7 +48,6 @@ const emptyForm: EditingCategory = {
   name: '',
   type: 'EXPENSE',
   color: '#7c3aed',
-  keywords: [],
   budget: {
     amount: '',
     period: 'MONTHLY',
@@ -60,8 +58,15 @@ const emptyForm: EditingCategory = {
 const categoryTypes = [
   { value: 'INCOME', label: 'Revenu', icon: '📈', color: '#22c55e' },
   { value: 'EXPENSE', label: 'Dépense', icon: '📉', color: '#ef4444' },
-  { value: 'FIXED', label: 'Fixe', icon: '📌', color: '#6b7280' },
 ];
+
+// Display labels — includes legacy types (e.g. FIXED) that are no longer
+// offered in the modal but may still exist on older categories.
+const typeLabels: Record<string, string> = {
+  INCOME: 'Revenu',
+  EXPENSE: 'Dépense',
+  FIXED: 'Fixe',
+};
 
 const predefinedColors = [
   '#54478c', '#2c699a', '#048ba8', '#0db39e', '#16db93',
@@ -227,7 +232,6 @@ export default function Categories() {
       name: category.name,
       type: category.type,
       color: category.color,
-      keywords: category.keywords || [],
       budget: categoryBudget
         ? {
             amount: categoryBudget.amount.toString(),
@@ -264,7 +268,6 @@ export default function Categories() {
         name: formData.name,
         type: formData.type,
         color: formData.color,
-        keywords: (formData.keywords || []).map((k) => k.toLowerCase().trim()).filter(Boolean),
       };
 
       const categoryRes = await fetch(
@@ -357,10 +360,7 @@ export default function Categories() {
     }
   };
 
-  const getTypeLabel = (type: string) => {
-    const t = categoryTypes.find((ct) => ct.value === type);
-    return t ? t.label : type;
-  };
+  const getTypeLabel = (type: string) => typeLabels[type] ?? type;
 
   if (loading) {
     return (
@@ -544,18 +544,6 @@ export default function Categories() {
                     <div className="text-[11px] text-zinc-500">{getTypeLabel(category.type)}</div>
                   </div>
 
-                  {/* Keywords */}
-                  {category.keywords && category.keywords.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mr-2">
-                      {category.keywords.slice(0, 2).map((kw) => (
-                        <span key={kw} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800/50 text-zinc-400">{kw}</span>
-                      ))}
-                      {category.keywords.length > 2 && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded text-zinc-500">+{category.keywords.length - 2}</span>
-                      )}
-                    </div>
-                  )}
-
                   {/* Actions */}
                   <div className="relative flex-shrink-0">
                     <button
@@ -646,7 +634,7 @@ export default function Categories() {
               {/* Type */}
               <div>
                 <label className="block text-xs font-medium text-zinc-400 mb-1.5">Type</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                   {categoryTypes.map((t) => (
                     <button
                       key={t.value}
@@ -764,49 +752,6 @@ export default function Categories() {
                 </>
               )}
 
-              {/* Keywords */}
-              <div className="pt-2 border-t border-white/[0.06]">
-                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
-                  Mots-clés <span className="text-zinc-600">(optionnel)</span>
-                </label>
-                {formData.keywords && formData.keywords.length > 0 && (
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {formData.keywords.map((kw) => (
-                      <button
-                        key={kw}
-                        type="button"
-                        onClick={() =>
-                          setFormData({
-                            ...formData,
-                            keywords: formData.keywords!.filter((k) => k !== kw),
-                          })
-                        }
-                        className="text-xs px-2 py-1 rounded-md bg-violet-600/20 text-violet-300 hover:bg-violet-600/30 transition-colors"
-                      >
-                        {kw} ×
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <input
-                  type="text"
-                  placeholder="Ajouter un mot-clé puis Entrée"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      const kw = (e.target as HTMLInputElement).value.trim().toLowerCase();
-                      if (kw && !formData.keywords?.includes(kw)) {
-                        setFormData({
-                          ...formData,
-                          keywords: [...(formData.keywords || []), kw],
-                        });
-                        (e.target as HTMLInputElement).value = '';
-                      }
-                    }
-                  }}
-                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors"
-                />
-              </div>
             </div>
 
             {/* Footer */}
