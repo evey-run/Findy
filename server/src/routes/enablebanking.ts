@@ -399,7 +399,20 @@ async function linkSelectedAccount(bankId: string, sessionId: string, accountUid
   return bank;
 }
 
-async function fetchAllTransactions(accountUid: string, dateFrom?: string): Promise<any[]> {
+/**
+ * Stratégie de récupération côté Enable Banking.
+ * - `default` : fenêtre classique (à partir de `date_from`), idéale pour le delta.
+ * - `longest` : remonte jusqu'à l'opération la plus ancienne accessible et tire
+ *   tout l'historique. `date_from` n'est alors qu'une suggestion de point de
+ *   départ ; omis, EB détermine lui-même la plus ancienne opération.
+ */
+type TransactionsFetchStrategy = 'default' | 'longest';
+
+async function fetchAllTransactions(
+  accountUid: string,
+  opts: { dateFrom?: string; strategy?: TransactionsFetchStrategy } = {},
+): Promise<any[]> {
+  const { dateFrom, strategy } = opts;
   let allTransactions: any[] = [];
   let continuationKey: string | null = null;
 
@@ -407,6 +420,7 @@ async function fetchAllTransactions(accountUid: string, dateFrom?: string): Prom
     const params = new URLSearchParams();
     if (continuationKey) params.set('continuation_key', continuationKey);
     if (dateFrom) params.set('date_from', dateFrom);
+    if (strategy) params.set('strategy', strategy);
 
     const qs = params.toString();
     const url = `/accounts/${accountUid}/transactions${qs ? `?${qs}` : ''}`;
@@ -446,8 +460,11 @@ export interface SyncResult {
 }
 
 /**
- * Backfill: fetch all available history (typically 90 days PSD2).
- * Called once when the user first links a bank account.
+ * Backfill : récupère TOUT l'historique disponible (souvent 1 à 2 ans, parfois
+ * plus), pas seulement les 90 derniers jours. Appelé une seule fois, juste
+ * après la liaison du compte — c'est la seule fenêtre où l'ASPSP donne accès à
+ * l'historique complet (au-delà d'~1 h après l'autorisation, la plupart des
+ * banques retombent à 90 jours glissants).
  */
 export async function syncBackfill(bankId: string): Promise<SyncResult> {
   const bank = await prisma.bank.findUnique({ where: { id: bankId } });
@@ -470,10 +487,12 @@ export async function syncBackfill(bankId: string): Promise<SyncResult> {
       console.error(`[EB] Balance fetch failed:`, e.message);
     }
 
-    // Fetch transactions with explicit date range (PSD2 allows up to 90 days)
-    const dateFrom = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    console.log(`[EB] Fetching transactions from ${dateFrom}`);
-    const rawTransactions = await fetchAllTransactions(bank.ebAccountUid, dateFrom);
+    // Stratégie « longest » : EB remonte jusqu'à l'opération la plus ancienne
+    // accessible et tire tout l'historique. On ne passe pas de `date_from` pour
+    // ne rien plafonner, et cette stratégie n'émet pas d'erreur
+    // WRONG_TRANSACTIONS_PERIOD si la banque expose moins de données.
+    console.log('[EB] Fetching full history (strategy=longest)');
+    const rawTransactions = await fetchAllTransactions(bank.ebAccountUid, { strategy: 'longest' });
     console.log(`[EB] Backfill: ${rawTransactions.length} raw transactions`);
     const result = await upsertTransactions(bankId, rawTransactions);
 
@@ -534,7 +553,9 @@ export async function syncIncremental(bankId: string): Promise<SyncResult> {
 
   let rawTransactions: any[];
   try {
-    rawTransactions = await fetchAllTransactions(bank.ebAccountUid, dateFrom);
+    // Sync incrémentale : stratégie par défaut, on ne veut que le delta depuis
+    // la dernière opération connue.
+    rawTransactions = await fetchAllTransactions(bank.ebAccountUid, { dateFrom });
   } catch (err: any) {
     if (isAccountError(err)) {
       await markBankExpired(bankId);
