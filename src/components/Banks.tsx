@@ -485,7 +485,10 @@ export default function Banks() {
     if (!deleteModal) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/banks/${deleteModal.bankId}`, { method: 'DELETE' });
+      // Suppression définitive : le compte ET toutes ses transactions/budgets/
+      // récurrences (cf. modale). L'endpoint sans `/permanent` ne fait qu'archiver
+      // le compte en laissant ses transactions orphelines visibles (issue #48).
+      const res = await fetch(`/api/banks/${deleteModal.bankId}/permanent`, { method: 'DELETE' });
       if (res.ok) {
         await loadBanks();
         await loadTransactions({ forceRefresh: true });
