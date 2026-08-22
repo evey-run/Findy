@@ -65,8 +65,10 @@ const HEADER_LABEL = 'text-[11px] font-medium uppercase tracking-wider text-zinc
  * une rangée où chaque cellule a sa propre taille se lit mal.
  */
 const HEADER_CONTROL =
-  'w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] font-medium '
-  + 'uppercase tracking-wider text-zinc-400 placeholder:text-zinc-600 transition-colors '
+  // Hauteur fixe plutôt que dérivée du texte : un `select` s'octroie sinon
+  // quelques pixels de plus qu'un `input`, et la barre s'épaissit pour rien.
+  'h-6 w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0 text-[11px] font-medium '
+  + 'uppercase leading-none tracking-wider text-zinc-400 placeholder:text-zinc-600 transition-colors '
   + 'hover:border-white/15 focus:border-violet-500/60 focus:text-zinc-200 focus:outline-none';
 
 /**
@@ -75,7 +77,7 @@ const HEADER_CONTROL =
  * L'adhérence est portée par les cellules et non par le `thead` : c'est le seul
  * moyen d'y ancrer un calque de flou (voir `HeaderGlass`).
  */
-const HEADER_CELL = 'sticky top-0 z-10 px-3 py-2';
+const HEADER_CELL = 'sticky top-0 z-10 px-3 py-1.5';
 
 /**
  * Fond en verre dépoli de l'en-tête.
@@ -94,7 +96,7 @@ function HeaderGlass() {
   return (
     <span
       aria-hidden
-      className="pointer-events-none absolute inset-0 -z-10 bg-zinc-950/95 shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_10px_24px_-14px_rgba(0,0,0,0.95)] backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-950/75"
+      className="pointer-events-none absolute inset-0 -z-10 bg-zinc-800/95 shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_8px_20px_-14px_rgba(0,0,0,0.9)] backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-800/80"
     />
   );
 }
