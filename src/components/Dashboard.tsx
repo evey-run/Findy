@@ -325,90 +325,42 @@ interface Forecast {
   dormantAccounts?: Array<{ id: string; name: string; balance: number }>;
 }
 
-const BLOCKER_TEXT: Record<string, string> = {
-  NO_SPENDABLE_ACCOUNT: 'Aucun compte courant à suivre. Ajoutez-en un pour voir votre reste à vivre.',
-  NO_TRANSACTIONS: 'Aucune opération enregistrée : il n’y a rien à projeter pour l’instant.',
-  STALE_DATA: 'Vos données datent de plus d’un mois. Synchronisez vos comptes pour un chiffre fiable.',
-};
-
-function forecastDayLabel(iso: string): string {
-  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
-}
-
 /**
- * Le chiffre que l'on vient chercher en ouvrant l'application.
+ * Ce qu'il reste à tenir, en haut de la carte Budgets.
  *
- * Il n'est jamais affiché « au mieux » : quand la donnée ne permet pas de le
- * calculer honnêtement, on explique quoi faire au lieu d'avancer un nombre.
+ * Deux nombres, sans phrase : combien de jours le solde tient au rythme
+ * observé, et où il atterrit à la fin du mois. Le reste — échéances déduites,
+ * budgets, réserves — vit dans le calcul, pas à l'écran.
  */
-function RestARivre({ forecast, loading }: { forecast: Forecast | null; loading: boolean }) {
+function ResteAVivre({ forecast, loading }: { forecast: Forecast | null; loading: boolean }) {
   if (loading) {
     return (
-      <div className="flex-shrink-0 rounded-2xl bg-white/[0.04] border border-white/[0.08] px-5 py-4">
-        <Skeleton h="h-4" w="w-32" />
-        <Skeleton h="h-9" w="w-48" className="mt-2" />
+      <div className="flex-shrink-0 border-b border-white/[0.06] px-5 py-3">
+        <Skeleton h="h-6" w="w-40" />
       </div>
     );
   }
-  if (!forecast) return null;
+  if (!forecast || forecast.state === 'blocked') return null;
 
-  if (forecast.state === 'blocked') {
-    const reason = forecast.blockers.map((b) => BLOCKER_TEXT[b]).find(Boolean) ?? BLOCKER_TEXT.NO_TRANSACTIONS;
-    return (
-      <div className="flex-shrink-0 rounded-2xl bg-white/[0.04] border border-white/[0.08] px-5 py-4">
-        <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">Reste à vivre</p>
-        <p className="mt-1.5 text-sm text-zinc-400">{reason}</p>
-      </div>
-    );
-  }
-
-  const perDay = forecast.perDay ?? 0;
-  const alert = forecast.state === 'overdrawn' || forecast.state === 'projected-overdraft' || perDay === 0;
   const runway = forecast.runway;
+  const days = runway?.state === 'ok' ? runway.days : null;
+  const endOfMonth = forecast.projectedEndOfMonth;
+  const short = endOfMonth !== undefined && endOfMonth < 0;
 
   return (
-    <div
-      className={`flex-shrink-0 rounded-2xl border px-5 py-4 ${
-        alert ? 'bg-red-500/[0.07] border-red-500/20' : 'bg-violet-500/[0.07] border-violet-500/20'
-      }`}
-    >
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">Reste à vivre</p>
-          <p className="mt-0.5 flex items-baseline gap-2">
-            <span className={`text-4xl font-bold tabular-nums leading-none ${alert ? 'text-red-300' : 'text-zinc-50'}`}>
-              {fmt(perDay)}
-            </span>
-            <span className="text-sm text-zinc-400">
-              par jour {forecast.daysLeft === 1 ? 'aujourd’hui' : `pendant ${forecast.daysLeft} jours`}
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            {forecast.state === 'overdrawn'
-              ? 'Vos comptes courants sont à découvert.'
-              : forecast.state === 'projected-overdraft'
-              ? `À découvert prévu le ${forecast.overdraftDay} du mois, échéances comprises.`
-              : forecast.limitedBy === 'budget'
-              ? `Limité par vos budgets : ${fmt(forecast.budgetsLeft ?? 0)} restants.`
-              : `${fmt(forecast.availableNow ?? 0)} disponibles, échéances à venir déduites.`}
-          </p>
-        </div>
-
-        {runway?.state === 'ok' && runway.date && (
-          <div className="text-right">
-            <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">À ce rythme</p>
-            <p className="mt-0.5 text-lg font-semibold text-zinc-200">
-              tenue jusqu’au {forecastDayLabel(runway.date)}
-            </p>
-            <p className="text-xs text-zinc-500">{fmt(runway.burnRate ?? 0)} par jour observés</p>
-          </div>
-        )}
-      </div>
-
-      {forecast.dormantAccounts && forecast.dormantAccounts.length > 0 && (
-        <p className="mt-2.5 text-[11px] text-amber-400/90">
-          {forecast.dormantAccounts.map((a) => a.name).join(', ')} pèse le plus dans ce chiffre sans avoir bougé depuis
-          trois mois. Si c’est de l’épargne, décochez-le dans le portefeuille.
+    <div className="flex-shrink-0 flex items-baseline gap-5 border-b border-white/[0.06] px-5 py-3">
+      {days !== null && days !== undefined && (
+        <p className="flex items-baseline gap-1.5">
+          <span className="text-2xl font-bold tabular-nums leading-none text-zinc-50">{days}</span>
+          <span className="text-xs text-zinc-500">jours</span>
+        </p>
+      )}
+      {endOfMonth !== undefined && (
+        <p className="flex items-baseline gap-1.5">
+          <span className={`text-2xl font-bold tabular-nums leading-none ${short ? 'text-red-300' : 'text-zinc-50'}`}>
+            {fmtCompact(endOfMonth)}
+          </span>
+          <span className="text-xs text-zinc-500">fin de mois</span>
         </p>
       )}
     </div>
@@ -757,8 +709,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <RestARivre forecast={forecast} loading={forecastLoading} />
-
       {/* ── Stat cards ── */}
       <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
@@ -896,6 +846,8 @@ export default function Dashboard() {
               Voir tous →
             </Link>
           </div>
+
+          <ResteAVivre forecast={forecast} loading={forecastLoading} />
 
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3 custom-scrollbar">
             {isLoading ? (

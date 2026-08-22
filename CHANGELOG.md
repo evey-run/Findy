@@ -36,9 +36,9 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
 - Champ « numéro de carte » sur le compte. Seuls les **quatre derniers
   chiffres** sont enregistrés : coller un numéro complet n'en garde que la fin,
   car le reste ne sert à rien et cette base part dans les sauvegardes.
-- **Reste à vivre prévisionnel** sur le tableau de bord : un seul chiffre, ce
-  qu'il reste à dépenser par jour jusqu'à la fin du mois, et la date à laquelle
-  les comptes s'assèchent au rythme observé. Le calcul part du solde du jour,
+- **Reste à vivre prévisionnel**, en tête de la carte Budgets du tableau de
+  bord : deux nombres et rien d'autre — combien de jours le solde tient au
+  rythme observé, et où il atterrit à la fin du mois. Le calcul part du solde du jour,
   déduit les échéances à venir — en rattrapant celles dont la date de
   prochaine occurrence traîne dans le passé — et se plafonne aux budgets
   restants sans jamais les soustraire du solde.
