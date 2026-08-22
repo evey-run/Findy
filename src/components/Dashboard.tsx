@@ -307,6 +307,66 @@ function MonthlyFlux({
   );
 }
 
+// ─── Reste à vivre ──────────────────────────────────────────────────────────
+
+interface Forecast {
+  state: 'ok' | 'last-day' | 'projected-overdraft' | 'overdrawn' | 'blocked';
+  perDay: number | null;
+  daysLeft: number;
+  availableNow?: number;
+  projectedEndOfMonth?: number;
+  limitedBy?: 'cash' | 'budget' | null;
+  overdraftDay?: number | null;
+  budgetsLeft?: number | null;
+  runway?: { state: string; date: string | null; days: number | null; burnRate: number | null };
+  warnings: string[];
+  blockers: string[];
+  accounts?: Array<{ id: string; name: string; balance: number }>;
+  dormantAccounts?: Array<{ id: string; name: string; balance: number }>;
+}
+
+/**
+ * Ce qu'il reste à tenir, en haut de la carte Budgets.
+ *
+ * Deux nombres, sans phrase : combien de jours le solde tient au rythme
+ * observé, et où il atterrit à la fin du mois. Le reste — échéances déduites,
+ * budgets, réserves — vit dans le calcul, pas à l'écran.
+ */
+function ResteAVivre({ forecast, loading }: { forecast: Forecast | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="flex-shrink-0 border-b border-white/[0.06] px-5 py-3">
+        <Skeleton h="h-6" w="w-40" />
+      </div>
+    );
+  }
+  if (!forecast || forecast.state === 'blocked') return null;
+
+  const runway = forecast.runway;
+  const days = runway?.state === 'ok' ? runway.days : null;
+  const endOfMonth = forecast.projectedEndOfMonth;
+  const short = endOfMonth !== undefined && endOfMonth < 0;
+
+  return (
+    <div className="flex-shrink-0 flex items-baseline gap-5 border-b border-white/[0.06] px-5 py-3">
+      {days !== null && days !== undefined && (
+        <p className="flex items-baseline gap-1.5">
+          <span className="text-2xl font-bold tabular-nums leading-none text-zinc-50">{days}</span>
+          <span className="text-xs text-zinc-500">jours</span>
+        </p>
+      )}
+      {endOfMonth !== undefined && (
+        <p className="flex items-baseline gap-1.5">
+          <span className={`text-2xl font-bold tabular-nums leading-none ${short ? 'text-red-300' : 'text-zinc-50'}`}>
+            {fmtCompact(endOfMonth)}
+          </span>
+          <span className="text-xs text-zinc-500">fin de mois</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── StatCard ───────────────────────────────────────────────────────────────
 
 function StatCard({
@@ -359,6 +419,8 @@ export default function Dashboard() {
   const [previousData, setPreviousData] = useState({ income: 0, expense: 0, savings: 0, investment: 0 });
   const [fluxData, setFluxData] = useState<{ label: string; income: number; expense: number }[]>([]);
   const [fluxCumulative, setFluxCumulative] = useState(false);
+  const [forecast, setForecast] = useState<Forecast | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(true);
 
   // ── period helpers ─────────────────────────────────────────────────────────
 
@@ -423,6 +485,23 @@ export default function Dashboard() {
     loadAllTransactions({ forceIgnoreSelectedBank: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate, currentSpace?.id]);
+
+  // Le reste à vivre porte toujours sur le mois en cours, quelle que soit la
+  // période consultée : « combien puis-je dépenser » ne se pose pas au passé.
+  useEffect(() => {
+    let cancelled = false;
+    const now = new Date();
+    // Date civile locale : le serveur ne doit pas déduire le mois de son fuseau.
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    setForecastLoading(true);
+    fetch(`/api/dashboard/forecast?${new URLSearchParams({ today, ...scopeParams() })}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled) setForecast(data); })
+      .catch(() => { if (!cancelled) setForecast(null); })
+      .finally(() => { if (!cancelled) setForecastLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSpace?.id]);
 
   useEffect(() => {
     if (!prevStart) return;
@@ -767,6 +846,8 @@ export default function Dashboard() {
               Voir tous →
             </Link>
           </div>
+
+          <ResteAVivre forecast={forecast} loading={forecastLoading} />
 
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-3 custom-scrollbar">
             {isLoading ? (

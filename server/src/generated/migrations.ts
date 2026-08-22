@@ -1,5 +1,5 @@
 // Généré par scripts/generate-migrations-bundle.mjs — ne pas éditer à la main.
-// Régénéré à chaque build du serveur ; 27 migration(s).
+// Régénéré à chaque build du serveur ; 32 migration(s).
 
 export interface EmbeddedMigration {
   name: string;
@@ -142,5 +142,30 @@ export const MIGRATIONS: EmbeddedMigration[] = [
     "name": "20260808153753_drop_user_banks",
     "checksum": "7f4054b672386fef332c6f2c0027a4e7ba02433a203b4711296a68b8386477d5",
     "sql": "-- DropIndex\nDROP INDEX \"user_banks_userId_bankId_key\";\n\n-- DropTable\nPRAGMA foreign_keys=off;\nDROP TABLE \"user_banks\";\nPRAGMA foreign_keys=on;\n\n-- RedefineTables\nPRAGMA defer_foreign_keys=ON;\nPRAGMA foreign_keys=OFF;\nCREATE TABLE \"new_banks\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"name\" TEXT NOT NULL,\n    \"shortName\" TEXT,\n    \"color\" TEXT NOT NULL DEFAULT '#3b82f6',\n    \"image\" TEXT,\n    \"iban\" TEXT,\n    \"balance\" REAL NOT NULL DEFAULT 0,\n    \"accountType\" TEXT NOT NULL DEFAULT 'CURRENT',\n    \"archived\" BOOLEAN NOT NULL DEFAULT false,\n    \"archivedAt\" DATETIME,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL,\n    \"ebAspspName\" TEXT,\n    \"ebAspspCountry\" TEXT,\n    \"ebState\" TEXT,\n    \"ebSessionId\" TEXT,\n    \"ebAccountUid\" TEXT,\n    \"ebStatus\" TEXT,\n    \"ebLinkedAt\" DATETIME,\n    \"ebExpiresAt\" DATETIME,\n    \"ebLastSyncAt\" DATETIME,\n    \"spaceId\" TEXT NOT NULL,\n    CONSTRAINT \"banks_spaceId_fkey\" FOREIGN KEY (\"spaceId\") REFERENCES \"spaces\" (\"id\") ON DELETE RESTRICT ON UPDATE CASCADE\n);\nINSERT INTO \"new_banks\" (\"accountType\", \"archived\", \"archivedAt\", \"balance\", \"color\", \"createdAt\", \"ebAccountUid\", \"ebAspspCountry\", \"ebAspspName\", \"ebExpiresAt\", \"ebLastSyncAt\", \"ebLinkedAt\", \"ebSessionId\", \"ebState\", \"ebStatus\", \"iban\", \"id\", \"image\", \"name\", \"shortName\", \"spaceId\", \"updatedAt\") SELECT \"accountType\", \"archived\", \"archivedAt\", \"balance\", \"color\", \"createdAt\", \"ebAccountUid\", \"ebAspspCountry\", \"ebAspspName\", \"ebExpiresAt\", \"ebLastSyncAt\", \"ebLinkedAt\", \"ebSessionId\", \"ebState\", \"ebStatus\", \"iban\", \"id\", \"image\", \"name\", \"shortName\", \"spaceId\", \"updatedAt\" FROM \"banks\";\nDROP TABLE \"banks\";\nALTER TABLE \"new_banks\" RENAME TO \"banks\";\nCREATE TABLE \"new_budgets\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"amount\" REAL NOT NULL,\n    \"period\" TEXT NOT NULL DEFAULT 'MONTHLY',\n    \"startDate\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL,\n    \"bankId\" TEXT,\n    \"categoryId\" TEXT NOT NULL,\n    \"spaceId\" TEXT,\n    CONSTRAINT \"budgets_spaceId_fkey\" FOREIGN KEY (\"spaceId\") REFERENCES \"spaces\" (\"id\") ON DELETE SET NULL ON UPDATE CASCADE,\n    CONSTRAINT \"budgets_categoryId_fkey\" FOREIGN KEY (\"categoryId\") REFERENCES \"categories\" (\"id\") ON DELETE RESTRICT ON UPDATE CASCADE,\n    CONSTRAINT \"budgets_bankId_fkey\" FOREIGN KEY (\"bankId\") REFERENCES \"banks\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE\n);\nINSERT INTO \"new_budgets\" (\"amount\", \"bankId\", \"categoryId\", \"createdAt\", \"id\", \"period\", \"spaceId\", \"startDate\", \"updatedAt\") SELECT \"amount\", \"bankId\", \"categoryId\", \"createdAt\", \"id\", \"period\", \"spaceId\", \"startDate\", \"updatedAt\" FROM \"budgets\";\nDROP TABLE \"budgets\";\nALTER TABLE \"new_budgets\" RENAME TO \"budgets\";\nPRAGMA foreign_keys=ON;\nPRAGMA defer_foreign_keys=OFF;\n\n"
+  },
+  {
+    "name": "20260821120000_add_bank_spendable",
+    "checksum": "a043771fbde8e20e2000c012b816a77ea4a1c6cbaa725d1e4b0bf9128581be76",
+    "sql": "-- Compter ou non un compte dans le reste à vivre.\n-- Nullable et sans valeur par défaut : `NULL` signifie « déduis-le du type de\n-- compte », ce qui préserve le comportement des comptes existants.\nALTER TABLE \"banks\" ADD COLUMN \"spendable\" BOOLEAN;\n"
+  },
+  {
+    "name": "20260822210000_add_bank_card_last4",
+    "checksum": "9c8caa254b22320cc68a0d2197e0611dfd1613112dcf388db4eeef5e06aacb39",
+    "sql": "-- Quatre derniers chiffres de la carte, affichés sur la tuile du portefeuille.\n-- Volontairement pas le numéro complet : il n'est jamais utilisé, et cette base\n-- est exportée telle quelle dans les sauvegardes.\nALTER TABLE \"banks\" ADD COLUMN \"cardLast4\" TEXT;\n"
+  },
+  {
+    "name": "20260822220000_add_bank_brand_logo",
+    "checksum": "faed791de39a84bb77b52cbbd2f79b46f71edff041a1190b1d420aa3011ea58f",
+    "sql": "-- Logotype officiel de la banque, récupéré une fois via Enable Banking puis\n-- servi depuis `uploads/` : l'affichage ne dépend d'aucun serveur tiers.\nALTER TABLE \"banks\" ADD COLUMN \"brandLogo\" TEXT;\n"
+  },
+  {
+    "name": "20260822230000_add_bank_brand_colors",
+    "checksum": "3739a803e31a4f3b95527d05f39367cc331d7731edb88237c9271fa74eb88fac",
+    "sql": "-- Couleurs dominantes du logotype, extraites une fois et stockées en JSON.\nALTER TABLE \"banks\" ADD COLUMN \"brandColors\" TEXT;\n"
+  },
+  {
+    "name": "20260822233000_add_bank_brand_logo_light",
+    "checksum": "b056f2adccb794be94f9bbf0cc120b37cd7ee766adeff45766ed8c0bbe2bfc65",
+    "sql": "-- Le logotype est-il clair ? Sinon, la carte le pose sur une plaque blanche.\nALTER TABLE \"banks\" ADD COLUMN \"brandLogoLight\" BOOLEAN;\n"
   }
 ];

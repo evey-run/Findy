@@ -6,6 +6,65 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [0.5.8] — 2026-08-22
 
+### Ajouté
+
+- **Portefeuille redessiné** : les comptes sont groupés par nature — comptes
+  courants, épargnes, investissements — et chaque tuile porte le logo du
+  compte, son code court et son solde **au centime**, là où il était
+  auparavant abrégé en « 12 k€ ».
+- Un compte courant s'affiche comme une **vraie carte bancaire** : format
+  paysage, couleur du compte, logo, solde et quatre derniers chiffres dessus,
+  au même gabarit que les autres tuiles. Les livrets et les comptes
+  d'investissement gardent la tuile classique.
+- Les logotypes sombres sur fond transparent — celui de Boursorama est en bleu
+  nuit, celui de Revolut en noir — sont posés sur une plaque claire : sans elle,
+  ils disparaissaient purement et simplement sur la carte. Les logotypes déjà
+  clairs restent posés à même la carte.
+- **Logotype officiel de la banque** récupéré via Enable Banking et copié dans
+  le dossier des images : la carte porte le vrai lettrage de l'établissement au
+  lieu d'une icône générique. Les comptes déjà liés le récupèrent à la
+  prochaine synchronisation. L'image est stockée localement, l'affichage ne
+  dépend d'aucun serveur tiers.
+- **La carte prend les couleurs de son logotype.** Les teintes dominantes sont
+  extraites du logo officiel — Boursorama donne son magenta, son bleu nuit et
+  son cyan, le Crédit Mutuel son bleu et son rouge — et composent des halos
+  larges et adoucis sur fond sombre, avec un grain qui évite les marches de
+  quantification. Un lettrage monochrome comme celui de Revolut ne donne aucune
+  couleur : la carte retombe alors sur celle du compte.
+- Toute couleur est ramenée sous un seuil de luminance avant d'être posée : le
+  texte blanc reste lisible quelle que soit la teinte de la marque.
+- Champ « numéro de carte » sur le compte. Seuls les **quatre derniers
+  chiffres** sont enregistrés : coller un numéro complet n'en garde que la fin,
+  car le reste ne sert à rien et cette base part dans les sauvegardes.
+- **Reste à vivre prévisionnel**, en tête de la carte Budgets du tableau de
+  bord : deux nombres et rien d'autre — combien de jours le solde tient au
+  rythme observé, et où il atterrit à la fin du mois. Le calcul part du solde du jour,
+  déduit les échéances à venir — en rattrapant celles dont la date de
+  prochaine occurrence traîne dans le passé — et se plafonne aux budgets
+  restants sans jamais les soustraire du solde.
+- Un compte peut être exclu du reste à vivre depuis le menu du portefeuille.
+  Une banque déclare parfois un livret comme compte courant : sans ce réglage,
+  12 000 € d'épargne faisaient annoncer 1 345 € par jour au lieu de 145 €.
+  L'application signale d'elle-même un compte qui pèse la majorité du solde
+  sans avoir bougé depuis trois mois.
+
+### Corrigé
+
+- Menu d'un compte : le bouton « Reste à vivre » était imbriqué dans le bouton
+  « Lier », rendant les deux actions et les pastilles d'état inutilisables.
+
+### Supprimé
+
+- L'IBAN et la barre « Comptes / Solde total » quittent le portefeuille : le
+  solde exact figure désormais sur chaque carte, et les coordonnées bancaires
+  n'ont pas leur place sur un écran de survol.
+
+### Sécurité
+
+- Le « dépensé » d'un budget agrégeait les transactions de **tous** les
+  espaces, y compris ceux dont le profil n'est pas membre : les catégories
+  étant un catalogue commun, aucun filtre de portée ne s'appliquait.
+
 ### Sécurité
 
 - La clé privée RSA d'Enable Banking n'est plus affichée en clair dans les

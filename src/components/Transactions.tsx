@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { assetUrl } from '../lib/url';
 import { otherBankOwnersSuffix } from '../lib/bankOwners';
+import { merchantColor, merchantInitials, merchantName } from '../lib/merchant';
 import type { Bank } from '../types';
 import { useLocation } from 'react-router-dom';
 
@@ -30,18 +31,111 @@ const formatAmount = (amount: number) => {
 };
 
 // Fonction de formatage de la date
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('fr-FR');
+/**
+ * Libellé d'un jour, relatif quand c'est utile.
+ *
+ * Le tableau n'a plus de colonne date : les transactions sont rangées sous
+ * l'en-tête de leur journée. « Aujourd'hui » et « Hier » situent tout de suite,
+ * au-delà la date suffit.
+ */
+const dayLabel = (dateString: string): string => {
+  const date = new Date(dateString);
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const today = new Date();
+  const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const diff = Math.round((midnight.getTime() - day.getTime()) / 86400000);
+
+  const full = day.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  if (diff === 0) return `Aujourd'hui — ${full}`;
+  if (diff === 1) return `Hier — ${full}`;
+  return full.charAt(0).toUpperCase() + full.slice(1);
 };
 
-// Tronque une description trop longue et ajoute des « … »
-const MAX_DESCRIPTION_LENGTH = 40;
-const truncateDescription = (text: string) => {
-  if (!text) return '';
-  return text.length > MAX_DESCRIPTION_LENGTH
-    ? text.slice(0, MAX_DESCRIPTION_LENGTH).trimEnd() + '…'
-    : text;
-};
+/** Clé de regroupement : le jour civil, indépendant de l'heure. */
+const dayKey = (dateString: string): string => new Date(dateString).toISOString().slice(0, 10);
+
+/** Intitulé de colonne : la référence typographique de l'en-tête. */
+const HEADER_LABEL = 'text-[11px] font-medium uppercase tracking-wider text-zinc-400';
+
+/**
+ * Contrôle d'en-tête — recherche et sélecteurs.
+ *
+ * Ils reprennent exactement la typographie des intitulés et la même hauteur :
+ * une rangée où chaque cellule a sa propre taille se lit mal.
+ */
+const HEADER_CONTROL =
+  // Hauteur fixe plutôt que dérivée du texte : un `select` s'octroie sinon
+  // quelques pixels de plus qu'un `input`, et la barre s'épaissit pour rien.
+  'h-6 w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-0 text-[11px] font-medium '
+  + 'uppercase leading-none tracking-wider text-zinc-400 placeholder:text-zinc-600 transition-colors '
+  + 'hover:border-white/15 focus:border-violet-500/60 focus:text-zinc-200 focus:outline-none';
+
+/**
+ * Cellule d'en-tête, collée en haut du tableau.
+ *
+ * Hauteur imposée plutôt que déduite du contenu : le calque de verre est un
+ * bloc séparé (voir `HeaderGlass`) et doit couvrir exactement la même bande.
+ * Une seule valeur pour les deux, et ils ne peuvent pas diverger.
+ */
+const HEADER_HEIGHT = 'h-9';
+/** Tire le tableau vers le haut d'exactement `HEADER_HEIGHT` : à changer ensemble. */
+const HEADER_PULL = '-mb-9';
+const HEADER_CELL = `sticky top-0 z-10 px-3 ${HEADER_HEIGHT}`;
+
+/**
+ * Fond en verre dépoli de l'en-tête.
+ *
+ * Trois raisons à cette forme, chacune tirée d'un essai raté.
+ *
+ * C'est un bloc, pas le `thead` ni un `th` : WebKit applique `backdrop-filter`
+ * de façon fiable sur une boîte de bloc, beaucoup moins sur une boîte de
+ * tableau.
+ *
+ * C'est un seul calque, pas un par cellule : `backdrop-filter` est rogné à la
+ * boîte qui le porte, donc six calques échantillonnent six voisinages
+ * différents et laissent une couture verticale à chaque frontière de colonne.
+ *
+ * C'est un frère du tableau et non son enfant : un calque assez large pour
+ * couvrir toutes les colonnes depuis l'intérieur d'une cellule débordait du
+ * conteneur, qui devenait défilable latéralement. Ici la largeur est celle du
+ * conteneur, sans débordement. La marge négative annule la place qu'il prend
+ * dans le flux : le tableau démarre où il démarrait, et l'en-tête se pose
+ * dessus — les cellules viennent après dans le document, donc au-dessus.
+ *
+ * Reste que rien de tout cela n'opérait tant que la carte englobante portait un
+ * `backdrop-blur` : elle formait une racine d'arrière-plan et ce flou-ci ne
+ * remplaçait plus rien (voir le commentaire sur la carte, plus bas).
+ */
+function HeaderGlass() {
+  return (
+    <div
+      aria-hidden
+      className={`pointer-events-none sticky top-0 z-10 ${HEADER_HEIGHT} ${HEADER_PULL} bg-zinc-800/95 shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_8px_20px_-14px_rgba(0,0,0,0.9)] backdrop-blur-lg backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-800/85`}
+    />
+  );
+}
+
+/**
+ * Pastille d'un commerçant.
+ *
+ * Aucun logo n'est téléchargé : récupérer les vraies marques supposerait
+ * d'envoyer le nom de chaque commerçant à un service tiers, ce qui contredirait
+ * la promesse de l'application — les données ne quittent pas la machine. Les
+ * initiales sur une couleur stable remplissent le même rôle de repère visuel,
+ * hors ligne et pour toutes les transactions.
+ */
+function MerchantAvatar({ description }: { description: string }) {
+  const name = merchantName(description);
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md text-[9px] font-bold text-white"
+      style={{ backgroundColor: merchantColor(name) }}
+    >
+      {merchantInitials(name)}
+    </span>
+  );
+}
 
 interface TransactionsProps {
   pageName?: string;
@@ -75,7 +169,6 @@ export default function Transactions({
     setSelectedBank,
     updateTransaction,
     removeTransaction,
-    addTransaction,
     loadMoreTransactions,
     appendTransactions,
     setTransactions,
@@ -409,65 +502,6 @@ export default function Transactions({
     }
   };
 
-  const handleAddTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingTransaction) return;
-
-    try {
-      // Vérifier que les données requises sont présentes
-      if (!editingTransaction.description || !editingTransaction.date || editingTransaction.amount === undefined) {
-        console.error('Données de transaction incomplètes');
-        return;
-      }
-
-      // S'assurer qu'une banque est sélectionnée
-      const bankId = editingTransaction.bankId || banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id;
-      if (!bankId) {
-        console.error('Aucun portefeuille sélectionné ou disponible');
-        return;
-      }
-
-      const response = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...editingTransaction,
-          bankId: bankId
-        }),
-      });
-
-      if (response.ok) {
-        const newTransaction = await response.json();
-        
-        // Ajouter la transaction directement au store
-        addTransaction(newTransaction);
-        
-        // Reset du formulaire
-        setEditingTransaction({
-          id: '',
-          amount: 0,
-          description: '',
-          date: new Date().toISOString().split('T')[0],
-          checked: false,
-          categoryId: categories[0]?.id || '',
-          bankId: banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id || ''
-        });
-      } else {
-        const errorText = await response.text();
-        console.error('Error creating transaction:', errorText);
-        alert(`Erreur lors de l'ajout de la transaction: ${errorText}`);
-      }
-    } catch (error) {
-      console.error('Error creating transaction:', error);
-      alert(`Erreur lors de l'ajout de la transaction: ${error}`);
-    }
-  };
-  
-  // Filtrer les transactions en fonction des critères.
-  // NB: l'exclusion des comptes d'investissement est faite côté serveur
-  // (excludeAccountType) pour garder une pagination cohérente.
   const filteredTransactions = transactions.filter(transaction => {
     // Filet de sécurité si des transactions d'investissement traînent dans le cache
     const transactionBank = banks.find(bank => bank.id === transaction.bankId);
@@ -497,6 +531,19 @@ export default function Transactions({
     
     return true;
   });
+
+  // Les transactions sont rangées sous l'en-tête de leur journée : la colonne
+  // date disparaît du tableau, l'information reste.
+  const groupedTransactions = useMemo(() => {
+    const groups: Array<{ key: string; label: string; items: typeof filteredTransactions }> = [];
+    for (const transaction of filteredTransactions) {
+      const key = dayKey(transaction.date);
+      const last = groups[groups.length - 1];
+      if (last && last.key === key) last.items.push(transaction);
+      else groups.push({ key, label: dayLabel(transaction.date), items: [transaction] });
+    }
+    return groups;
+  }, [filteredTransactions]);
 
   // Ouvre la fenêtre de modification des transactions sélectionnées
   const openEditSelected = () => {
@@ -810,10 +857,10 @@ export default function Transactions({
       {/* Header */}
       <div className="md:flex md:items-center md:justify-between mt-0">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-bold leading-7 text-white sm:text-3xl sm:truncate">
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-50">
             Transactions
           </h2>
-          <p className="text-sm text-zinc-300 mt-1">
+          <p className="mt-0.5 text-sm text-zinc-500">
             Gérez toutes vos transactions et opérations bancaires
           </p>
         </div>
@@ -847,104 +894,26 @@ export default function Transactions({
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 px-1 py-1">
-          <select
-            name="bank-filter-select"
-            value={selectedBank?.id || ''}
-            onChange={(e) => {
-              const bank = banks.find(b => b.id === e.target.value);
-              setSelectedBank(bank || null);
-              applyFilters({ ...filters });
-            }}
-            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none appearance-none min-w-0"
-          >
-            <option value="" style={{ backgroundColor: '#18191c' }}>Portefeuille</option>
-            {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
-              const bankUsersText = otherBankOwnersSuffix(bank.users, authUser?.id);
-              return (
-                <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
-                  {bank.name}{bankUsersText}
-                </option>
-              );
-            })}
-          </select>
-
-          <input
-            type="text"
-            placeholder="Recherche..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 min-w-0 w-40"
-          />
-
-          <select
-            value={filters.categoryId}
-            onChange={(e) => {
-              const newFilters = { ...filters, categoryId: e.target.value };
-              applyFilters(newFilters);
-            }}
-            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none appearance-none min-w-0"
-          >
-            <option value="" style={{ backgroundColor: '#18191c' }}>Catégorie</option>
-            <option value="undefined" style={{ backgroundColor: '#18191c' }}>Non défini</option>
-            {categories.map(category => (
-              <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            placeholder="Début"
-            value={filters.startDate}
-            onFocus={(e) => e.target.type = 'date'}
-            onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
-            onChange={(e) => {
-              const newFilters = { ...filters, startDate: e.target.value };
-              applyFilters(newFilters);
-            }}
-            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 min-w-0 w-32"
-          />
-
-          <input
-            type="text"
-            placeholder="Fin"
-            value={filters.endDate}
-            onFocus={(e) => e.target.type = 'date'}
-            onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
-            onChange={(e) => {
-              const newFilters = { ...filters, endDate: e.target.value };
-              applyFilters(newFilters);
-            }}
-            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none placeholder:text-zinc-600 min-w-0 w-32"
-          />
-
-          <select
-            value={filters.checked}
-            onChange={(e) => {
-              const newFilters = { ...filters, checked: e.target.value };
-              applyFilters(newFilters);
-            }}
-            className="rounded-lg border border-white/10 bg-white/[0.04] text-xs text-zinc-300 py-1.5 px-2 focus:ring-1 focus:ring-violet-500 focus:outline-none appearance-none min-w-0"
-          >
-            <option value="" style={{ backgroundColor: '#18191c' }}>Pointé</option>
-            <option value="true" style={{ backgroundColor: '#18191c' }}>Oui</option>
-            <option value="false" style={{ backgroundColor: '#18191c' }}>Non</option>
-          </select>
-      </div>
-
       {/* Transactions Table */}
-      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 flex flex-col">
+      {/* La carte ne porte volontairement aucun `backdrop-blur` : un ancêtre
+          filtré devient une racine d'arrière-plan, et le `backdrop-filter` de
+          l'en-tête cesse alors de remplacer ce qu'il recouvre — il n'ajoute
+          plus qu'un halo par-dessus des lignes restées nettes. Le fond derrière
+          la carte est uni : le flou n'y produisait rien de toute façon. */}
+      <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 border border-white/10 flex flex-col">
         <div
           ref={scrollContainerRef}
           className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
           onScroll={handleScroll}
         >
+          <HeaderGlass />
           <table className="w-full divide-y divide-zinc-800">
-          <thead className="sticky top-0 z-10 bg-zinc-900/60">
+          {/* En-tête en verre dépoli : il reste lisible pendant que les lignes
+              défilent dessous, sans les masquer complètement. La saturation
+              rattrape la désaturation qu'un flou seul provoque. */}
+          <thead>
             <tr>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-8">
+              <th className={`${HEADER_CELL} text-left w-8`}>
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -952,129 +921,61 @@ export default function Transactions({
                   className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                 />
               </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-24">
-                Date
+              {/* Toutes les cellules d'en-tête partagent la même typographie et
+                  la même hauteur : contrôles et intitulés se ressemblent. */}
+              <th className={`${HEADER_CELL} w-64 text-left`}>
+                <input
+                  type="text"
+                  placeholder="Rechercher…"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                  className={HEADER_CONTROL}
+                />
               </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-64">
-                Description
+              <th className={`${HEADER_CELL} w-32 text-left`}>
+                <select
+                  value={filters.categoryId}
+                  onChange={(e) => applyFilters({ ...filters, categoryId: e.target.value })}
+                  className={`${HEADER_CONTROL} appearance-none`}
+                >
+                  <option value="" style={{ backgroundColor: '#18191c' }}>Catégorie</option>
+                  <option value="undefined" style={{ backgroundColor: '#18191c' }}>Non défini</option>
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
+                  ))}
+                </select>
               </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-32">
-                Catégorie
+              <th className={`${HEADER_CELL} w-56 text-left`}>
+                <select
+                  value={selectedBank?.id || ''}
+                  onChange={(e) => {
+                    setSelectedBank(banks.find((b) => b.id === e.target.value) || null);
+                    applyFilters({ ...filters });
+                  }}
+                  className={`${HEADER_CONTROL} appearance-none`}
+                >
+                  <option value="" style={{ backgroundColor: '#18191c' }}>Portefeuille</option>
+                  {banks.filter((b) => b.accountType === 'CURRENT' || b.accountType === 'SAVINGS').map((bank) => (
+                    <option key={bank.id} value={bank.id} style={{ backgroundColor: '#18191c' }}>
+                      {bank.name}{otherBankOwnersSuffix(bank.users, authUser?.id)}
+                    </option>
+                  ))}
+                </select>
               </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-56">
-                Portefeuille
-              </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-24">
-                Montant
-              </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-16">
-                Pointé
-              </th>
-              <th className="px-3 py-1.5 text-center text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
-                Actions
-              </th>
+              <th className={`${HEADER_CELL} w-28 text-right ${HEADER_LABEL}`}>Montant</th>
+              <th className={`${HEADER_CELL} w-16 text-center ${HEADER_LABEL}`}>Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
-            {/* Add form row - always visible as first row */}
-            <tr className="border-l-4 bg-zinc-900/60" style={{ borderLeftColor: '#7c3aed' }}>
-              {/* Cellule vide pour aligner avec la colonne de checkbox */}
-              <td className="px-3 py-1.5"></td>
-              <td className="px-3 py-1.5">
-                <input
-                  type="date"
-                  value={editingTransaction?.date || ''}
-                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
-                  required
-                />
-              </td>
-              <td className="px-3 py-1.5">
-                <input
-                  type="text"
-                  value={editingTransaction?.description || ''}
-                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, description: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
-                  placeholder="Description de la transaction"
-                  required
-                />
-              </td>
-              <td className="px-3 py-1.5">
-                <select
-                  value={editingTransaction?.categoryId || ''}
-                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
-                >
-                  <option value="" style={{ backgroundColor: '#1e2024' }}>Non défini</option>
-                  {categories.map(category => (
-                    <option key={category.id} value={category.id} style={{ backgroundColor: '#1e2024' }}>{category.name}</option>
-                  ))}
-                </select>
-              </td>
-              <td className="px-3 py-1.5">
-                <select
-                  value={editingTransaction?.bankId || ''}
-                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, bankId: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2.5" style={{ backgroundColor: '#18191c' }}
-                  required
-                >
-                  <option value="" style={{ backgroundColor: '#1e2024' }}>Sélectionnez un portefeuille</option>
-                  {banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS').map(bank => {
-                    const bankUsersText = otherBankOwnersSuffix(bank.users, authUser?.id);
-                    
-                    return (
-                      <option key={bank.id} value={bank.id} style={{ backgroundColor: '#1e2024' }}>
-                        {bank.name}{bankUsersText}
-                      </option>
-                    );
-                  })}
-                </select>
-              </td>
-              <td className="px-3 py-1.5">
-                <input
-                  type="number"
-                  step="1"
-                  value={editingTransaction?.amount || ''}
-                  onChange={(e) => setEditingTransaction(prev => prev ? {...prev, amount: parseFloat(e.target.value) || 0} : null)}
-                  className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
-                  style={{ backgroundColor: '#1e2024' }}
-                  placeholder="0.00"
-                  required
-                />
-              </td>
-              <td className="px-3 py-1.5">
-                <label className="flex items-center text-xs text-zinc-300">
-                  <input
-                    type="checkbox"
-                    checked={editingTransaction?.checked || false}
-                    onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
-                    className="h-3 w-3 rounded"
-                    style={{ accentColor: '#7c3aed' }}
-                  />
-                  <span className="ml-1 text-zinc-300">Pointé</span>
-                </label>
-              </td>
-              <td className="px-3 py-1.5">
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleAddTransaction(e);
-                    }}
-                    className="px-2 py-1 text-xs font-medium text-white border border-transparent rounded-md hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 flex items-center gap-1"
-                    style={{ backgroundColor: '#7c3aed', minWidth: '0' }}
-                    title="Ajouter"
-                  >
-                    <svg className="w-3 h-3 mr-1" fill="none" viewBox="0 0 16 16" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 3.5v9m4.5-4.5h-9" />
-                    </svg>
-                    Ajouter
-                  </button>
-                </div>
-              </td>
-            </tr>
-            {filteredTransactions.map((transaction) => (
+            {groupedTransactions.map((group) => (
+              <React.Fragment key={group.key}>
+                <tr>
+                  <td colSpan={6} className="px-3 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                    {group.label}
+                  </td>
+                </tr>
+                {group.items.map((transaction) => (
               <tr
                 key={transaction.id}
                 className="transition-colors cursor-pointer group"
@@ -1082,7 +983,7 @@ export default function Transactions({
                 onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #7c3aed'}
                 onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
               >
-                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
                   <input
                     type="checkbox"
                     checked={selectedTransactions.includes(transaction.id)}
@@ -1091,36 +992,7 @@ export default function Transactions({
                     onClick={(e) => e.stopPropagation()}
                   />
                 </td>
-                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
-                  {editingId === transaction.id ? (
-                    <input
-                      type="date"
-                      value={editingTransaction?.date || ''}
-                      onChange={(e) => setEditingTransaction(prev => prev ? {...prev, date: e.target.value} : null)}
-              className="w-full rounded-md text-white border-none focus:ring-0 bg-transparent text-xs py-1.5 px-2" style={{ backgroundColor: '#18191c' }}
-                    />
-                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'date' ? (
-                    <input
-                      type="date"
-                      value={inlineEditValue}
-                      onChange={(e) => setInlineEditValue(e.target.value)}
-                      onBlur={handleInlineSave}
-                      onKeyDown={handleInlineKeyDown}
-                      className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
-                      style={{ backgroundColor: '#18191c' }}
-                      autoFocus
-                    />
-                  ) : (
-                    <span 
-                      onClick={() => handleInlineEdit(transaction.id, 'date')}
-                      className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
-                      title="Double-cliquez pour éditer"
-                    >
-                      {formatDate(transaction.date)}
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
+                <td className="w-64 max-w-[16rem] px-3 py-2 text-xs text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="text"
@@ -1143,14 +1015,16 @@ export default function Transactions({
                   ) : (
                     <span
                       onClick={() => handleInlineEdit(transaction.id, 'description')}
-                      className="cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80"
+                      className="flex min-w-0 max-w-full cursor-pointer items-center gap-2.5 rounded px-1 py-0.5 editable-cell hover:opacity-80"
+                      // Le libellé brut de la banque reste accessible : rien n'est perdu.
                       title={transaction.description}
                     >
-                      {truncateDescription(transaction.description)}
+                      <MerchantAvatar description={transaction.description} />
+                      <span className="truncate">{merchantName(transaction.description)}</span>
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
                   {editingId === transaction.id ? (
                     <select
                       value={editingTransaction?.categoryId || ''}
@@ -1204,7 +1078,7 @@ export default function Transactions({
                     </span>
                   )}
                 </td>
-                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
                   {inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'bank' ? (
                     <select
                       value={inlineEditValue}
@@ -1242,8 +1116,13 @@ export default function Transactions({
                           className="w-8 h-8 rounded-full object-cover"
                         />
                       ) : (
-                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium" style={{ backgroundColor: transaction.bank.color }}>
-                          {transaction.bank.shortName}
+                        // Sans code court — c'est le cas de plusieurs comptes —
+                        // le cercle restait vide : on retombe sur les initiales.
+                        <div
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                          style={{ backgroundColor: transaction.bank.color || '#3b82f6' }}
+                        >
+                          {transaction.bank.shortName || merchantInitials(transaction.bank.name)}
                         </div>
                       )}
                       <div className="ml-2">
@@ -1259,7 +1138,7 @@ export default function Transactions({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
+                <td className="px-3 py-2 whitespace-nowrap text-right text-xs tabular-nums text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="number"
@@ -1289,31 +1168,6 @@ export default function Transactions({
                     >
                       {formatAmount(transaction.amount)}
                     </span>
-                  )}
-                </td>
-                <td className="px-3 py-1.5 whitespace-nowrap text-xs text-white">
-                  {editingId === transaction.id ? (
-                    <label className="flex items-center text-xs text-zinc-300">
-                      <input
-                        type="checkbox"
-                        checked={editingTransaction?.checked || false}
-                        onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
-                        className="h-3 w-3 rounded"
-                        style={{ accentColor: '#7c3aed' }}
-                      />
-                      <span className="ml-1 text-zinc-300">Pointé</span>
-                    </label>
-                  ) : (
-                    <label className="flex items-center text-xs text-zinc-300 cursor-pointer" onClick={() => handleInlineEdit(transaction.id, 'checked')}>
-                      <input
-                        type="checkbox"
-                        checked={transaction.checked}
-                        readOnly
-                        className="h-3 w-3 rounded"
-                        style={{ accentColor: '#7c3aed' }}
-                      />
-                      <span className="ml-1 text-zinc-300">Pointé</span>
-                    </label>
                   )}
                 </td>
                 <td className="px-3 py-1.5 whitespace-nowrap text-xs font-medium">
@@ -1359,6 +1213,8 @@ export default function Transactions({
                   )}
                 </td>
               </tr>
+                ))}
+              </React.Fragment>
             ))}
           </tbody>
         </table>

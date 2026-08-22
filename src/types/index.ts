@@ -78,6 +78,20 @@ export interface Bank {
   ebAccountUid?: string | null;
   ebAspspName?: string | null;
   ebAspspCountry?: string | null;
+  /** Compter ce compte dans le reste à vivre. `null`/absent = déduit du type. */
+  spendable?: boolean | null;
+  /** Quatre derniers chiffres de la carte — le numéro complet n'est pas stocké. */
+  cardLast4?: string | null;
+  /** Logotype officiel de la banque, rapatrié depuis Enable Banking. */
+  brandLogo?: string | null;
+  /** Couleurs dominantes du logotype, en JSON. */
+  brandColors?: string | null;
+  /** Logotype clair, donc lisible sans plaque sur la carte sombre. */
+  brandLogoLight?: boolean | null;
+  /** Soldes de clôture des six derniers mois, pour la courbe d'évolution. */
+  points?: number[];
+  /** Variation en pourcentage sur la fenêtre, `null` si elle n'a pas de sens. */
+  trend?: number | null;
 }
 
 export interface Category {

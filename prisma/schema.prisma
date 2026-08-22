@@ -97,6 +97,27 @@ model Bank {
   balance      Float         @default(0)
   accountType  String        @default("CURRENT")
   archived     Boolean       @default(false)
+  /// Compter ce compte dans le reste à vivre. `null` = déduit du type de compte
+  /// (les comptes courants comptent, l'épargne et l'investissement non). Sert à
+  /// exclure un livret que la banque déclare comme compte courant.
+  spendable    Boolean?
+  /// Quatre derniers chiffres de la carte, pour la reconnaître d'un coup d'œil.
+  /// On ne stocke jamais le numéro complet : il ne sert à rien ici, et la base
+  /// part dans les sauvegardes JSON.
+  cardLast4    String?
+  /// Logotype officiel de la banque, récupéré via Enable Banking et copié dans
+  /// `uploads/`. Distinct de `image`, qui reste l'illustration choisie par
+  /// l'utilisateur. Stocké localement : l'app ne dépend d'aucun serveur tiers
+  /// pour s'afficher.
+  brandLogo    String?
+  /// Couleurs dominantes du logotype, en JSON (`["#d20073","#1e3581"]`).
+  /// Extraites une fois à la récupération du logo : la carte prend les
+  /// couleurs de la marque au lieu d'une teinte choisie au hasard.
+  brandColors  String?
+  /// Vrai si le logotype est clair, donc lisible tel quel sur la carte sombre.
+  /// Faux ou absent : il est posé sur une plaque blanche, sinon un lettrage
+  /// bleu nuit sur fond transparent devient invisible.
+  brandLogoLight Boolean?
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

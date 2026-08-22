@@ -8,6 +8,8 @@ import path from 'node:path';
 import { SYNC_SETTINGS_PATH, PERSISTENCE_DIR, ensurePersistenceDir } from '../lib/persistence';
 import { ensureTunnel, keepTunnelWarm } from '../lib/tunnel';
 import { consentWarning, normalizeTransaction, planReconciliation } from '../lib/ebTransactions';
+import { fetchBrandLogo } from '../lib/brandLogo';
+import { decodePng, dominantColors, isLightLogo } from '../lib/logoColors';
 
 const router = express.Router();
 const EB_BASE = 'https://api.enablebanking.com';
@@ -97,6 +99,47 @@ async function ebFetch(path: string, options: RequestInit = {}): Promise<any> {
 }
 
 // ─── Helpers ───────────────────────────────────────────────
+
+/**
+ * Rapatrie le logotype officiel de la banque, une seule fois.
+ *
+ * Enable Banking publie pour chaque établissement un lettrage en PNG. On le
+ * copie dans `uploads/` au moment de la liaison : le portefeuille l'affiche
+ * ensuite sans dépendre d'un serveur tiers. Un échec ne fait jamais rater la
+ * liaison — c'est une image.
+ */
+async function storeBrandLogo(bankId: string, aspspName: string, country: string): Promise<void> {
+  const logo = await fetchBrandLogo(aspspName, country, {
+    uploadsDir: process.env.UPLOADS_DIR || 'public/uploads',
+    listAspsps: async (c) => {
+      const data = await ebFetch(`/aspsps?country=${c.toUpperCase()}`);
+      const aspsps = Array.isArray(data?.aspsps) ? data.aspsps : Array.isArray(data) ? data : [];
+      return aspsps.map((a: any) => ({ name: a.name || a.aspsp_name || '', logo: a.logo || a.logoUrl || '' }));
+    },
+  });
+  if (!logo) return;
+
+  // Les couleurs de la carte viennent du logotype lui-même. Un lettrage
+  // monochrome (Revolut, N26) n'en donne aucune : la carte retombera alors sur
+  // la couleur du compte, ce qui reste correct.
+  let brandColors: string | null = null;
+  let brandLogoLight: boolean | null = null;
+  try {
+    const file = path.join(process.env.UPLOADS_DIR || 'public/uploads', path.basename(logo));
+    const pixels = decodePng(fs.readFileSync(file));
+    const palette = dominantColors(pixels);
+    if (palette.length > 0) brandColors = JSON.stringify(palette);
+    brandLogoLight = isLightLogo(pixels);
+  } catch (error) {
+    console.warn('[Brand] Palette illisible:', error);
+  }
+
+  await prisma.bank.update({
+    where: { id: bankId },
+    data: { brandLogo: logo, brandColors, brandLogoLight },
+  });
+}
+
 
 /**
  * Vérifie que l'URL de retour est bien déclarée dans l'application Enable
@@ -760,6 +803,10 @@ router.post('/link', async (req, res) => {
       },
     });
 
+    // Sans `await` : l'utilisateur part chez sa banque immédiatement, le
+    // logotype arrive avant qu'il ne revienne sur le portefeuille.
+    void storeBrandLogo(bankId, aspspName, aspspCountry).catch(() => {});
+
     res.json({ link: authData.url });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1034,7 +1081,32 @@ router.delete('/banks/:bankId/unlink', async (req, res) => {
  * Sync all LINKED banks. Called by the background scheduler.
  * Returns summary of all sync results.
  */
+/**
+ * Rattrape le logotype des comptes liés avant l'arrivée de cette fonctionnalité.
+ *
+ * Ils ne repasseront jamais par `/link` : sans ce rattrapage, seuls les comptes
+ * liés à l'avenir auraient leur logotype officiel.
+ */
+export async function backfillBrandLogos(): Promise<void> {
+  const banks = await prisma.bank.findMany({
+    where: {
+      OR: [{ brandLogo: null }, { brandColors: null }, { brandLogoLight: null }],
+      ebAspspName: { not: null },
+      ebAspspCountry: { not: null },
+    },
+    select: { id: true, ebAspspName: true, ebAspspCountry: true },
+  });
+
+  for (const bank of banks) {
+    await storeBrandLogo(bank.id, bank.ebAspspName!, bank.ebAspspCountry!).catch(() => {});
+  }
+}
+
 export async function syncAllBanks(): Promise<Array<{ bankId: string; bankName: string; result: SyncResult | null; error: string | null }>> {
+  // Un logotype manquant ne dépend pas du consentement bancaire : on le
+  // rattrape même pour les comptes dont la synchronisation va échouer.
+  await backfillBrandLogos().catch(() => {});
+
   const linkedBanks = await prisma.bank.findMany({
     where: { ebStatus: 'LINKED', ebAccountUid: { not: null } },
     select: { id: true, name: true, ebExpiresAt: true },

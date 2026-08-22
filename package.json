@@ -20,7 +20,8 @@
     "tauri:dev": "tauri dev --no-watch",
     "build:server": "bash scripts/build-server.sh",
     "build:mac": "bash scripts/build-mac.sh",
-    "migrations:bundle": "node scripts/generate-migrations-bundle.mjs"
+    "migrations:bundle": "node scripts/generate-migrations-bundle.mjs",
+    "test": "tsx --test \"server/src/**/*.test.ts\" \"src/lib/**/*.test.ts\""
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

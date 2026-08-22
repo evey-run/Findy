@@ -4,12 +4,28 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from '../prisma';
 import { resolveScope, resolveSpaceForUsers } from '../lib/scope';
+import { balanceHistory } from '../lib/balanceHistory';
 import { computeBalance } from '../lib/balance';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+/**
+ * Normalise les quatre derniers chiffres d'une carte.
+ *
+ * On ne conserve jamais le numéro complet : il n'est utilisé nulle part, et la
+ * base part telle quelle dans les sauvegardes JSON. Si l'utilisateur colle un
+ * numéro entier, on n'en garde que la fin.
+ */
+function normalizeCardLast4(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== 'string') return undefined as unknown as null;
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return null;
+  return digits.slice(-4);
+}
 
 /**
  * Un compte appartient désormais à un Espace. L'UI, elle, raisonne encore en
@@ -111,6 +127,25 @@ router.get('/', async (req, res) => {
     const assetFlow = new Map(assetSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
     const cashFlow = new Map(cashSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
 
+    // Historique du solde : la carte d'épargne ou d'investissement affiche une
+    // courbe. Aucun solde passé n'est stocké, on le reconstitue en remontant
+    // les mouvements des six derniers mois.
+    const historyStart = new Date();
+    historyStart.setUTCMonth(historyStart.getUTCMonth() - 6);
+    const historyRows = bankIds.length > 0
+      ? await prisma.transaction.findMany({
+          where: { bankId: { in: bankIds }, date: { gte: historyStart } },
+          select: { bankId: true, date: true, amount: true },
+        })
+      : [];
+    const historyByBank = new Map<string, Array<{ date: Date; amount: number }>>();
+    for (const row of historyRows) {
+      if (!row.bankId) continue;
+      const list = historyByBank.get(row.bankId) ?? [];
+      list.push({ date: row.date, amount: row.amount });
+      historyByBank.set(row.bankId, list);
+    }
+
     // Transform the data to match the expected format
     const transformedBanks = banks.map(bank => ({
       ...withSpaceMembers(bank),
@@ -120,7 +155,14 @@ router.get('/', async (req, res) => {
       balance: computeBalance(bank, {
         assetFlow: assetFlow.get(bank.id) ?? 0,
         cashFlow: cashFlow.get(bank.id) ?? 0
-      })
+      }),
+      ...balanceHistory(
+        computeBalance(bank, {
+          assetFlow: assetFlow.get(bank.id) ?? 0,
+          cashFlow: cashFlow.get(bank.id) ?? 0
+        }),
+        historyByBank.get(bank.id) ?? [],
+      )
     }));
     
     res.json(transformedBanks);
@@ -159,7 +201,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/banks - Create a new bank
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    let { name, shortName, color, iban, balance, createdAt, accountType, data } = req.body;
+    let { name, shortName, color, iban, balance, createdAt, accountType, data, cardLast4 } = req.body;
     let userIds: string[] = [];
 
     if (data) {
@@ -196,6 +238,7 @@ router.post('/', upload.single('image'), async (req, res) => {
         color: color || '#3b82f6',
         image: imageUrl,
         iban,
+        cardLast4: normalizeCardLast4(cardLast4) ?? null,
         balance: parseFloat(balance) || 0,
         accountType: accountType || 'CURRENT',
         createdAt: createdAtDate,
@@ -227,7 +270,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     console.log('🔧 Raw request body:', req.body);
-    let { name, shortName, color, iban, balance, createdAt, accountType, data } = req.body;
+    let { name, shortName, color, iban, balance, createdAt, accountType, data, cardLast4 } = req.body;
     console.log('🔧 Initial values - accountType:', accountType, 'data:', data);
     
     // Vérifier si les données sont envoyées dans le champ 'data' (format JSON)
@@ -289,6 +332,11 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateData.image = `/uploads/${req.file.filename}`;
     }
     
+    // Le numéro de carte n'est touché que s'il est explicitement fourni.
+    if ('cardLast4' in req.body) {
+      updateData.cardLast4 = normalizeCardLast4(req.body.cardLast4);
+    }
+
     // Changer les propriétaires = déplacer le compte vers l'espace correspondant.
     if (userIds.length > 0) {
       updateData.spaceId = await resolveSpaceForUsers(userIds);
@@ -411,6 +459,37 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error archiving bank:', error);
     res.status(500).json({ error: 'Failed to archive bank' });
+  }
+});
+
+// PATCH /api/banks/:id/spendable — compter ou non ce compte dans le reste à vivre.
+//
+// Point d'entrée dédié : `PUT /api/banks/:id` réécrit le compte entier (nom,
+// solde, type…), l'utiliser pour un seul drapeau enverrait `balance: NaN`.
+router.patch('/:id/spendable', async (req, res) => {
+  try {
+    // Le compte doit appartenir à un espace du profil connecté : sans cette
+    // vérification, n'importe qui pourrait modifier le compte d'un autre.
+    const scope = await resolveScope(req.query as any, req.authUserId);
+    const bank = await prisma.bank.findFirst({
+      where: { id: req.params.id, spaceId: { in: scope } },
+      select: { id: true },
+    });
+    if (!bank) return res.status(404).json({ error: 'Compte introuvable' });
+
+    const raw = req.body?.spendable;
+    // `null` remet la déduction automatique par type de compte.
+    const spendable = raw === null || raw === undefined ? null : Boolean(raw);
+
+    const updated = await prisma.bank.update({
+      where: { id: bank.id },
+      data: { spendable },
+      select: { id: true, name: true, spendable: true },
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating spendable flag:', error);
+    res.status(500).json({ error: 'Failed to update account' });
   }
 });
 
