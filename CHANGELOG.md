@@ -25,6 +25,13 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
   occupé — au lieu du conseil au hasard « configurez le token et/ou le
   domaine ». Un bouton « Réessayer maintenant » relance l'ouverture sans avoir
   à ré-enregistrer les identifiants.
+- À la liaison d'un compte bancaire, tout l'historique disponible est désormais
+  récupéré (souvent un à deux ans), et plus seulement les 90 derniers jours. La
+  récupération initiale utilise la stratégie « longest » d'Enable Banking, qui
+  remonte jusqu'à l'opération la plus ancienne accessible. Cette fenêtre n'est
+  ouverte qu'immédiatement après l'autorisation : passé environ une heure, la
+  plupart des banques retombent à 90 jours glissants, d'où l'importance de tout
+  récupérer dès la liaison.
 
 ## [0.5.7] — 2026-08-21
 
