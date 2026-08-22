@@ -70,6 +70,34 @@ const HEADER_CONTROL =
   + 'hover:border-white/15 focus:border-violet-500/60 focus:text-zinc-200 focus:outline-none';
 
 /**
+ * Cellule d'en-tête, collée en haut du tableau.
+ *
+ * L'adhérence est portée par les cellules et non par le `thead` : c'est le seul
+ * moyen d'y ancrer un calque de flou (voir `HeaderGlass`).
+ */
+const HEADER_CELL = 'sticky top-0 z-10 px-3 py-2';
+
+/**
+ * Fond en verre dépoli de l'en-tête.
+ *
+ * `backdrop-filter` n'a aucun effet sur un `thead` ni sur un `th` : les boîtes
+ * de tableau ne servent pas de racine de flou, le navigateur ignore la
+ * propriété sans rien signaler et il ne restait que le fond translucide — les
+ * lignes se voyaient en transparence. Le flou est donc confié à un calque
+ * absolu, une boîte de bloc ordinaire, posé derrière le contenu de la cellule.
+ * L'ombre porte au passage le filet de séparation, qui suivrait le `thead` hors
+ * de l'écran s'il y restait attaché.
+ */
+function HeaderGlass() {
+  return (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 bg-zinc-950/75 shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_10px_24px_-14px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-950/45"
+    />
+  );
+}
+
+/**
  * Pastille d'un commerçant.
  *
  * Aucun logo n'est téléchargé : récupérer les vraies marques supposerait
@@ -1165,9 +1193,10 @@ export default function Transactions({
           {/* En-tête en verre dépoli : il reste lisible pendant que les lignes
               défilent dessous, sans les masquer complètement. La saturation
               rattrape la désaturation qu'un flou seul provoque. */}
-          <thead className="sticky top-0 z-10 border-b border-white/10 bg-zinc-950/55 shadow-[0_1px_0_0_rgba(255,255,255,0.06),0_8px_24px_-12px_rgba(0,0,0,0.9)] backdrop-blur-xl backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-950/45">
+          <thead>
             <tr>
-              <th className="px-3 py-2 text-left w-8">
+              <th className={`${HEADER_CELL} text-left w-8`}>
+                <HeaderGlass />
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -1177,7 +1206,8 @@ export default function Transactions({
               </th>
               {/* Toutes les cellules d'en-tête partagent la même typographie et
                   la même hauteur : contrôles et intitulés se ressemblent. */}
-              <th className="w-64 px-3 py-2 text-left">
+              <th className={`${HEADER_CELL} w-64 text-left`}>
+                <HeaderGlass />
                 <input
                   type="text"
                   placeholder="Rechercher…"
@@ -1187,7 +1217,8 @@ export default function Transactions({
                   className={HEADER_CONTROL}
                 />
               </th>
-              <th className="w-32 px-3 py-2 text-left">
+              <th className={`${HEADER_CELL} w-32 text-left`}>
+                <HeaderGlass />
                 <select
                   value={filters.categoryId}
                   onChange={(e) => applyFilters({ ...filters, categoryId: e.target.value })}
@@ -1200,7 +1231,8 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className="w-56 px-3 py-2 text-left">
+              <th className={`${HEADER_CELL} w-56 text-left`}>
+                <HeaderGlass />
                 <select
                   value={selectedBank?.id || ''}
                   onChange={(e) => {
@@ -1217,8 +1249,8 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className={`w-28 px-3 py-2 text-right ${HEADER_LABEL}`}>Montant</th>
-              <th className={`w-16 px-3 py-2 text-center ${HEADER_LABEL}`}>Actions</th>
+              <th className={`${HEADER_CELL} w-28 text-right ${HEADER_LABEL}`}><HeaderGlass />Montant</th>
+              <th className={`${HEADER_CELL} w-16 text-center ${HEADER_LABEL}`}><HeaderGlass />Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
