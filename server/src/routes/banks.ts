@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from '../prisma';
 import { resolveScope, resolveSpaceForUsers } from '../lib/scope';
+import { balanceHistory } from '../lib/balanceHistory';
 import { computeBalance } from '../lib/balance';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -126,6 +127,25 @@ router.get('/', async (req, res) => {
     const assetFlow = new Map(assetSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
     const cashFlow = new Map(cashSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
 
+    // Historique du solde : la carte d'épargne ou d'investissement affiche une
+    // courbe. Aucun solde passé n'est stocké, on le reconstitue en remontant
+    // les mouvements des six derniers mois.
+    const historyStart = new Date();
+    historyStart.setUTCMonth(historyStart.getUTCMonth() - 6);
+    const historyRows = bankIds.length > 0
+      ? await prisma.transaction.findMany({
+          where: { bankId: { in: bankIds }, date: { gte: historyStart } },
+          select: { bankId: true, date: true, amount: true },
+        })
+      : [];
+    const historyByBank = new Map<string, Array<{ date: Date; amount: number }>>();
+    for (const row of historyRows) {
+      if (!row.bankId) continue;
+      const list = historyByBank.get(row.bankId) ?? [];
+      list.push({ date: row.date, amount: row.amount });
+      historyByBank.set(row.bankId, list);
+    }
+
     // Transform the data to match the expected format
     const transformedBanks = banks.map(bank => ({
       ...withSpaceMembers(bank),
@@ -135,7 +155,14 @@ router.get('/', async (req, res) => {
       balance: computeBalance(bank, {
         assetFlow: assetFlow.get(bank.id) ?? 0,
         cashFlow: cashFlow.get(bank.id) ?? 0
-      })
+      }),
+      ...balanceHistory(
+        computeBalance(bank, {
+          assetFlow: assetFlow.get(bank.id) ?? 0,
+          cashFlow: cashFlow.get(bank.id) ?? 0
+        }),
+        historyByBank.get(bank.id) ?? [],
+      )
     }));
     
     res.json(transformedBanks);

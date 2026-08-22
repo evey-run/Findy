@@ -5,6 +5,7 @@ import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { assetUrl } from '../lib/url';
 import { cardSurface, GRAIN_DATA_URI } from '../lib/cardSurface';
+import { sparklinePath } from '../lib/sparkline';
 import {
   PlusIcon,
   EllipsisHorizontalIcon,
@@ -80,6 +81,41 @@ async function openAuthenticationUrl(url: string): Promise<void> {
 
   const opened = window.open(target.toString(), '_blank', 'noopener,noreferrer');
   if (!opened) throw new Error('Le navigateur a bloqué l’ouverture du lien bancaire.');
+}
+
+/**
+ * Courbe d'évolution du solde, pour les comptes qu'on suit dans la durée.
+ *
+ * Les comptes courants n'en ont pas : leur solde oscille au gré des dépenses
+ * du quotidien, une tendance n'y voudrait rien dire. Un livret ou un PEA, si.
+ */
+function BalanceTrend({ points, trend }: { points?: number[]; trend?: number | null }) {
+  const path = sparklinePath(points ?? [], 88, 26);
+  if (!path) return null;
+
+  const rising = (trend ?? 0) >= 0;
+  return (
+    <div className="flex items-end gap-2">
+      <svg width="88" height="26" viewBox="0 0 88 26" fill="none" aria-hidden="true" className="overflow-visible">
+        <path
+          d={path}
+          stroke={rising ? '#a78bfa' : '#f87171'}
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      {trend !== null && trend !== undefined && (
+        <span
+          className={`flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+            rising ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'
+          }`}
+        >
+          {rising ? '↑' : '↓'} {Math.abs(trend).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %
+        </span>
+      )}
+    </div>
+  );
 }
 
 /** Palette du logotype, stockée en JSON par le serveur. */
@@ -750,7 +786,7 @@ export default function Banks() {
                   de plus par ligne que les tuiles classiques. */}
               <div className={`grid gap-3 ${
                 type === 'CURRENT'
-                  ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4'
+                  ? 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
                   : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
               }`}>
           {sectionBanks.map((bank) => {
@@ -768,7 +804,7 @@ export default function Banks() {
                 // « connexion expirée » fait grandir la carte au lieu d'être rogné.
                 className={
                   isCard
-                    ? 'group relative flex flex-col rounded-xl p-3.5 aspect-[1.586] text-white shadow-md ring-1 ring-white/10 transition-all duration-200 hover:ring-white/20'
+                    ? 'group relative flex flex-col rounded-xl p-3 aspect-[1.586] text-white shadow-md ring-1 ring-white/10 transition-all duration-200 hover:ring-white/20'
                     : 'group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]'
                 }
                 style={isCard ? { backgroundImage: surface.background } : undefined}
@@ -830,8 +866,8 @@ export default function Banks() {
                       <img
                         src={assetUrl(bank.brandLogo)}
                         alt={bank.name}
-                        className={`max-w-[92px] object-contain object-left ${
-                          bank.brandLogoLight ? 'h-4 drop-shadow' : 'h-3.5'
+                        className={`max-w-[76px] object-contain object-left ${
+                          bank.brandLogoLight ? 'h-3.5 drop-shadow' : 'h-3'
                         }`}
                       />
                     </div>
@@ -839,18 +875,18 @@ export default function Banks() {
                     <img
                       src={assetUrl(bank.image)}
                       alt={bank.name}
-                      className={`rounded-xl object-cover flex-shrink-0 ${isCard ? 'h-7 w-7 ring-1 ring-white/25' : 'h-10 w-10'}`}
+                      className={`rounded-lg object-cover flex-shrink-0 ${isCard ? 'h-6 w-6 ring-1 ring-white/25' : 'h-8 w-8'}`}
                     />
                   ) : (
                     <div className={`rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
-                      isCard ? 'h-7 w-7 bg-white/15 ring-1 ring-white/20' : 'h-10 w-10 bg-violet-500/15'
+                      isCard ? 'h-6 w-6 bg-white/15 ring-1 ring-white/20' : 'h-8 w-8 bg-violet-500/15'
                     }`}>
                       🏦
                     </div>
                   )}
                   <div className="flex-1 min-w-0 flex items-center gap-2">
                     {!(isCard && bank.brandLogo) && (
-                      <h3 className={`font-semibold truncate ${isCard ? 'text-sm text-white drop-shadow-sm' : 'text-base text-zinc-50'}`}>
+                      <h3 className={`font-semibold truncate ${isCard ? 'text-xs text-white drop-shadow-sm' : 'text-base text-zinc-50'}`}>
                         {bank.name}
                       </h3>
                     )}
@@ -953,16 +989,16 @@ export default function Banks() {
                     {/* Un solde à sept chiffres déborderait : la taille cède
                         avant que le texte ne soit tronqué. */}
                     <p className={`font-bold leading-none tabular-nums text-white drop-shadow-sm ${
-                      fmtExact(bank.balance).length > 13 ? 'text-base' : 'text-lg'
+                      fmtExact(bank.balance).length > 13 ? 'text-sm' : 'text-base'
                     }`}>
                       {fmtExact(bank.balance)}
                     </p>
                     <div className="mt-2 flex items-end justify-between gap-3">
-                      <span className="font-mono text-[10px] tracking-[0.16em] text-white/70">
+                      <span className="font-mono text-[9px] tracking-[0.14em] text-white/70">
                         ••••&nbsp;{bank.cardLast4 || '••••'}
                       </span>
                       {bank.shortName && (
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-white/80">
+                        <span className="text-[9px] font-semibold uppercase tracking-wider text-white/80">
                           {bank.shortName}
                         </span>
                       )}
@@ -971,9 +1007,12 @@ export default function Banks() {
                 ) : (
                   <div className="mt-1">
                     <p className="text-xs text-zinc-500">{typeInfo.label}</p>
-                    <p className="mt-3 text-xl font-bold text-zinc-50 tabular-nums">
-                      {fmtExact(bank.balance)}
-                    </p>
+                    <div className="mt-3 flex items-end justify-between gap-3">
+                      <p className="text-xl font-bold text-zinc-50 tabular-nums">
+                        {fmtExact(bank.balance)}
+                      </p>
+                      <BalanceTrend points={bank.points} trend={bank.trend} />
+                    </div>
                   </div>
                 )}
 

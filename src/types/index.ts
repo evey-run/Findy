@@ -88,6 +88,10 @@ export interface Bank {
   brandColors?: string | null;
   /** Logotype clair, donc lisible sans plaque sur la carte sombre. */
   brandLogoLight?: boolean | null;
+  /** Soldes de clôture des six derniers mois, pour la courbe d'évolution. */
+  points?: number[];
+  /** Variation en pourcentage sur la fenêtre, `null` si elle n'a pas de sens. */
+  trend?: number | null;
 }
 
 export interface Category {
