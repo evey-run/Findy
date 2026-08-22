@@ -1217,8 +1217,8 @@ export default function Transactions({
           <tbody className="divide-y divide-zinc-800">
             {groupedTransactions.map((group) => (
               <React.Fragment key={group.key}>
-                <tr className="bg-white/[0.04]">
-                  <td colSpan={7} className="px-3 py-2 text-[11px] font-medium tracking-wide text-zinc-400">
+                <tr>
+                  <td colSpan={7} className="px-3 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
                     {group.label}
                   </td>
                 </tr>
@@ -1239,7 +1239,7 @@ export default function Transactions({
                     onClick={(e) => e.stopPropagation()}
                   />
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
+                <td className="w-64 max-w-[16rem] px-3 py-2 text-xs text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="text"
@@ -1262,7 +1262,7 @@ export default function Transactions({
                   ) : (
                     <span
                       onClick={() => handleInlineEdit(transaction.id, 'description')}
-                      className="flex cursor-pointer items-center gap-2.5 rounded px-1 py-0.5 editable-cell hover:opacity-80"
+                      className="flex min-w-0 max-w-full cursor-pointer items-center gap-2.5 rounded px-1 py-0.5 editable-cell hover:opacity-80"
                       // Le libellé brut de la banque reste accessible : rien n'est perdu.
                       title={transaction.description}
                     >
