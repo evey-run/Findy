@@ -55,6 +55,20 @@ const dayLabel = (dateString: string): string => {
 /** Clé de regroupement : le jour civil, indépendant de l'heure. */
 const dayKey = (dateString: string): string => new Date(dateString).toISOString().slice(0, 10);
 
+/** Intitulé de colonne : la référence typographique de l'en-tête. */
+const HEADER_LABEL = 'text-[11px] font-medium uppercase tracking-wider text-zinc-400';
+
+/**
+ * Contrôle d'en-tête — recherche et sélecteurs.
+ *
+ * Ils reprennent exactement la typographie des intitulés et la même hauteur :
+ * une rangée où chaque cellule a sa propre taille se lit mal.
+ */
+const HEADER_CONTROL =
+  'w-full rounded-md border border-white/[0.08] bg-white/[0.03] px-2 py-1 text-[11px] font-medium '
+  + 'uppercase tracking-wider text-zinc-400 placeholder:text-zinc-600 transition-colors '
+  + 'hover:border-white/15 focus:border-violet-500/60 focus:text-zinc-200 focus:outline-none';
+
 /**
  * Pastille d'un commerçant.
  *
@@ -1158,26 +1172,23 @@ export default function Transactions({
                   className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                 />
               </th>
-              {/* La recherche vit dans l'en-tête, à la place d'une barre de
-                  filtres séparée qui doublait la hauteur consommée. */}
-              <th className="px-3 py-2 text-left w-64">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-medium uppercase tracking-wider text-zinc-400">Commerçant</span>
-                  <input
-                    type="text"
-                    placeholder="Rechercher…"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-                    className="min-w-0 flex-1 rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-xs font-normal normal-case tracking-normal text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                  />
-                </div>
+              {/* Toutes les cellules d'en-tête partagent la même typographie et
+                  la même hauteur : contrôles et intitulés se ressemblent. */}
+              <th className="w-64 px-3 py-2 text-left">
+                <input
+                  type="text"
+                  placeholder="Rechercher…"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
+                  className={HEADER_CONTROL}
+                />
               </th>
-              <th className="px-3 py-2 text-left w-32">
+              <th className="w-32 px-3 py-2 text-left">
                 <select
                   value={filters.categoryId}
                   onChange={(e) => applyFilters({ ...filters, categoryId: e.target.value })}
-                  className="w-full appearance-none rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-zinc-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  className={`${HEADER_CONTROL} appearance-none`}
                 >
                   <option value="" style={{ backgroundColor: '#18191c' }}>Catégorie</option>
                   <option value="undefined" style={{ backgroundColor: '#18191c' }}>Non défini</option>
@@ -1186,14 +1197,14 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className="px-3 py-2 text-left w-56">
+              <th className="w-56 px-3 py-2 text-left">
                 <select
                   value={selectedBank?.id || ''}
                   onChange={(e) => {
                     setSelectedBank(banks.find((b) => b.id === e.target.value) || null);
                     applyFilters({ ...filters });
                   }}
-                  className="w-full appearance-none rounded-md border border-white/10 bg-white/[0.04] px-2 py-1 text-[11px] font-medium uppercase tracking-wider text-zinc-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  className={`${HEADER_CONTROL} appearance-none`}
                 >
                   <option value="" style={{ backgroundColor: '#18191c' }}>Portefeuille</option>
                   {banks.filter((b) => b.accountType === 'CURRENT' || b.accountType === 'SAVINGS').map((bank) => (
@@ -1203,22 +1214,15 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-24">
-                Montant
-              </th>
-              <th className="px-3 py-1.5 text-left text-[11px] font-medium text-zinc-300 uppercase tracking-wider w-16">
-                Pointé
-              </th>
-              <th className="px-3 py-1.5 text-center text-xs font-medium text-zinc-300 uppercase tracking-wider w-16">
-                Actions
-              </th>
+              <th className={`w-28 px-3 py-2 text-right ${HEADER_LABEL}`}>Montant</th>
+              <th className={`w-16 px-3 py-2 text-center ${HEADER_LABEL}`}>Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-800">
             {groupedTransactions.map((group) => (
               <React.Fragment key={group.key}>
                 <tr>
-                  <td colSpan={7} className="px-3 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                  <td colSpan={6} className="px-3 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
                     {group.label}
                   </td>
                 </tr>
@@ -1380,7 +1384,7 @@ export default function Transactions({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
+                <td className="px-3 py-2 whitespace-nowrap text-right text-xs tabular-nums text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="number"
@@ -1410,31 +1414,6 @@ export default function Transactions({
                     >
                       {formatAmount(transaction.amount)}
                     </span>
-                  )}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
-                  {editingId === transaction.id ? (
-                    <label className="flex items-center text-xs text-zinc-300">
-                      <input
-                        type="checkbox"
-                        checked={editingTransaction?.checked || false}
-                        onChange={(e) => setEditingTransaction(prev => prev ? {...prev, checked: e.target.checked} : null)}
-                        className="h-3 w-3 rounded"
-                        style={{ accentColor: '#7c3aed' }}
-                      />
-                      <span className="ml-1 text-zinc-300">Pointé</span>
-                    </label>
-                  ) : (
-                    <label className="flex items-center text-xs text-zinc-300 cursor-pointer" onClick={() => handleInlineEdit(transaction.id, 'checked')}>
-                      <input
-                        type="checkbox"
-                        checked={transaction.checked}
-                        readOnly
-                        className="h-3 w-3 rounded"
-                        style={{ accentColor: '#7c3aed' }}
-                      />
-                      <span className="ml-1 text-zinc-300">Pointé</span>
-                    </label>
                   )}
                 </td>
                 <td className="px-3 py-1.5 whitespace-nowrap text-xs font-medium">
