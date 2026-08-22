@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import prisma from '../prisma';
+import { seedDefaultCategories } from '../lib/defaultCategories';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -143,6 +144,17 @@ router.post('/', async (req, res) => {
         }
       }
     });
+
+    // Compte vierge : le premier profil hérite d'un jeu de catégories par défaut
+    // (issue #36). Sans effet si le catalogue commun est déjà peuplé.
+    if (existingCount === 0) {
+      try {
+        await seedDefaultCategories();
+      } catch (seedError) {
+        // Non bloquant : un profil créé sans catégories reste utilisable.
+        console.error('Error seeding default categories:', seedError);
+      }
+    }
 
     res.status(201).json(sanitizeUser(user));
   } catch (error) {

@@ -20,8 +20,10 @@ import {
   CreditCardIcon,
   BuildingLibraryIcon,
   ChartBarIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import ImportCsvModal from './ImportCsvModal';
 
 const getAccountTypeInfo = (type: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
   const info: Record<string, { label: string; icon: string }> = {
@@ -58,7 +60,9 @@ const emptyForm: FormData = {
 const fmtExact = (n: number) =>
   n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-interface EbModal { bankId: string; bankName: string; }
+// `create` = parcours « Nouveau compte » : aucun compte n'existe encore, il est
+// créé au moment où l'utilisateur choisit sa banque (bankId reste vide avant).
+interface EbModal { bankId: string; bankName: string; create?: boolean; }
 interface EbAspsp { name: string; country: string; logo: string; }
 
 /** Ouvre l'autorisation PSD2 dans le navigateur système sous Tauri. */
@@ -179,6 +183,9 @@ export default function Banks() {
   // Delete confirmation modal
   const [deleteModal, setDeleteModal] = useState<{ bankId: string; bankName: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Compte ciblé par l'import CSV (ouvre la fenêtre d'import quand défini).
+  const [importBank, setImportBank] = useState<Bank | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -339,12 +346,10 @@ export default function Banks() {
     }
   };
 
-  const openEbModal = async (bankId: string, bankName: string, country: string = ebCountry) => {
-    if (!(await ensureEbConfigured())) return;
-
-    setEbModal({ bankId, bankName });
-    setEbStep('search');
-    setEbSearch('');
+  // Charge la liste des banques disponibles pour un pays donné. Isolé pour être
+  // réutilisé par la liaison d'un compte existant, la création « Nouveau compte »
+  // et le changement de pays, sans réinitialiser l'identité du modal en cours.
+  const loadEbAspsps = async (country: string) => {
     setEbAspsps([]);
     setEbLoading(true);
 
@@ -374,6 +379,67 @@ export default function Banks() {
     }
   };
 
+  const openEbModal = async (bankId: string, bankName: string, country: string = ebCountry) => {
+    if (!(await ensureEbConfigured())) return;
+    setEbModal({ bankId, bankName });
+    setEbStep('search');
+    setEbSearch('');
+    await loadEbAspsps(country);
+  };
+
+  // « Nouveau compte » : ouvre directement la liaison bancaire. Le compte sera
+  // créé automatiquement au choix de la banque (cf. handleEbLink). Si Enable
+  // Banking n'est pas configuré, on retombe silencieusement sur la création
+  // manuelle plutôt que de rediriger vers les Paramètres (contrairement au bouton
+  // « Lier » d'un compte existant, où le renvoi vers la configuration est voulu).
+  const openCreateAccount = async () => {
+    let configured = false;
+    try {
+      const confRes = await fetch('/api/enablebanking/configured');
+      const confData = await confRes.json().catch(() => ({ configured: false }));
+      configured = !!confData?.configured;
+    } catch {
+      configured = false;
+    }
+    if (!configured) {
+      openCreate();
+      return;
+    }
+    setEbModal({ bankId: '', bankName: 'Nouveau compte', create: true });
+    setEbStep('search');
+    setEbSearch('');
+    await loadEbAspsps(ebCountry);
+  };
+
+  // Crée le compte support qui recevra la liaison en mode « Nouveau compte ».
+  // Nom et solde sont provisoires : le solde est recalé par le backfill et
+  // l'IBAN complété côté serveur une fois le compte bancaire sélectionné.
+  const createLinkedBankPlaceholder = async (aspspName: string): Promise<string | null> => {
+    if (!meId) {
+      toast.error('Aucun utilisateur connecté pour rattacher le compte.');
+      return null;
+    }
+    try {
+      const fd = new FormData();
+      fd.append('data', JSON.stringify({
+        name: aspspName,
+        iban: '',
+        balance: 0,
+        accountType: 'CURRENT',
+        createdAt: new Date().toISOString().split('T')[0],
+        userIds: [meId],
+      }));
+      const res = await fetch('/api/banks', { method: 'POST', body: fd });
+      if (!res.ok) throw new Error(`Erreur ${res.status}`);
+      const created = await res.json();
+      return created.id as string;
+    } catch (err) {
+      console.error('Error creating linked bank placeholder:', err);
+      toast.error('Impossible de créer le compte à lier.');
+      return null;
+    }
+  };
+
   const stopEbPolling = useCallback(() => {
     if (ebPollRef.current) {
       clearInterval(ebPollRef.current);
@@ -385,9 +451,17 @@ export default function Banks() {
   // `target` permet de relancer une liaison sans passer par la recherche de
   // banque : le renouvellement de consentement réutilise l'ASPSP déjà connu.
   const handleEbLink = async (aspspName: string, aspspCountry: string, target?: EbModal) => {
-    const bank = target ?? ebModal;
+    let bank = target ?? ebModal;
     if (!bank) return;
     try {
+      // Mode « Nouveau compte » : on matérialise d'abord le compte support qui
+      // recevra la liaison, puis on poursuit le parcours d'autorisation habituel.
+      if (bank.create && !bank.bankId) {
+        const bankId = await createLinkedBankPlaceholder(aspspName);
+        if (!bankId) return;
+        bank = { ...bank, bankId, bankName: aspspName };
+        setEbModal(bank);
+      }
       const res = await fetch('/api/enablebanking/link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -492,7 +566,10 @@ export default function Banks() {
     if (!deleteModal) return;
     setDeleting(true);
     try {
-      const res = await fetch(`/api/banks/${deleteModal.bankId}`, { method: 'DELETE' });
+      // Suppression définitive : le compte ET toutes ses transactions/budgets/
+      // récurrences (cf. modale). L'endpoint sans `/permanent` ne fait qu'archiver
+      // le compte en laissant ses transactions orphelines visibles (issue #48).
+      const res = await fetch(`/api/banks/${deleteModal.bankId}/permanent`, { method: 'DELETE' });
       if (res.ok) {
         await loadBanks();
         await loadTransactions({ forceRefresh: true });
@@ -675,7 +752,7 @@ export default function Banks() {
             </button>
           )}
           <button
-            onClick={openCreate}
+            onClick={openCreateAccount}
             className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors"
           >
             <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
@@ -761,7 +838,7 @@ export default function Banks() {
             Connectez votre premier portefeuille pour commencer à tracker vos finances.
           </p>
           <button
-            onClick={openCreate}
+            onClick={openCreateAccount}
             className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3.5 py-2 transition-colors"
           >
             <PlusIcon className="h-4 w-4" strokeWidth={2.5} />
@@ -967,6 +1044,13 @@ export default function Banks() {
                           >
                             <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
                             Modifier
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); setImportBank(bank); }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                          >
+                            <ArrowUpTrayIcon className="h-4 w-4 text-zinc-500" />
+                            Importer CSV
                           </button>
                           <button
                             onClick={() => handleDelete(bank.id, bank.name)}
@@ -1293,8 +1377,14 @@ export default function Banks() {
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
               <div>
-                <h3 className="text-base font-semibold text-zinc-50">Connecter Enable Banking</h3>
-                <p className="text-xs text-zinc-500 mt-0.5">{ebModal.bankName}</p>
+                <h3 className="text-base font-semibold text-zinc-50">
+                  {ebModal.create ? 'Nouveau compte' : 'Connecter Enable Banking'}
+                </h3>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  {ebModal.create
+                    ? 'Liez votre banque — le compte est créé automatiquement'
+                    : ebModal.bankName}
+                </p>
               </div>
               <button
                 onClick={closeEbModal}
@@ -1321,7 +1411,7 @@ export default function Banks() {
                       onChange={(e) => {
                         const newCountry = e.target.value;
                         setEbCountry(newCountry);
-                        if (ebModal) openEbModal(ebModal.bankId, ebModal.bankName, newCountry);
+                        loadEbAspsps(newCountry);
                       }}
                       className="rounded-lg bg-zinc-800/60 border border-white/10 px-2 py-2 text-sm text-zinc-100 outline-none [color-scheme:dark]"
                     >
@@ -1379,6 +1469,20 @@ export default function Banks() {
                         </button>
                       ))}
                   </div>
+                  {ebModal.create && (
+                    <div className="pt-3 border-t border-white/[0.06]">
+                      <p className="text-[11px] text-zinc-500 text-center mb-2">
+                        Vous ne souhaitez pas lier de compte bancaire ?
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => { closeEbModal(); openCreate(); }}
+                        className="w-full rounded-lg border border-white/10 px-3.5 py-2 text-sm font-medium text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                      >
+                        Créer un compte manuellement
+                      </button>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-6">
@@ -1517,6 +1621,19 @@ export default function Banks() {
             </div>
           </form>
         </div>
+      )}
+
+      {importBank && (
+        <ImportCsvModal
+          bankId={importBank.id}
+          bankName={importBank.name}
+          accountType={importBank.accountType}
+          onClose={() => setImportBank(null)}
+          onImported={async () => {
+            await loadBanks();
+            await loadTransactions({ forceRefresh: true });
+          }}
+        />
       )}
     </div>
   );

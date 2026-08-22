@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import prisma from '../prisma';
 import { issueToken } from '../lib/authTokens';
+import { seedDefaultCategories } from '../lib/defaultCategories';
 
 const router = express.Router();
 
@@ -130,6 +131,17 @@ router.post('/register', async (req, res) => {
       prisma.user.updateMany({ where: { id: { not: user.id } }, data: { isMe: false } }),
       prisma.user.update({ where: { id: user.id }, data: { isMe: true } })
     ]);
+
+    // Compte vierge : le premier profil hérite d'un jeu de catégories par défaut
+    // (issue #36). Sans effet si le catalogue commun est déjà peuplé.
+    if (isFirst) {
+      try {
+        await seedDefaultCategories();
+      } catch (seedError) {
+        // Non bloquant : un profil créé sans catégories reste utilisable.
+        console.error('Error seeding default categories:', seedError);
+      }
+    }
 
     const fresh = await prisma.user.findUnique({ where: { id: user.id }, include: userInclude });
     res.status(201).json({ ...sanitize(fresh!), token: issueToken(user.id) });
