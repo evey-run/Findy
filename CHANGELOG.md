@@ -6,6 +6,37 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ## [0.5.8] — 2026-08-22
 
+### Ajouté
+
+- **Portefeuille redessiné** : les comptes sont groupés par nature — comptes
+  courants, épargnes, investissements — et chaque carte porte le logo du
+  compte, son code court, sa nature et son solde **au centime**, là où il était
+  auparavant abrégé en « 12 k€ ». Un visuel de carte bancaire n'apparaît que
+  sur les comptes courants ; un livret ou un PEA n'a pas de carte.
+- **Reste à vivre prévisionnel** sur le tableau de bord : un seul chiffre, ce
+  qu'il reste à dépenser par jour jusqu'à la fin du mois, et la date à laquelle
+  les comptes s'assèchent au rythme observé. Le calcul part du solde du jour,
+  déduit les échéances à venir — en rattrapant celles dont la date de
+  prochaine occurrence traîne dans le passé — et se plafonne aux budgets
+  restants sans jamais les soustraire du solde.
+- Un compte peut être exclu du reste à vivre depuis le menu du portefeuille.
+  Une banque déclare parfois un livret comme compte courant : sans ce réglage,
+  12 000 € d'épargne faisaient annoncer 1 345 € par jour au lieu de 145 €.
+  L'application signale d'elle-même un compte qui pèse la majorité du solde
+  sans avoir bougé depuis trois mois.
+
+### Supprimé
+
+- L'IBAN et la barre « Comptes / Solde total » quittent le portefeuille : le
+  solde exact figure désormais sur chaque carte, et les coordonnées bancaires
+  n'ont pas leur place sur un écran de survol.
+
+### Sécurité
+
+- Le « dépensé » d'un budget agrégeait les transactions de **tous** les
+  espaces, y compris ceux dont le profil n'est pas membre : les catégories
+  étant un catalogue commun, aucun filtre de portée ne s'appliquait.
+
 ### Sécurité
 
 - La clé privée RSA d'Enable Banking n'est plus affichée en clair dans les

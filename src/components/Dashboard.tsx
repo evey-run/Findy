@@ -307,6 +307,114 @@ function MonthlyFlux({
   );
 }
 
+// ─── Reste à vivre ──────────────────────────────────────────────────────────
+
+interface Forecast {
+  state: 'ok' | 'last-day' | 'projected-overdraft' | 'overdrawn' | 'blocked';
+  perDay: number | null;
+  daysLeft: number;
+  availableNow?: number;
+  projectedEndOfMonth?: number;
+  limitedBy?: 'cash' | 'budget' | null;
+  overdraftDay?: number | null;
+  budgetsLeft?: number | null;
+  runway?: { state: string; date: string | null; days: number | null; burnRate: number | null };
+  warnings: string[];
+  blockers: string[];
+  accounts?: Array<{ id: string; name: string; balance: number }>;
+  dormantAccounts?: Array<{ id: string; name: string; balance: number }>;
+}
+
+const BLOCKER_TEXT: Record<string, string> = {
+  NO_SPENDABLE_ACCOUNT: 'Aucun compte courant à suivre. Ajoutez-en un pour voir votre reste à vivre.',
+  NO_TRANSACTIONS: 'Aucune opération enregistrée : il n’y a rien à projeter pour l’instant.',
+  STALE_DATA: 'Vos données datent de plus d’un mois. Synchronisez vos comptes pour un chiffre fiable.',
+};
+
+function forecastDayLabel(iso: string): string {
+  return new Date(`${iso}T12:00:00Z`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+}
+
+/**
+ * Le chiffre que l'on vient chercher en ouvrant l'application.
+ *
+ * Il n'est jamais affiché « au mieux » : quand la donnée ne permet pas de le
+ * calculer honnêtement, on explique quoi faire au lieu d'avancer un nombre.
+ */
+function RestARivre({ forecast, loading }: { forecast: Forecast | null; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="flex-shrink-0 rounded-2xl bg-white/[0.04] border border-white/[0.08] px-5 py-4">
+        <Skeleton h="h-4" w="w-32" />
+        <Skeleton h="h-9" w="w-48" className="mt-2" />
+      </div>
+    );
+  }
+  if (!forecast) return null;
+
+  if (forecast.state === 'blocked') {
+    const reason = forecast.blockers.map((b) => BLOCKER_TEXT[b]).find(Boolean) ?? BLOCKER_TEXT.NO_TRANSACTIONS;
+    return (
+      <div className="flex-shrink-0 rounded-2xl bg-white/[0.04] border border-white/[0.08] px-5 py-4">
+        <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">Reste à vivre</p>
+        <p className="mt-1.5 text-sm text-zinc-400">{reason}</p>
+      </div>
+    );
+  }
+
+  const perDay = forecast.perDay ?? 0;
+  const alert = forecast.state === 'overdrawn' || forecast.state === 'projected-overdraft' || perDay === 0;
+  const runway = forecast.runway;
+
+  return (
+    <div
+      className={`flex-shrink-0 rounded-2xl border px-5 py-4 ${
+        alert ? 'bg-red-500/[0.07] border-red-500/20' : 'bg-violet-500/[0.07] border-violet-500/20'
+      }`}
+    >
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">Reste à vivre</p>
+          <p className="mt-0.5 flex items-baseline gap-2">
+            <span className={`text-4xl font-bold tabular-nums leading-none ${alert ? 'text-red-300' : 'text-zinc-50'}`}>
+              {fmt(perDay)}
+            </span>
+            <span className="text-sm text-zinc-400">
+              par jour {forecast.daysLeft === 1 ? 'aujourd’hui' : `pendant ${forecast.daysLeft} jours`}
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            {forecast.state === 'overdrawn'
+              ? 'Vos comptes courants sont à découvert.'
+              : forecast.state === 'projected-overdraft'
+              ? `À découvert prévu le ${forecast.overdraftDay} du mois, échéances comprises.`
+              : forecast.limitedBy === 'budget'
+              ? `Limité par vos budgets : ${fmt(forecast.budgetsLeft ?? 0)} restants.`
+              : `${fmt(forecast.availableNow ?? 0)} disponibles, échéances à venir déduites.`}
+          </p>
+        </div>
+
+        {runway?.state === 'ok' && runway.date && (
+          <div className="text-right">
+            <p className="text-xs font-medium uppercase tracking-widest text-zinc-500">À ce rythme</p>
+            <p className="mt-0.5 text-lg font-semibold text-zinc-200">
+              tenue jusqu’au {forecastDayLabel(runway.date)}
+            </p>
+            <p className="text-xs text-zinc-500">{fmt(runway.burnRate ?? 0)} par jour observés</p>
+          </div>
+        )}
+      </div>
+
+      {forecast.dormantAccounts && forecast.dormantAccounts.length > 0 && (
+        <p className="mt-2.5 text-[11px] text-amber-400/90">
+          {forecast.dormantAccounts.map((a) => a.name).join(', ')} pèse le plus dans ce chiffre sans avoir bougé depuis
+          trois mois. Si c’est de l’épargne, décochez-le dans le portefeuille.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // ─── StatCard ───────────────────────────────────────────────────────────────
 
 function StatCard({
@@ -359,6 +467,8 @@ export default function Dashboard() {
   const [previousData, setPreviousData] = useState({ income: 0, expense: 0, savings: 0, investment: 0 });
   const [fluxData, setFluxData] = useState<{ label: string; income: number; expense: number }[]>([]);
   const [fluxCumulative, setFluxCumulative] = useState(false);
+  const [forecast, setForecast] = useState<Forecast | null>(null);
+  const [forecastLoading, setForecastLoading] = useState(true);
 
   // ── period helpers ─────────────────────────────────────────────────────────
 
@@ -423,6 +533,23 @@ export default function Dashboard() {
     loadAllTransactions({ forceIgnoreSelectedBank: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate, currentSpace?.id]);
+
+  // Le reste à vivre porte toujours sur le mois en cours, quelle que soit la
+  // période consultée : « combien puis-je dépenser » ne se pose pas au passé.
+  useEffect(() => {
+    let cancelled = false;
+    const now = new Date();
+    // Date civile locale : le serveur ne doit pas déduire le mois de son fuseau.
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    setForecastLoading(true);
+    fetch(`/api/dashboard/forecast?${new URLSearchParams({ today, ...scopeParams() })}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (!cancelled) setForecast(data); })
+      .catch(() => { if (!cancelled) setForecast(null); })
+      .finally(() => { if (!cancelled) setForecastLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSpace?.id]);
 
   useEffect(() => {
     if (!prevStart) return;
@@ -629,6 +756,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <RestARivre forecast={forecast} loading={forecastLoading} />
 
       {/* ── Stat cards ── */}
       <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">

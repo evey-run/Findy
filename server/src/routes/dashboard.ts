@@ -1,6 +1,8 @@
 import express from 'express';
 import prisma from '../prisma';
 import { resolveScope } from '../lib/scope';
+import { computeBalance } from '../lib/balance';
+import { computeForecast, type ForecastRecurrence, type ForecastTransaction } from '../lib/forecast';
 
 const router = express.Router();
 
@@ -269,6 +271,10 @@ router.get('/budget-status', async (req, res) => {
               lte: endOfMonth
             },
             amount: { lt: 0 },
+            // Les catégories sont un catalogue commun : sans ce filtre, le
+            // « dépensé » d'un budget agrégeait les transactions de TOUS les
+            // espaces, y compris ceux dont le profil n'est pas membre.
+            bank: { spaceId: { in: scope } },
             ...(budget.bankId && { bankId: budget.bankId })
           },
           _sum: { amount: true }
@@ -296,3 +302,182 @@ router.get('/budget-status', async (req, res) => {
 });
 
 export default router;
+
+// GET /api/dashboard/forecast?today=AAAA-MM-JJ — le reste à vivre prévisionnel.
+//
+// `today` est la date civile du client : « quel mois sommes-nous ? » est une
+// question locale, et le serveur ne doit pas y répondre depuis son propre
+// fuseau. À défaut, on retombe sur la date UTC du serveur.
+router.get('/forecast', async (req, res) => {
+  try {
+    const scope = await resolveScope(req.query as any, req.authUserId);
+    const today = parseCivilDate(req.query.today as string | undefined);
+
+    const monthStart = new Date(Date.UTC(today.year, today.month - 1, 1));
+    const monthEnd = new Date(Date.UTC(today.year, today.month, 1));
+    // Aujourd'hui appartient au passé : le solde doit inclure la journée en cours.
+    const cutoff = new Date(Date.UTC(today.year, today.month - 1, today.day + 1));
+    const burnStart = new Date(cutoff.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    // Comptes dépensables : les comptes courants non archivés de la portée.
+    // L'épargne et l'investissement ne sont pas de l'argent du quotidien.
+    const banks = await prisma.bank.findMany({
+      where: {
+        spaceId: { in: scope },
+        archived: false,
+        // `spendable` tranche quand il est renseigné ; sinon on retombe sur le
+        // type de compte. Une banque peut déclarer un livret comme compte
+        // courant : ces 12 000 € d'épargne feraient dire à l'app qu'on peut
+        // dépenser 1 300 €/jour.
+        OR: [{ spendable: true }, { spendable: null, accountType: 'CURRENT' }],
+      },
+      select: {
+        id: true, name: true, balance: true, accountType: true,
+        spendable: true, ebLastSyncAt: true, ebStatus: true,
+      },
+    });
+    const bankIds = banks.map((b) => b.id);
+
+    if (bankIds.length === 0) {
+      return res.json({
+        state: 'blocked',
+        perDay: null,
+        blockers: ['NO_SPENDABLE_ACCOUNT'],
+        warnings: [],
+        accounts: [],
+        daysInMonth: new Date(Date.UTC(today.year, today.month, 0)).getUTCDate(),
+      });
+    }
+
+    // Le solde affiché est recalculé depuis les mouvements (`bank.balance` n'est
+    // que le solde initial). On le borne à aujourd'hui : sans cela, une
+    // transaction saisie à l'avance serait déduite ici ET reprojetée ensuite.
+    const [assetSums, cashSums, recurrenceRows, monthRows, burnRows, budgets, firstTx, lastTx] = await Promise.all([
+      prisma.transaction.groupBy({
+        by: ['bankId'],
+        where: { bankId: { in: bankIds }, quantity: { not: null }, date: { lt: cutoff } },
+        _sum: { amount: true },
+      }),
+      prisma.transaction.groupBy({
+        by: ['bankId'],
+        where: { bankId: { in: bankIds }, quantity: null, date: { lt: cutoff } },
+        _sum: { amount: true },
+      }),
+      prisma.recurrence.findMany({
+        where: { active: true },
+        include: { category: { select: { type: true } } },
+      }),
+      prisma.transaction.findMany({
+        where: { bankId: { in: bankIds }, date: { gte: monthStart, lt: monthEnd } },
+        select: { id: true, bankId: true, categoryId: true, amount: true, date: true },
+      }),
+      prisma.transaction.findMany({
+        where: { bankId: { in: bankIds }, date: { gte: burnStart, lt: cutoff } },
+        select: { id: true, bankId: true, categoryId: true, amount: true, date: true },
+      }),
+      prisma.budget.findMany({
+        where: { spaceId: { in: scope }, period: 'MONTHLY' },
+        select: { id: true, categoryId: true, bankId: true, amount: true },
+      }),
+      prisma.transaction.findFirst({
+        where: { bankId: { in: bankIds } },
+        orderBy: { date: 'asc' },
+        select: { date: true },
+      }),
+      prisma.transaction.findFirst({
+        where: { bankId: { in: bankIds }, date: { lt: cutoff } },
+        orderBy: { date: 'desc' },
+        select: { date: true },
+      }),
+    ]);
+
+    const assetFlow = new Map(assetSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
+    const cashFlow = new Map(cashSums.map((g) => [g.bankId, g._sum.amount ?? 0]));
+    const accounts = banks.map((bank) => ({
+      id: bank.id,
+      name: bank.name,
+      /** `true` seulement si l'utilisateur l'a explicitement décidé. */
+      explicit: bank.spendable === true,
+      balance: computeBalance(bank, {
+        assetFlow: assetFlow.get(bank.id) ?? 0,
+        cashFlow: cashFlow.get(bank.id) ?? 0,
+      }),
+    }));
+    const availableNow = accounts.reduce((sum, a) => sum + a.balance, 0);
+
+    // Une récurrence sans compte n'est rattachable à aucun espace : la compter
+    // ferait fuiter les charges d'un autre profil dans ce calcul.
+    const scoped = recurrenceRows.filter((r) => r.bankId && bankIds.includes(r.bankId));
+    const unscopedRecurrenceCount = recurrenceRows.filter((r) => !r.bankId).length;
+
+    const recurrences: ForecastRecurrence[] = scoped.map((r) => ({
+      id: r.id,
+      amount: r.amount,
+      frequency: r.frequency,
+      nextDue: r.nextDue,
+      description: r.description,
+      bankId: r.bankId,
+      categoryId: r.categoryId,
+      categoryType: r.category?.type ?? 'EXPENSE',
+    }));
+
+    const toForecastTx = (t: { id: string; bankId: string | null; categoryId: string | null; amount: number; date: Date }): ForecastTransaction => ({
+      id: t.id,
+      bankId: t.bankId ?? '',
+      categoryId: t.categoryId,
+      amount: t.amount,
+      date: t.date,
+    });
+
+    const lastSync = banks
+      .map((b) => b.ebLastSyncAt)
+      .filter((d): d is Date => d instanceof Date)
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+    const lastDataDate = [lastTx?.date ?? null, lastSync]
+      .filter((d): d is Date => d instanceof Date)
+      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+    const forecast = computeForecast({
+      today,
+      availableNow,
+      recurrences,
+      monthTransactions: monthRows.map(toForecastTx),
+      burnTransactions: burnRows.map(toForecastTx),
+      budgets,
+      firstTransactionDate: firstTx?.date ?? null,
+      lastDataDate,
+      unscopedRecurrenceCount,
+    });
+
+    if (banks.some((b) => b.ebStatus === 'EXPIRED')) forecast.warnings.push('CONSENT_EXPIRED');
+
+    // Un compte qui pèse la majorité du solde sans le moindre mouvement récent
+    // est presque toujours un livret mal typé. Plutôt que d'afficher un reste à
+    // vivre gonflé en silence, on nomme le compte en cause.
+    const activeBankIds = new Set(burnRows.map((t) => t.bankId));
+    const dormant = accounts.filter(
+      (a) => !a.explicit && a.balance > 0.5 * availableNow && !activeBankIds.has(a.id),
+    );
+    if (availableNow > 0 && dormant.length > 0) {
+      forecast.warnings.push('DORMANT_ACCOUNT');
+      (forecast as any).dormantAccounts = dormant.map((a) => ({ id: a.id, name: a.name, balance: a.balance }));
+    }
+
+    res.json({ ...forecast, accounts });
+  } catch (error) {
+    console.error('Error computing forecast:', error);
+    res.status(500).json({ error: 'Failed to compute forecast' });
+  }
+});
+
+/** `AAAA-MM-JJ` envoyé par le client, ou la date UTC du serveur en dernier recours. */
+function parseCivilDate(value: string | undefined): { year: number; month: number; day: number } {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? '');
+  if (match) {
+    const [, year, month, day] = match;
+    const parsed = { year: Number(year), month: Number(month), day: Number(day) };
+    if (parsed.month >= 1 && parsed.month <= 12 && parsed.day >= 1 && parsed.day <= 31) return parsed;
+  }
+  const now = new Date();
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1, day: now.getUTCDate() };
+}
