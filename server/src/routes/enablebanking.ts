@@ -373,6 +373,19 @@ function selectAccountHtml(bankId: string, state: string, bankName: string, acco
 
 async function linkSelectedAccount(bankId: string, sessionId: string, accountUid: string) {
   const now = new Date();
+
+  // Un compte créé via « Nouveau compte » arrive sans IBAN : on le complète
+  // avec celui du compte bancaire réel. On ne touche jamais un IBAN déjà saisi
+  // (compte créé manuellement puis lié) pour ne pas écraser le choix de l'utilisateur.
+  let realIban: string | null = null;
+  try {
+    const details = await ebFetch(`/accounts/${encodeURIComponent(accountUid)}/details`);
+    realIban = nonEmptyString(asRecord(details?.account_id)?.iban ?? details?.iban);
+  } catch (err) {
+    console.warn(`[EB] IBAN indisponible pour le compte ${accountUid}:`, err);
+  }
+  const existing = await prisma.bank.findUnique({ where: { id: bankId }, select: { iban: true } });
+
   const bank = await prisma.bank.update({
     where: { id: bankId },
     data: {
@@ -383,6 +396,7 @@ async function linkSelectedAccount(bankId: string, sessionId: string, accountUid
       ebLinkedAt: now,
       ebExpiresAt: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
       ebLastSyncAt: null,
+      ...(realIban && !nonEmptyString(existing?.iban) ? { iban: realIban } : {}),
     },
   });
 
