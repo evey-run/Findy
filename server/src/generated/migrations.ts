@@ -1,5 +1,5 @@
 // Généré par scripts/generate-migrations-bundle.mjs — ne pas éditer à la main.
-// Régénéré à chaque build du serveur ; 29 migration(s).
+// Régénéré à chaque build du serveur ; 30 migration(s).
 
 export interface EmbeddedMigration {
   name: string;
@@ -152,5 +152,10 @@ export const MIGRATIONS: EmbeddedMigration[] = [
     "name": "20260822210000_add_bank_card_last4",
     "checksum": "9c8caa254b22320cc68a0d2197e0611dfd1613112dcf388db4eeef5e06aacb39",
     "sql": "-- Quatre derniers chiffres de la carte, affichés sur la tuile du portefeuille.\n-- Volontairement pas le numéro complet : il n'est jamais utilisé, et cette base\n-- est exportée telle quelle dans les sauvegardes.\nALTER TABLE \"banks\" ADD COLUMN \"cardLast4\" TEXT;\n"
+  },
+  {
+    "name": "20260822220000_add_bank_brand_logo",
+    "checksum": "faed791de39a84bb77b52cbbd2f79b46f71edff041a1190b1d420aa3011ea58f",
+    "sql": "-- Logotype officiel de la banque, récupéré une fois via Enable Banking puis\n-- servi depuis `uploads/` : l'affichage ne dépend d'aucun serveur tiers.\nALTER TABLE \"banks\" ADD COLUMN \"brandLogo\" TEXT;\n"
   }
 ];

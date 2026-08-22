@@ -105,6 +105,11 @@ model Bank {
   /// On ne stocke jamais le numéro complet : il ne sert à rien ici, et la base
   /// part dans les sauvegardes JSON.
   cardLast4    String?
+  /// Logotype officiel de la banque, récupéré via Enable Banking et copié dans
+  /// `uploads/`. Distinct de `image`, qui reste l'illustration choisie par
+  /// l'utilisateur. Stocké localement : l'app ne dépend d'aucun serveur tiers
+  /// pour s'afficher.
+  brandLogo    String?
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

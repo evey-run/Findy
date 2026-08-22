@@ -82,6 +82,8 @@ export interface Bank {
   spendable?: boolean | null;
   /** Quatre derniers chiffres de la carte — le numéro complet n'est pas stocké. */
   cardLast4?: string | null;
+  /** Logotype officiel de la banque, rapatrié depuis Enable Banking. */
+  brandLogo?: string | null;
 }
 
 export interface Category {

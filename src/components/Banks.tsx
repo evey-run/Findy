@@ -4,6 +4,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { assetUrl } from '../lib/url';
+import { cardSurface } from '../lib/cardSurface';
 import {
   PlusIcon,
   EllipsisHorizontalIcon,
@@ -79,18 +80,6 @@ async function openAuthenticationUrl(url: string): Promise<void> {
 
   const opened = window.open(target.toString(), '_blank', 'noopener,noreferrer');
   if (!opened) throw new Error('Le navigateur a bloqué l’ouverture du lien bancaire.');
-}
-
-/**
- * Teinte de la carte, dérivée de la couleur du compte.
- *
- * La couleur est choisie par l'utilisateur et peut être claire (jaune, menthe).
- * On l'assombrit vers le fond de l'application plutôt que d'inverser l'encre :
- * le texte reste blanc dans tous les cas, donc lisible quoi qu'il arrive.
- */
-function cardGradient(color?: string): string {
-  const tint = /^#[0-9a-f]{6}$/i.test(color ?? '') ? (color as string) : '#3b82f6';
-  return `linear-gradient(135deg, ${tint} 0%, ${tint}b3 42%, #0b0b0f 100%)`;
 }
 
 /** `spendable` non renseigné : on retombe sur le type de compte. */
@@ -746,17 +735,12 @@ export default function Banks() {
                 <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
                 <span className="text-xs text-zinc-600">{sectionBanks.length}</span>
               </div>
-              {/* Une carte au format paysage a besoin de largeur : trois par
-                  ligne seulement sur les très grands écrans. */}
-              <div className={`grid gap-4 ${
-                type === 'CURRENT'
-                  ? 'grid-cols-1 md:grid-cols-2 2xl:grid-cols-3'
-                  : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
-              }`}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {sectionBanks.map((bank) => {
             const typeInfo = getAccountTypeInfo(bank.accountType);
 
             const isCard = bank.accountType === 'CURRENT';
+            const surface = cardSurface(bank.color);
 
             return (
               <div
@@ -767,17 +751,20 @@ export default function Banks() {
                 // « connexion expirée » fait grandir la carte au lieu d'être rogné.
                 className={
                   isCard
-                    ? 'group relative flex flex-col rounded-2xl p-5 aspect-[1.586] max-w-[420px] w-full text-white shadow-lg ring-1 ring-white/10 transition-all duration-200 hover:ring-white/20'
+                    ? 'group relative flex flex-col rounded-2xl p-4 aspect-[1.586] text-white shadow-lg ring-1 ring-white/10 transition-all duration-200 hover:ring-white/20'
                     : 'group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]'
                 }
-                style={isCard ? { backgroundImage: cardGradient(bank.color) } : undefined}
+                style={isCard ? { backgroundImage: surface.background } : undefined}
               >
                 {/* Les calques décoratifs sont enfermés : sans ce conteneur, un
                     `overflow-hidden` sur la racine rognerait le menu déroulant. */}
                 {isCard && (
                   <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
                     <div className="absolute inset-0 bg-gradient-to-tr from-black/35 via-transparent to-white/10" />
-                    <div className="absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                    <div
+                      className="absolute -right-10 -top-14 h-40 w-40 rounded-full opacity-40 blur-2xl"
+                      style={{ background: surface.accent }}
+                    />
                   </div>
                 )}
                 {/* User avatars (bottom right) — only if multiple users */}
@@ -808,23 +795,33 @@ export default function Banks() {
                 {/* Row 1 — image + name + short name + menu */}
                 <div className="flex items-center gap-2.5">
                   {/* Bank image */}
-                  {bank.image ? (
+                  {isCard && bank.brandLogo ? (
+                    /* Logotype officiel récupéré via Enable Banking : un
+                       lettrage large, qu'on cadre par la hauteur. */
+                    <img
+                      src={assetUrl(bank.brandLogo)}
+                      alt={bank.name}
+                      className="h-5 max-w-[104px] flex-shrink-0 object-contain object-left drop-shadow"
+                    />
+                  ) : bank.image ? (
                     <img
                       src={assetUrl(bank.image)}
                       alt={bank.name}
-                      className={`h-10 w-10 rounded-xl object-cover flex-shrink-0 ${isCard ? 'ring-1 ring-white/25' : ''}`}
+                      className={`rounded-xl object-cover flex-shrink-0 ${isCard ? 'h-8 w-8 ring-1 ring-white/25' : 'h-10 w-10'}`}
                     />
                   ) : (
-                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
-                      isCard ? 'bg-white/15 ring-1 ring-white/20' : 'bg-violet-500/15'
+                    <div className={`rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
+                      isCard ? 'h-8 w-8 bg-white/15 ring-1 ring-white/20' : 'h-10 w-10 bg-violet-500/15'
                     }`}>
                       🏦
                     </div>
                   )}
                   <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <h3 className={`text-base font-semibold truncate ${isCard ? 'text-white drop-shadow-sm' : 'text-zinc-50'}`}>
-                      {bank.name}
-                    </h3>
+                    {!(isCard && bank.brandLogo) && (
+                      <h3 className={`font-semibold truncate ${isCard ? 'text-sm text-white drop-shadow-sm' : 'text-base text-zinc-50'}`}>
+                        {bank.name}
+                      </h3>
+                    )}
                     {/* Sur une carte, le code court est déjà en bas à droite. */}
                     {bank.shortName && !isCard && (
                       <span className="flex-shrink-0 rounded bg-white/[0.07] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
@@ -920,16 +917,16 @@ export default function Banks() {
                   /* Sur une carte : le solde en bas à gauche, les quatre
                      derniers chiffres et le code court sur la dernière ligne.
                      Pas de mention « compte courant » — la section le dit déjà. */
-                  <div className="relative mt-auto pt-4">
-                    {/* Un solde à sept chiffres déborderait en 26 px : la taille
-                        cède avant que le texte ne soit tronqué. */}
+                  <div className="relative mt-auto pt-3">
+                    {/* Un solde à sept chiffres déborderait : la taille cède
+                        avant que le texte ne soit tronqué. */}
                     <p className={`font-bold leading-none tabular-nums text-white drop-shadow-sm ${
-                      fmtExact(bank.balance).length > 13 ? 'text-xl' : 'text-[26px]'
+                      fmtExact(bank.balance).length > 13 ? 'text-lg' : 'text-xl'
                     }`}>
                       {fmtExact(bank.balance)}
                     </p>
-                    <div className="mt-3 flex items-end justify-between gap-3">
-                      <span className="font-mono text-xs tracking-[0.2em] text-white/70">
+                    <div className="mt-2 flex items-end justify-between gap-3">
+                      <span className="font-mono text-[11px] tracking-[0.18em] text-white/70">
                         ••••&nbsp;{bank.cardLast4 || '••••'}
                       </span>
                       {bank.shortName && (

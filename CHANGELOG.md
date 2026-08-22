@@ -13,8 +13,17 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
   compte, son code court et son solde **au centime**, là où il était
   auparavant abrégé en « 12 k€ ».
 - Un compte courant s'affiche comme une **vraie carte bancaire** : format
-  paysage, couleur du compte, logo, solde et quatre derniers chiffres dessus.
-  Les livrets et les comptes d'investissement gardent la tuile classique.
+  paysage, couleur du compte, logo, solde et quatre derniers chiffres dessus,
+  au même gabarit que les autres tuiles. Les livrets et les comptes
+  d'investissement gardent la tuile classique.
+- **Logotype officiel de la banque** récupéré via Enable Banking et copié dans
+  le dossier des images : la carte porte le vrai lettrage de l'établissement au
+  lieu d'une icône générique. Les comptes déjà liés le récupèrent à la
+  prochaine synchronisation. L'image est stockée localement, l'affichage ne
+  dépend d'aucun serveur tiers.
+- La couleur de la carte est assombrie jusqu'à garantir la lisibilité du texte
+  blanc, quelle que soit la teinte choisie — un compte en jaune vif reste jaune,
+  mais lisible.
 - Champ « numéro de carte » sur le compte. Seuls les **quatre derniers
   chiffres** sont enregistrés : coller un numéro complet n'en garde que la fin,
   car le reste ne sert à rien et cette base part dans les sauvegardes.
