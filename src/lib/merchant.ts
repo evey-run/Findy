@@ -24,6 +24,15 @@ const PREFIXES = [
   /^paiement\s+/i,
 ];
 
+/**
+ * Ville et pays accolés au commerçant.
+ *
+ * Boursorama écrit « MAXICOFFEE ARA\NEYRON\ FR » : le nom du commerçant, puis
+ * la ville entre barres obliques, puis le pays. Tout ce qui suit la première
+ * barre est du contexte de terminal de paiement, pas le marchand.
+ */
+const TERMINAL_SUFFIX = /\\.*$/;
+
 /** Ce qui traîne autour du nom : dates, numéro de carte, référence, civilité. */
 const NOISE = [
   /\bcb\*?\s*\d{3,4}\b/gi,          // CB*0556
@@ -32,7 +41,14 @@ const NOISE = [
   /\bref\.?\s*:?\s*\S+/gi,
   /\bmandat\s+\S+/gi,
   /\b(?:m|mme|mlle|mr)\b\.?\s+/gi,  // civilité d'un virement
+  /\*\w+\b/g,                        // référence de terminal : « PRIME*OQ2V »
+  /\s+\d{1,3},$/,                     // montant tronqué en fin de libellé
 ];
+
+/** « Virement de X » : le virement est déjà dit par le montant, reste le nom. */
+const TRANSFER_LEAD = /^virement\s+(?:de|depuis|vers|à|a)\s+/i;
+/** Certaines banques recollent « Virement de … » APRÈS le nom. */
+const TRANSFER_TRAIL = /\s+virement\s+(?:de|depuis|vers)?\s*$/i;
 
 /** Suffixes de forme sociale, sans intérêt à l'affichage. */
 const LEGAL_SUFFIX = /\s+(?:sas|sasu|sarl|eurl|sa|sci|ltd|inc|gmbh|bv|nv|plc)\b\.?$/i;
@@ -91,7 +107,9 @@ export function merchantName(description: string): string {
     }
   }
 
+  value = value.replace(TERMINAL_SUFFIX, '');
   for (const noise of NOISE) value = value.replace(noise, ' ');
+  value = value.replace(TRANSFER_TRAIL, '').replace(TRANSFER_LEAD, '');
 
   value = value
     .replace(/\s{2,}/g, ' ')
