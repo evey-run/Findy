@@ -97,6 +97,10 @@ model Bank {
   balance      Float         @default(0)
   accountType  String        @default("CURRENT")
   archived     Boolean       @default(false)
+  /// Compter ce compte dans le reste à vivre. `null` = déduit du type de compte
+  /// (les comptes courants comptent, l'épargne et l'investissement non). Sert à
+  /// exclure un livret que la banque déclare comme compte courant.
+  spendable    Boolean?
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

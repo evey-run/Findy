@@ -414,4 +414,35 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// PATCH /api/banks/:id/spendable — compter ou non ce compte dans le reste à vivre.
+//
+// Point d'entrée dédié : `PUT /api/banks/:id` réécrit le compte entier (nom,
+// solde, type…), l'utiliser pour un seul drapeau enverrait `balance: NaN`.
+router.patch('/:id/spendable', async (req, res) => {
+  try {
+    // Le compte doit appartenir à un espace du profil connecté : sans cette
+    // vérification, n'importe qui pourrait modifier le compte d'un autre.
+    const scope = await resolveScope(req.query as any, req.authUserId);
+    const bank = await prisma.bank.findFirst({
+      where: { id: req.params.id, spaceId: { in: scope } },
+      select: { id: true },
+    });
+    if (!bank) return res.status(404).json({ error: 'Compte introuvable' });
+
+    const raw = req.body?.spendable;
+    // `null` remet la déduction automatique par type de compte.
+    const spendable = raw === null || raw === undefined ? null : Boolean(raw);
+
+    const updated = await prisma.bank.update({
+      where: { id: bank.id },
+      data: { spendable },
+      select: { id: true, name: true, spendable: true },
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating spendable flag:', error);
+    res.status(500).json({ error: 'Failed to update account' });
+  }
+});
+
 export default router;

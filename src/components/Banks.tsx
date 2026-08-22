@@ -14,6 +14,7 @@ import {
   ArrowPathIcon,
   ExclamationTriangleIcon,
   UserGroupIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -90,6 +91,11 @@ async function openAuthenticationUrl(url: string): Promise<void> {
 
   const opened = window.open(target.toString(), '_blank', 'noopener,noreferrer');
   if (!opened) throw new Error('Le navigateur a bloqué l’ouverture du lien bancaire.');
+}
+
+/** `spendable` non renseigné : on retombe sur le type de compte. */
+function spendableForBank(bank: Bank): boolean {
+  return bank.spendable ?? bank.accountType === 'CURRENT';
 }
 
 export default function Banks() {
@@ -414,6 +420,30 @@ export default function Banks() {
     stopEbPolling();
     setEbModal(null);
   }, [stopEbPolling]);
+
+  /**
+   * Compter ou non ce compte dans le reste à vivre.
+   *
+   * Une banque déclare parfois un livret comme compte courant : ses 12 000 €
+   * d'épargne gonflent alors le chiffre affiché sur le tableau de bord. Ce
+   * réglage prime sur le type de compte.
+   */
+  const toggleSpendable = async (bank: Bank) => {
+    setOpenMenuId(null);
+    const next = spendableForBank(bank) ? false : true;
+    try {
+      const res = await fetch(`/api/banks/${bank.id}/spendable`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spendable: next }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.error || 'Modification impossible');
+      await loadBanks();
+      toast.success(next ? `${bank.name} compte dans le reste à vivre` : `${bank.name} en est exclu`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Modification impossible');
+    }
+  };
 
   const handleDelete = async (bankId: string, bankName: string) => {
     setOpenMenuId(null);
@@ -805,7 +835,18 @@ export default function Banks() {
                           >
                             <LinkIcon className={`h-4 w-4 ${bank.ebStatus === 'EXPIRED' ? 'text-amber-400' : 'text-violet-400'}`} />
                             <span>{bank.ebStatus === 'EXPIRED' ? 'Relier' : 'Lier'}</span>
-                            {bank.ebStatus === 'LINKED' && (
+                            <button
+                            onClick={() => toggleSpendable(bank)}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                            title="Inclure ou non ce compte dans le reste à vivre du tableau de bord"
+                          >
+                            <BanknotesIcon className={`h-4 w-4 ${spendableForBank(bank) ? 'text-violet-400' : 'text-zinc-600'}`} />
+                            <span>Reste à vivre</span>
+                            <span className={`ml-auto text-[10px] font-medium ${spendableForBank(bank) ? 'text-green-400' : 'text-zinc-500'}`}>
+                              {spendableForBank(bank) ? 'compté' : 'exclu'}
+                            </span>
+                          </button>
+                          {bank.ebStatus === 'LINKED' && (
                               <span className="ml-auto text-[10px] text-green-400 font-medium">✓</span>
                             )}
                             {bank.ebStatus === 'PENDING' && (

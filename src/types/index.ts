@@ -78,6 +78,8 @@ export interface Bank {
   ebAccountUid?: string | null;
   ebAspspName?: string | null;
   ebAspspCountry?: string | null;
+  /** Compter ce compte dans le reste à vivre. `null`/absent = déduit du type. */
+  spendable?: boolean | null;
 }
 
 export interface Category {
