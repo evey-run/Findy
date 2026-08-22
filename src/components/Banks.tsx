@@ -34,6 +34,7 @@ interface FormData {
   name: string;
   shortName: string;
   iban: string;
+  cardLast4: string;
   balance: number | string;
   accountType: 'CURRENT' | 'SAVINGS' | 'INVESTMENT';
   userIds: string[];
@@ -44,6 +45,7 @@ const emptyForm: FormData = {
   name: '',
   shortName: '',
   iban: '',
+  cardLast4: '',
   balance: 0,
   accountType: 'CURRENT',
   userIds: [],
@@ -80,37 +82,15 @@ async function openAuthenticationUrl(url: string): Promise<void> {
 }
 
 /**
- * Visuel de carte bancaire.
+ * Teinte de la carte, dérivée de la couleur du compte.
  *
- * Les images stockées sont des logos carrés : la carte est donc dessinée, à
- * partir de la couleur du compte. Elle n'apparaît que sur les comptes courants
- * — un livret ou un PEA n'a pas de carte.
+ * La couleur est choisie par l'utilisateur et peut être claire (jaune, menthe).
+ * On l'assombrit vers le fond de l'application plutôt que d'inverser l'encre :
+ * le texte reste blanc dans tous les cas, donc lisible quoi qu'il arrive.
  */
-function AccountCardVisual({ bank }: { bank: Bank }) {
-  const tint = bank.color || '#7c3aed';
-  return (
-    <div
-      aria-hidden="true"
-      className="relative h-[86px] w-[136px] flex-shrink-0 overflow-hidden rounded-xl shadow-lg ring-1 ring-white/10"
-      style={{ background: `linear-gradient(135deg, ${tint} 0%, rgba(9,9,11,0.92) 78%)` }}
-    >
-      <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10" />
-      <div className="absolute left-3 top-3 h-4 w-5 rounded-[3px] bg-gradient-to-br from-amber-200/90 to-amber-400/70" />
-      {bank.image && (
-        <img
-          src={assetUrl(bank.image)}
-          alt=""
-          className="absolute right-2.5 top-2.5 h-5 w-5 rounded object-cover opacity-90"
-        />
-      )}
-      <span className="absolute bottom-2.5 left-3 font-mono text-[9px] tracking-[0.18em] text-white/70">
-        ••••&nbsp;{(bank.iban || '').replace(/\s+/g, '').slice(-4) || '••••'}
-      </span>
-      <span className="absolute bottom-2.5 right-3 text-[10px] font-semibold uppercase tracking-wider text-white/80">
-        {bank.shortName || bank.name.slice(0, 6)}
-      </span>
-    </div>
-  );
+function cardGradient(color?: string): string {
+  const tint = /^#[0-9a-f]{6}$/i.test(color ?? '') ? (color as string) : '#3b82f6';
+  return `linear-gradient(135deg, ${tint} 0%, ${tint}b3 42%, #0b0b0f 100%)`;
 }
 
 /** `spendable` non renseigné : on retombe sur le type de compte. */
@@ -202,6 +182,7 @@ export default function Banks() {
       name: bank.name,
       shortName: bank.shortName || '',
       iban: bank.iban || '',
+      cardLast4: bank.cardLast4 || '',
       // `bank.balance` est le solde *calculé* (initial + mouvements). Le réinjecter
       // ici puis l'enregistrer doublerait les mouvements — on édite le solde initial.
       balance: bank.initialBalance ?? bank.balance,
@@ -276,6 +257,7 @@ export default function Banks() {
         name: formData.name,
         shortName: formData.shortName,
         iban: formData.iban,
+        cardLast4: formData.cardLast4,
         balance: parseFloat(formData.balance.toString()),
         accountType: formData.accountType,
         createdAt: formData.createdAt,
@@ -764,15 +746,40 @@ export default function Banks() {
                 <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
                 <span className="text-xs text-zinc-600">{sectionBanks.length}</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {/* Une carte au format paysage a besoin de largeur : trois par
+                  ligne seulement sur les très grands écrans. */}
+              <div className={`grid gap-4 ${
+                type === 'CURRENT'
+                  ? 'grid-cols-1 md:grid-cols-2 2xl:grid-cols-3'
+                  : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3'
+              }`}>
           {sectionBanks.map((bank) => {
             const typeInfo = getAccountTypeInfo(bank.accountType);
+
+            const isCard = bank.accountType === 'CURRENT';
 
             return (
               <div
                 key={bank.id}
-                className="group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]"
+                // Pour un compte courant, la tuile EST la carte : format paysage
+                // d'une carte bancaire (85,6 × 54 mm ≈ 1,586). Le ratio agit ici
+                // comme une hauteur plancher, pas plafond — un bandeau
+                // « connexion expirée » fait grandir la carte au lieu d'être rogné.
+                className={
+                  isCard
+                    ? 'group relative flex flex-col rounded-2xl p-5 aspect-[1.586] max-w-[420px] w-full text-white shadow-lg ring-1 ring-white/10 transition-all duration-200 hover:ring-white/20'
+                    : 'group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]'
+                }
+                style={isCard ? { backgroundImage: cardGradient(bank.color) } : undefined}
               >
+                {/* Les calques décoratifs sont enfermés : sans ce conteneur, un
+                    `overflow-hidden` sur la racine rognerait le menu déroulant. */}
+                {isCard && (
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/35 via-transparent to-white/10" />
+                    <div className="absolute -right-10 -top-14 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
+                  </div>
+                )}
                 {/* User avatars (bottom right) — only if multiple users */}
                 {users.length > 1 && bank.users && bank.users.length > 0 && (
                   <div className="absolute bottom-3 right-3 flex items-center -space-x-2">
@@ -805,18 +812,21 @@ export default function Banks() {
                     <img
                       src={assetUrl(bank.image)}
                       alt={bank.name}
-                      className="h-10 w-10 rounded-xl object-cover flex-shrink-0"
+                      className={`h-10 w-10 rounded-xl object-cover flex-shrink-0 ${isCard ? 'ring-1 ring-white/25' : ''}`}
                     />
                   ) : (
-                    <div className="h-10 w-10 rounded-xl bg-violet-500/15 flex items-center justify-center flex-shrink-0 text-base">
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center flex-shrink-0 text-base ${
+                      isCard ? 'bg-white/15 ring-1 ring-white/20' : 'bg-violet-500/15'
+                    }`}>
                       🏦
                     </div>
                   )}
                   <div className="flex-1 min-w-0 flex items-center gap-2">
-                    <h3 className="text-base font-semibold text-zinc-50 truncate">
+                    <h3 className={`text-base font-semibold truncate ${isCard ? 'text-white drop-shadow-sm' : 'text-zinc-50'}`}>
                       {bank.name}
                     </h3>
-                    {bank.shortName && (
+                    {/* Sur une carte, le code court est déjà en bas à droite. */}
+                    {bank.shortName && !isCard && (
                       <span className="flex-shrink-0 rounded bg-white/[0.07] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
                         {bank.shortName}
                       </span>
@@ -837,9 +847,9 @@ export default function Banks() {
                         e.stopPropagation();
                         setOpenMenuId(openMenuId === bank.id ? null : bank.id);
                       }}
-                      className={`h-6 w-6 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
-                        openMenuId === bank.id ? 'opacity-100 bg-white/10 text-zinc-100' : 'opacity-100'
-                      }`}
+                      className={`h-6 w-6 flex items-center justify-center rounded-md transition-all hover:bg-white/15 ${
+                        isCard ? 'text-white/70 hover:text-white' : 'text-zinc-500 hover:text-zinc-100'
+                      } ${openMenuId === bank.id ? 'bg-white/15 ' + (isCard ? 'text-white' : 'text-zinc-100') : ''}`}
                       title="Actions"
                     >
                       <EllipsisHorizontalIcon className="h-5 w-5" />
@@ -855,7 +865,17 @@ export default function Banks() {
                           >
                             <LinkIcon className={`h-4 w-4 ${bank.ebStatus === 'EXPIRED' ? 'text-amber-400' : 'text-violet-400'}`} />
                             <span>{bank.ebStatus === 'EXPIRED' ? 'Relier' : 'Lier'}</span>
-                            <button
+                            {bank.ebStatus === 'LINKED' && (
+                              <span className="ml-auto text-[10px] text-green-400 font-medium">✓</span>
+                            )}
+                            {bank.ebStatus === 'PENDING' && (
+                              <span className="ml-auto text-[10px] text-amber-400 font-medium">⏳</span>
+                            )}
+                            {bank.ebStatus === 'EXPIRED' && (
+                              <span className="ml-auto text-[10px] text-amber-400 font-medium">⚠</span>
+                            )}
+                          </button>
+                          <button
                             onClick={() => toggleSpendable(bank)}
                             className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
                             title="Inclure ou non ce compte dans le reste à vivre du tableau de bord"
@@ -865,16 +885,6 @@ export default function Banks() {
                             <span className={`ml-auto text-[10px] font-medium ${spendableForBank(bank) ? 'text-green-400' : 'text-zinc-500'}`}>
                               {spendableForBank(bank) ? 'compté' : 'exclu'}
                             </span>
-                          </button>
-                          {bank.ebStatus === 'LINKED' && (
-                              <span className="ml-auto text-[10px] text-green-400 font-medium">✓</span>
-                            )}
-                            {bank.ebStatus === 'PENDING' && (
-                              <span className="ml-auto text-[10px] text-amber-400 font-medium">⏳</span>
-                            )}
-                            {bank.ebStatus === 'EXPIRED' && (
-                              <span className="ml-auto text-[10px] text-amber-400 font-medium">⚠</span>
-                            )}
                           </button>
                           {bank.ebStatus === 'LINKED' && (
                             <button
@@ -906,17 +916,37 @@ export default function Banks() {
                   </div>
                 </div>
 
-                {/* Nature du compte, puis le visuel de carte — réservé aux
-                    comptes courants : un livret ou un PEA n'a pas de carte. */}
-                <div className="mt-1 flex items-end justify-between gap-3">
-                  <div className="min-w-0">
+                {isCard ? (
+                  /* Sur une carte : le solde en bas à gauche, les quatre
+                     derniers chiffres et le code court sur la dernière ligne.
+                     Pas de mention « compte courant » — la section le dit déjà. */
+                  <div className="relative mt-auto pt-4">
+                    {/* Un solde à sept chiffres déborderait en 26 px : la taille
+                        cède avant que le texte ne soit tronqué. */}
+                    <p className={`font-bold leading-none tabular-nums text-white drop-shadow-sm ${
+                      fmtExact(bank.balance).length > 13 ? 'text-xl' : 'text-[26px]'
+                    }`}>
+                      {fmtExact(bank.balance)}
+                    </p>
+                    <div className="mt-3 flex items-end justify-between gap-3">
+                      <span className="font-mono text-xs tracking-[0.2em] text-white/70">
+                        ••••&nbsp;{bank.cardLast4 || '••••'}
+                      </span>
+                      {bank.shortName && (
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">
+                          {bank.shortName}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1">
                     <p className="text-xs text-zinc-500">{typeInfo.label}</p>
                     <p className="mt-3 text-xl font-bold text-zinc-50 tabular-nums">
                       {fmtExact(bank.balance)}
                     </p>
                   </div>
-                  {bank.accountType === 'CURRENT' && <AccountCardVisual bank={bank} />}
-                </div>
+                )}
 
                 {/* Row 5 — Sync status & consent warning */}
                 {bank.ebStatus === 'EXPIRED' && (
@@ -1050,6 +1080,27 @@ export default function Banks() {
                   placeholder="FR1420041010050500013M02606"
                   required
                 />
+              </div>
+
+              {/* Quatre derniers chiffres de la carte — affichés sur la tuile du
+                  portefeuille. Le numéro complet n'est jamais conservé : coller
+                  une carte entière ici n'en gardera que la fin. */}
+              <div>
+                <label className="block text-xs font-medium text-zinc-400 mb-1.5">
+                  Numéro de carte <span className="text-zinc-600">(4 derniers chiffres)</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={formData.cardLast4}
+                  onChange={(e) => setFormData({ ...formData, cardLast4: e.target.value.replace(/\D/g, '').slice(-4) })}
+                  className="w-full rounded-lg bg-zinc-800/60 border border-white/10 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-500 focus:border-violet-500/60 focus:ring-1 focus:ring-violet-500/40 outline-none transition-colors font-mono"
+                  placeholder="8160"
+                />
+                <p className="mt-1 text-[10px] text-zinc-600">
+                  Seuls ces quatre chiffres sont enregistrés.
+                </p>
               </div>
 
               {/* Account type */}

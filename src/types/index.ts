@@ -80,6 +80,8 @@ export interface Bank {
   ebAspspCountry?: string | null;
   /** Compter ce compte dans le reste à vivre. `null`/absent = déduit du type. */
   spendable?: boolean | null;
+  /** Quatre derniers chiffres de la carte — le numéro complet n'est pas stocké. */
+  cardLast4?: string | null;
 }
 
 export interface Category {

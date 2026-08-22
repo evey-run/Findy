@@ -101,6 +101,10 @@ model Bank {
   /// (les comptes courants comptent, l'épargne et l'investissement non). Sert à
   /// exclure un livret que la banque déclare comme compte courant.
   spendable    Boolean?
+  /// Quatre derniers chiffres de la carte, pour la reconnaître d'un coup d'œil.
+  /// On ne stocke jamais le numéro complet : il ne sert à rien ici, et la base
+  /// part dans les sauvegardes JSON.
+  cardLast4    String?
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

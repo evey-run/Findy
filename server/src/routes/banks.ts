@@ -12,6 +12,21 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 /**
+ * Normalise les quatre derniers chiffres d'une carte.
+ *
+ * On ne conserve jamais le numéro complet : il n'est utilisé nulle part, et la
+ * base part telle quelle dans les sauvegardes JSON. Si l'utilisateur colle un
+ * numéro entier, on n'en garde que la fin.
+ */
+function normalizeCardLast4(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== 'string') return undefined as unknown as null;
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 0) return null;
+  return digits.slice(-4);
+}
+
+/**
  * Un compte appartient désormais à un Espace. L'UI, elle, raisonne encore en
  * « qui possède ce compte ? » — on expose donc `users` (les membres de l'espace)
  * et `userBanks` (même forme qu'avant) pour ne rien casser côté front.
@@ -159,7 +174,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/banks - Create a new bank
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    let { name, shortName, color, iban, balance, createdAt, accountType, data } = req.body;
+    let { name, shortName, color, iban, balance, createdAt, accountType, data, cardLast4 } = req.body;
     let userIds: string[] = [];
 
     if (data) {
@@ -196,6 +211,7 @@ router.post('/', upload.single('image'), async (req, res) => {
         color: color || '#3b82f6',
         image: imageUrl,
         iban,
+        cardLast4: normalizeCardLast4(cardLast4) ?? null,
         balance: parseFloat(balance) || 0,
         accountType: accountType || 'CURRENT',
         createdAt: createdAtDate,
@@ -227,7 +243,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     console.log('🔧 Raw request body:', req.body);
-    let { name, shortName, color, iban, balance, createdAt, accountType, data } = req.body;
+    let { name, shortName, color, iban, balance, createdAt, accountType, data, cardLast4 } = req.body;
     console.log('🔧 Initial values - accountType:', accountType, 'data:', data);
     
     // Vérifier si les données sont envoyées dans le champ 'data' (format JSON)
@@ -289,6 +305,11 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       updateData.image = `/uploads/${req.file.filename}`;
     }
     
+    // Le numéro de carte n'est touché que s'il est explicitement fourni.
+    if ('cardLast4' in req.body) {
+      updateData.cardLast4 = normalizeCardLast4(req.body.cardLast4);
+    }
+
     // Changer les propriétaires = déplacer le compte vers l'espace correspondant.
     if (userIds.length > 0) {
       updateData.spaceId = await resolveSpaceForUsers(userIds);

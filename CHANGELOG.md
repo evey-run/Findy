@@ -9,10 +9,15 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
 ### Ajouté
 
 - **Portefeuille redessiné** : les comptes sont groupés par nature — comptes
-  courants, épargnes, investissements — et chaque carte porte le logo du
-  compte, son code court, sa nature et son solde **au centime**, là où il était
-  auparavant abrégé en « 12 k€ ». Un visuel de carte bancaire n'apparaît que
-  sur les comptes courants ; un livret ou un PEA n'a pas de carte.
+  courants, épargnes, investissements — et chaque tuile porte le logo du
+  compte, son code court et son solde **au centime**, là où il était
+  auparavant abrégé en « 12 k€ ».
+- Un compte courant s'affiche comme une **vraie carte bancaire** : format
+  paysage, couleur du compte, logo, solde et quatre derniers chiffres dessus.
+  Les livrets et les comptes d'investissement gardent la tuile classique.
+- Champ « numéro de carte » sur le compte. Seuls les **quatre derniers
+  chiffres** sont enregistrés : coller un numéro complet n'en garde que la fin,
+  car le reste ne sert à rien et cette base part dans les sauvegardes.
 - **Reste à vivre prévisionnel** sur le tableau de bord : un seul chiffre, ce
   qu'il reste à dépenser par jour jusqu'à la fin du mois, et la date à laquelle
   les comptes s'assèchent au rythme observé. Le calcul part du solde du jour,
@@ -24,6 +29,11 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
   12 000 € d'épargne faisaient annoncer 1 345 € par jour au lieu de 145 €.
   L'application signale d'elle-même un compte qui pèse la majorité du solde
   sans avoir bougé depuis trois mois.
+
+### Corrigé
+
+- Menu d'un compte : le bouton « Reste à vivre » était imbriqué dans le bouton
+  « Lier », rendant les deux actions et les pastilles d'état inutilisables.
 
 ### Supprimé
 

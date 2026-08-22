@@ -1,5 +1,5 @@
 // Généré par scripts/generate-migrations-bundle.mjs — ne pas éditer à la main.
-// Régénéré à chaque build du serveur ; 28 migration(s).
+// Régénéré à chaque build du serveur ; 29 migration(s).
 
 export interface EmbeddedMigration {
   name: string;
@@ -147,5 +147,10 @@ export const MIGRATIONS: EmbeddedMigration[] = [
     "name": "20260821120000_add_bank_spendable",
     "checksum": "a043771fbde8e20e2000c012b816a77ea4a1c6cbaa725d1e4b0bf9128581be76",
     "sql": "-- Compter ou non un compte dans le reste à vivre.\n-- Nullable et sans valeur par défaut : `NULL` signifie « déduis-le du type de\n-- compte », ce qui préserve le comportement des comptes existants.\nALTER TABLE \"banks\" ADD COLUMN \"spendable\" BOOLEAN;\n"
+  },
+  {
+    "name": "20260822210000_add_bank_card_last4",
+    "checksum": "9c8caa254b22320cc68a0d2197e0611dfd1613112dcf388db4eeef5e06aacb39",
+    "sql": "-- Quatre derniers chiffres de la carte, affichés sur la tuile du portefeuille.\n-- Volontairement pas le numéro complet : il n'est jamais utilisé, et cette base\n-- est exportée telle quelle dans les sauvegardes.\nALTER TABLE \"banks\" ADD COLUMN \"cardLast4\" TEXT;\n"
   }
 ];
