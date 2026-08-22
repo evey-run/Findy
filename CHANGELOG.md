@@ -4,7 +4,7 @@ Toutes les évolutions notables de Findy. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le projet respecte
 le [versionnage sémantique](https://semver.org/lang/fr/).
 
-## [0.5.8] — 2026-08-22
+## [0.6.0] — 2026-08-23
 
 ### Ajouté
 
@@ -47,23 +47,75 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
   12 000 € d'épargne faisaient annoncer 1 345 € par jour au lieu de 145 €.
   L'application signale d'elle-même un compte qui pèse la majorité du solde
   sans avoir bougé depuis trois mois.
-
+- **Tableau des transactions redessiné autour du commerçant et du jour.** Le
+  nom du marchand est extrait du libellé bancaire — « CARTE 09/08/25 MONOPRIX
+  LYON 3 CB*0556 » devient « Monoprix Lyon » — et porté par une pastille de
+  couleur stable, la même d'une session à l'autre. Le libellé d'origine reste
+  accessible en infobulle. Aucun nom de commerçant n'est envoyé à un service
+  tiers : la reconnaissance se fait entièrement sur la machine.
+- Les lignes sont **groupées par journée**, sous un intitulé discret aux noms
+  relatifs — « Aujourd'hui », « Hier ». La colonne date devient inutile et
+  disparaît.
+- Recherche, catégorie et portefeuille sont **intégrés à l'en-tête du
+  tableau**, à la même typographie et à la même hauteur que les intitulés de
+  colonnes : la ligne d'ajout et la barre de filtres n'ont plus lieu d'être.
+- L'en-tête du tableau est en **verre dépoli** : il reste lisible pendant que
+  les lignes défilent dessous, sans les masquer tout à fait.
 ### Corrigé
 
 - Menu d'un compte : le bouton « Reste à vivre » était imbriqué dans le bouton
   « Lier », rendant les deux actions et les pastilles d'état inutilisables.
-
+- Les libellés de virement interminables sont coupés devant leur première
+  référence : « PAIERIE REGIONALE D'AUVERGNE RH PAYE DU MOIS REMU STAGIAIRES
+  S22HE L069A80L200PAY08/2026… » débordait de la ligne sans rien apprendre.
+- Un compte sans code court n'affiche plus une pastille vide dans les
+  transactions : il retombe sur ses initiales.
+- Le flou de l'en-tête du tableau ne s'appliquait pas. La carte qui l'entoure
+  portait elle aussi un `backdrop-blur`, ce qui en faisait une racine
+  d'arrière-plan : le flou de l'en-tête cessait de remplacer ce qu'il
+  recouvrait et n'ajoutait qu'un halo par-dessus des lignes restées nettes.
+- Chaque cellule d'en-tête portait son propre calque de verre. `backdrop-filter`
+  étant rogné à la boîte qui le porte, six calques échantillonnaient six
+  voisinages différents et laissaient une couture verticale à chaque frontière
+  de colonne.
 ### Supprimé
 
 - L'IBAN et la barre « Comptes / Solde total » quittent le portefeuille : le
   solde exact figure désormais sur chaque carte, et les coordonnées bancaires
   n'ont pas leur place sur un écran de survol.
-
+- La colonne date, la colonne « Pointé », la ligne d'ajout et la mention
+  « Total N transactions » quittent le tableau des transactions.
 ### Sécurité
 
 - Le « dépensé » d'un budget agrégeait les transactions de **tous** les
   espaces, y compris ceux dont le profil n'est pas membre : les catégories
   étant un catalogue commun, aucun filtre de portée ne s'appliquait.
+
+## [0.5.9] — 2026-08-22
+
+### Ajouté
+
+- Modification contextuelle des transactions sélectionnées et suppression
+  conditionnelle (#33, #34).
+- Import CSV par compte, depuis le portefeuille (#35).
+- La liaison bancaire s'ouvre directement depuis « Nouveau compte » (#41).
+- Les catégories par défaut sont créées sur un compte vierge (#36).
+
+### Modifié
+
+- Objectifs : le bouton d'archivage disparaît, et les objectifs atteints
+  passent sous les objectifs en cours (#42).
+
+### Supprimé
+
+- Catégories : les mots-clés et le type fixe (#39, #40).
+
+### Corrigé
+
+- Supprimer un compte supprime désormais aussi ses transactions (#48).
+- Le portefeuille affiche les sommes exactes (#47).
+
+## [0.5.8] — 2026-08-22
 
 ### Sécurité
 
