@@ -8,6 +8,11 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Portefeuille redessiné** : les comptes sont groupés par nature — comptes
+  courants, épargnes, investissements — et chaque carte porte le logo du
+  compte, son code court, sa nature et son solde **au centime**, là où il était
+  auparavant abrégé en « 12 k€ ». Un visuel de carte bancaire n'apparaît que
+  sur les comptes courants ; un livret ou un PEA n'a pas de carte.
 - **Reste à vivre prévisionnel** sur le tableau de bord : un seul chiffre, ce
   qu'il reste à dépenser par jour jusqu'à la fin du mois, et la date à laquelle
   les comptes s'assèchent au rythme observé. Le calcul part du solde du jour,
@@ -19,6 +24,12 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
   12 000 € d'épargne faisaient annoncer 1 345 € par jour au lieu de 145 €.
   L'application signale d'elle-même un compte qui pèse la majorité du solde
   sans avoir bougé depuis trois mois.
+
+### Supprimé
+
+- L'IBAN et la barre « Comptes / Solde total » quittent le portefeuille : le
+  solde exact figure désormais sur chaque carte, et les coordonnées bancaires
+  n'ont pas leur place sur un écran de survol.
 
 ### Sécurité
 

@@ -15,13 +15,11 @@ import {
   ExclamationTriangleIcon,
   UserGroupIcon,
   BanknotesIcon,
+  CreditCardIcon,
+  BuildingLibraryIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-
-const formatIBAN = (iban: string): string => {
-  const clean = iban.replace(/\s+/g, '');
-  return clean.replace(/(.{4})(?=.)/g, '$1 ');
-};
 
 const getAccountTypeInfo = (type: 'CURRENT' | 'SAVINGS' | 'INVESTMENT') => {
   const info: Record<string, { label: string; icon: string }> = {
@@ -52,21 +50,9 @@ const emptyForm: FormData = {
   createdAt: new Date().toISOString().split('T')[0],
 };
 
-const fmt = (n: number) =>
-  `${Math.round(n).toLocaleString('fr-FR')} €`;
-
-const fmtCompact = (n: number) => {
-  const abs = Math.abs(n);
-  if (abs >= 1000000) {
-    const v = n / 1000000;
-    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} M€`;
-  }
-  if (abs >= 1000) {
-    const v = n / 1000;
-    return `${(Math.round(v * 10) / 10).toLocaleString('fr-FR')} k€`;
-  }
-  return fmt(n);
-};
+/** Solde affiché sur les cartes : au centime, jamais abrégé. */
+const fmtExact = (n: number) =>
+  n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface EbModal { bankId: string; bankName: string; }
 interface EbAspsp { name: string; country: string; logo: string; }
@@ -91,6 +77,40 @@ async function openAuthenticationUrl(url: string): Promise<void> {
 
   const opened = window.open(target.toString(), '_blank', 'noopener,noreferrer');
   if (!opened) throw new Error('Le navigateur a bloqué l’ouverture du lien bancaire.');
+}
+
+/**
+ * Visuel de carte bancaire.
+ *
+ * Les images stockées sont des logos carrés : la carte est donc dessinée, à
+ * partir de la couleur du compte. Elle n'apparaît que sur les comptes courants
+ * — un livret ou un PEA n'a pas de carte.
+ */
+function AccountCardVisual({ bank }: { bank: Bank }) {
+  const tint = bank.color || '#7c3aed';
+  return (
+    <div
+      aria-hidden="true"
+      className="relative h-[86px] w-[136px] flex-shrink-0 overflow-hidden rounded-xl shadow-lg ring-1 ring-white/10"
+      style={{ background: `linear-gradient(135deg, ${tint} 0%, rgba(9,9,11,0.92) 78%)` }}
+    >
+      <div className="absolute inset-0 bg-gradient-to-tr from-black/40 via-transparent to-white/10" />
+      <div className="absolute left-3 top-3 h-4 w-5 rounded-[3px] bg-gradient-to-br from-amber-200/90 to-amber-400/70" />
+      {bank.image && (
+        <img
+          src={assetUrl(bank.image)}
+          alt=""
+          className="absolute right-2.5 top-2.5 h-5 w-5 rounded object-cover opacity-90"
+        />
+      )}
+      <span className="absolute bottom-2.5 left-3 font-mono text-[9px] tracking-[0.18em] text-white/70">
+        ••••&nbsp;{(bank.iban || '').replace(/\s+/g, '').slice(-4) || '••••'}
+      </span>
+      <span className="absolute bottom-2.5 right-3 text-[10px] font-semibold uppercase tracking-wider text-white/80">
+        {bank.shortName || bank.name.slice(0, 6)}
+      </span>
+    </div>
+  );
 }
 
 /** `spendable` non renseigné : on retombe sur le type de compte. */
@@ -610,18 +630,21 @@ export default function Banks() {
     );
   }
 
-  const totalBalance = banks.reduce((sum, b) => sum + b.balance, 0);
-  const stats = [
-    { label: 'Comptes', value: banks.length.toString(), icon: '🏦' },
-    { label: 'Solde total', value: fmtCompact(totalBalance), icon: '💰' },
+  // Les comptes sont présentés par nature : on ne mélange pas l'argent du
+  // quotidien, l'épargne et les placements dans une même grille.
+  const SECTIONS: Array<{ type: Bank['accountType']; title: string; icon: typeof CreditCardIcon }> = [
+    { type: 'CURRENT', title: 'Comptes courants', icon: CreditCardIcon },
+    { type: 'SAVINGS', title: 'Épargnes', icon: BuildingLibraryIcon },
+    { type: 'INVESTMENT', title: 'Investissements', icon: ChartBarIcon },
   ];
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
       {/* ── Header (compact) ── */}
       <div className="flex-shrink-0 flex items-center justify-between gap-4">
-        <div className="flex items-baseline gap-2.5 min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight text-zinc-50">Portefeuille</h2>
+        <div className="min-w-0">
+          <h2 className="text-2xl font-bold tracking-tight text-zinc-50">Portefeuille</h2>
+          <p className="mt-0.5 text-sm text-zinc-500">Vos comptes bancaires connectés</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {users.length === 0 && (
@@ -709,22 +732,6 @@ export default function Banks() {
         </div>
       )}
 
-      {/* ── KPI bar ── */}
-      {banks.length > 0 && (
-        <div className="flex-shrink-0 grid grid-cols-2 rounded-xl bg-white/[0.04] border border-white/[0.08] divide-x divide-white/[0.06] overflow-hidden">
-          {stats.map((s) => (
-            <div key={s.label} className="px-4 py-2.5">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">
-                {s.label}
-              </div>
-              <div className="mt-0.5 text-base font-semibold text-zinc-50 tabular-nums">
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* ── Empty state ── */}
       {banks.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-16 text-center">
@@ -744,16 +751,27 @@ export default function Banks() {
           </button>
         </div>
       ) : (
-        /* ── Grid of compact bank cards ── */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
-          {banks.map((bank) => {
+        /* ── Comptes, groupés par nature ── */
+        <div className="flex-1 min-h-0 space-y-7">
+        {SECTIONS.map(({ type, title, icon: SectionIcon }) => {
+          const sectionBanks = banks.filter((b) => b.accountType === type);
+          if (sectionBanks.length === 0) return null;
+
+          return (
+            <section key={type}>
+              <div className="flex items-center gap-2 mb-3">
+                <SectionIcon className="h-5 w-5 text-violet-400" />
+                <h3 className="text-base font-semibold text-zinc-100">{title}</h3>
+                <span className="text-xs text-zinc-600">{sectionBanks.length}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {sectionBanks.map((bank) => {
             const typeInfo = getAccountTypeInfo(bank.accountType);
-            const displayIban = bank.iban ? formatIBAN(bank.iban).slice(-15) : '—';
 
             return (
               <div
                 key={bank.id}
-                className="group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]"
+                className="group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]"
               >
                 {/* User avatars (bottom right) — only if multiple users */}
                 {users.length > 1 && bank.users && bank.users.length > 0 && (
@@ -787,19 +805,21 @@ export default function Banks() {
                     <img
                       src={assetUrl(bank.image)}
                       alt={bank.name}
-                      className="h-8 w-8 rounded-lg object-cover flex-shrink-0"
+                      className="h-10 w-10 rounded-xl object-cover flex-shrink-0"
                     />
                   ) : (
-                    <div className="h-8 w-8 rounded-lg bg-violet-500/20 flex items-center justify-center flex-shrink-0 text-sm">
+                    <div className="h-10 w-10 rounded-xl bg-violet-500/15 flex items-center justify-center flex-shrink-0 text-base">
                       🏦
                     </div>
                   )}
-                  <div className="flex-1 min-w-0 flex items-baseline gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-50 truncate">
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-zinc-50 truncate">
                       {bank.name}
                     </h3>
                     {bank.shortName && (
-                      <span className="text-xs text-zinc-500 flex-shrink-0">{bank.shortName}</span>
+                      <span className="flex-shrink-0 rounded bg-white/[0.07] px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                        {bank.shortName}
+                      </span>
                     )}
                   </div>
 
@@ -886,19 +906,16 @@ export default function Banks() {
                   </div>
                 </div>
 
-                {/* Row 2 — account type (subtitle) */}
-                <div className="mt-1 text-xs text-zinc-500">
-                  {typeInfo.label}
-                </div>
-
-                {/* Row 3 — balance (emphasis) */}
-                <div className="mt-2 text-lg font-bold text-zinc-50 tabular-nums">
-                  {fmtCompact(bank.balance)}
-                </div>
-
-                {/* Row 4 — IBAN compact */}
-                <div className="mt-2 text-[10px] text-zinc-500 font-mono tabular-nums">
-                  {displayIban}
+                {/* Nature du compte, puis le visuel de carte — réservé aux
+                    comptes courants : un livret ou un PEA n'a pas de carte. */}
+                <div className="mt-1 flex items-end justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-zinc-500">{typeInfo.label}</p>
+                    <p className="mt-3 text-xl font-bold text-zinc-50 tabular-nums">
+                      {fmtExact(bank.balance)}
+                    </p>
+                  </div>
+                  {bank.accountType === 'CURRENT' && <AccountCardVisual bank={bank} />}
                 </div>
 
                 {/* Row 5 — Sync status & consent warning */}
@@ -937,6 +954,10 @@ export default function Banks() {
               </div>
             );
           })}
+              </div>
+            </section>
+          );
+        })}
         </div>
       )}
 
