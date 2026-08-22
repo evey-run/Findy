@@ -11,7 +11,6 @@ import {
   XMarkIcon,
   ArrowUpRightIcon,
   CheckCircleIcon,
-  ArchiveBoxIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -67,7 +66,6 @@ export default function Budgets() {
 
   // Per-card actions menu
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     loadObjectives();
@@ -204,34 +202,26 @@ export default function Budgets() {
     }
   };
 
-  const handleArchive = async (objective: Objective) => {
-    setOpenMenuId(null);
-    try {
-      const response = await fetch(`/api/objectives/${objective.id}/archive`, { method: 'PATCH' });
-      if (!response.ok) throw new Error("Erreur lors de l'archivage");
-      const updated = await response.json();
-      setObjectives((prev) => prev.map((o) => (o.id === objective.id ? updated : o)));
-      toast.success(objective.archived ? 'Objectif désarchivé' : 'Objectif archivé');
-    } catch (error) {
-      console.error('Error archiving objective:', error);
-      toast.error("Erreur lors de l'archivage de l'objectif");
-    }
-  };
-
   const viewTransactions = (objective: Objective) => {
     setOpenMenuId(null);
     navigate(`/transactions?search=${encodeURIComponent(`Économie ${objective.title}`)}`);
   };
 
-  // ── Filter objectives by archived status ──────────────────────────────
-  const visibleObjectives = objectives.filter((o) => showArchived ? o.archived : !o.archived);
+  // ── Only show active (non-archived) objectives ────────────────────────
+  const visibleObjectives = objectives.filter((o) => !o.archived);
+
+  const isObjectiveDone = (o: Objective) => {
+    const p = objectiveProgress[o.id];
+    return p ? p.isCompleted : o.isCompleted;
+  };
+
+  // ── Split: in-progress first, completed shown below ───────────────────
+  const inProgressObjectives = visibleObjectives.filter((o) => !isObjectiveDone(o));
+  const doneObjectives = visibleObjectives.filter((o) => isObjectiveDone(o));
 
   // ── Aggregate stats ──────────────────────────────────────────────────
   const totalObjectives = visibleObjectives.length;
-  const completedObjectives = visibleObjectives.filter((o) => {
-    const p = objectiveProgress[o.id];
-    return p ? p.isCompleted : o.isCompleted;
-  }).length;
+  const completedObjectives = doneObjectives.length;
   const totalTargetAmount = visibleObjectives.reduce((sum, o) => sum + o.targetAmount, 0);
   const totalSaved = visibleObjectives.reduce(
     (sum, o) => sum + (objectiveProgress[o.id]?.totalSaved ?? 0),
@@ -254,6 +244,120 @@ export default function Budgets() {
     { label: 'Cible totale', value: fmtCompact(totalTargetAmount) },
   ];
 
+  const renderObjectiveCard = (objective: Objective) => {
+    const progress = objectiveProgress[objective.id];
+    const percentage = progress ? progress.percentage : 0;
+    const isCompleted = progress ? progress.isCompleted : objective.isCompleted;
+    const saved = progress?.totalSaved ?? 0;
+    const remaining = progress?.remaining ?? objective.targetAmount;
+    const { deadline } = objective;
+    const overdue = deadline && isOverdue(deadline) && !isCompleted;
+    const accent = isCompleted ? '#22c55e' : '#a78bfa';
+
+    return (
+      <div
+        key={objective.id}
+        className="group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05]"
+      >
+        {/* Row 1 — icon + title + actions */}
+        <div className="flex items-center gap-2.5">
+          <div
+            className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: isCompleted ? 'rgba(34,197,94,0.12)' : 'rgba(124,58,237,0.14)' }}
+          >
+            {isCompleted ? (
+              <CheckCircleIcon className="h-4 w-4 text-green-400" />
+            ) : (
+              <TrophyIcon className="h-4 w-4 text-violet-400" />
+            )}
+          </div>
+          <h3 className="text-sm font-semibold text-zinc-50 truncate flex-1">
+            {objective.title}
+          </h3>
+
+          {/* Actions menu */}
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpenMenuId(openMenuId === objective.id ? null : objective.id);
+              }}
+              className="h-6 w-6 -mr-1 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all"
+              title="Actions"
+            >
+              <EllipsisHorizontalIcon className="h-5 w-5" />
+            </button>
+
+            {openMenuId === objective.id && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
+                <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
+                  <button
+                    onClick={() => openEdit(objective)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                  >
+                    <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
+                    Modifier
+                  </button>
+                  <button
+                    onClick={() => viewTransactions(objective)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
+                  >
+                    <ArrowUpRightIcon className="h-4 w-4 text-zinc-500" />
+                    Transactions
+                  </button>
+                  <button
+                    onClick={() => handleDelete(objective.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                  >
+                    <TrashIcon className="h-4 w-4" />
+                    Supprimer
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2 — amounts + percentage */}
+        <div className="mt-3 flex items-end justify-between">
+          <div className="text-sm tabular-nums">
+            <span className="font-semibold text-zinc-50">{fmt(saved)}</span>
+            <span className="text-zinc-500"> / {fmt(objective.targetAmount)}</span>
+          </div>
+          <span
+            className="text-base font-bold tabular-nums leading-none"
+            style={{ color: accent }}
+          >
+            {Math.round(percentage)}%
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        <div className="mt-2 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(percentage, 100)}%`, backgroundColor: accent }}
+          />
+        </div>
+
+        {/* Row 3 — remaining (emphasis) + deadline */}
+        <div className="mt-2.5 flex items-center justify-between text-xs">
+          <span className={isCompleted ? 'text-green-400 font-medium' : 'text-zinc-400'}>
+            {isCompleted ? 'Objectif atteint 🎉' : `${fmt(remaining)} restant`}
+          </span>
+          {deadline && (
+            <span
+              className={`tabular-nums ${overdue ? 'text-red-400 font-medium' : 'text-zinc-500'}`}
+            >
+              {fmtDeadline(deadline)}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 overflow-y-auto custom-scrollbar pb-2">
       {/* ── Header (compact, single row) ── */}
@@ -267,17 +371,6 @@ export default function Budgets() {
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className={`inline-flex items-center gap-1.5 rounded-lg text-sm font-medium px-3 py-1.5 transition-colors ${
-              showArchived
-                ? 'bg-zinc-700 text-zinc-200 hover:bg-zinc-600'
-                : 'bg-white/[0.06] text-zinc-400 hover:text-zinc-200 hover:bg-white/10'
-            }`}
-          >
-            <ArchiveBoxIcon className="h-4 w-4" />
-            <span className="hidden sm:inline">{showArchived ? 'Archivés' : 'Archiver'}</span>
-          </button>
           <button
             onClick={openCreate}
             className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-3 py-1.5 transition-colors"
@@ -321,130 +414,31 @@ export default function Budgets() {
           </button>
         </div>
       ) : (
-        /* ── Dense grid of compact cards ── */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
-          {visibleObjectives.map((objective) => {
-            const progress = objectiveProgress[objective.id];
-            const percentage = progress ? progress.percentage : 0;
-            const isCompleted = progress ? progress.isCompleted : objective.isCompleted;
-            const saved = progress?.totalSaved ?? 0;
-            const remaining = progress?.remaining ?? objective.targetAmount;
-            const { deadline } = objective;
-            const overdue = deadline && isOverdue(deadline) && !isCompleted;
-            const accent = isCompleted ? '#22c55e' : '#a78bfa';
+        <div className="flex flex-col gap-5">
+          {/* ── In-progress objectives ── */}
+          {inProgressObjectives.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+              {inProgressObjectives.map(renderObjectiveCard)}
+            </div>
+          )}
 
-            return (
-              <div
-                key={objective.id}
-                className={`group relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-4 transition-all duration-200 hover:border-white/[0.12] hover:bg-white/[0.05] ${objective.archived ? 'opacity-50' : ''}`}
-              >
-                {/* Row 1 — icon + title + actions */}
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: isCompleted ? 'rgba(34,197,94,0.12)' : 'rgba(124,58,237,0.14)' }}
-                  >
-                    {isCompleted ? (
-                      <CheckCircleIcon className="h-4 w-4 text-green-400" />
-                    ) : (
-                      <TrophyIcon className="h-4 w-4 text-violet-400" />
-                    )}
-                  </div>
-                  <h3 className="text-sm font-semibold text-zinc-50 truncate flex-1">
-                    {objective.title}
-                  </h3>
-
-                  {/* Actions menu */}
-                  <div className="relative flex-shrink-0">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(openMenuId === objective.id ? null : objective.id);
-                      }}
-                      className={`h-6 w-6 -mr-1 flex items-center justify-center rounded-md text-zinc-500 hover:text-zinc-100 hover:bg-white/10 transition-all ${
-                        openMenuId === objective.id ? 'opacity-100' : 'opacity-100'
-                      }`}
-                      title="Actions"
-                    >
-                      <EllipsisHorizontalIcon className="h-5 w-5" />
-                    </button>
-
-                    {openMenuId === objective.id && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenMenuId(null)} />
-                        <div className="absolute right-0 top-7 z-20 w-44 rounded-lg bg-zinc-900/95 backdrop-blur-xl border border-white/10 shadow-xl overflow-hidden py-1">
-                          <button
-                            onClick={() => openEdit(objective)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
-                          >
-                            <PencilSquareIcon className="h-4 w-4 text-zinc-500" />
-                            Modifier
-                          </button>
-                          <button
-                            onClick={() => viewTransactions(objective)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
-                          >
-                            <ArrowUpRightIcon className="h-4 w-4 text-zinc-500" />
-                            Transactions
-                          </button>
-                          <button
-                            onClick={() => handleArchive(objective)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-zinc-300 hover:text-zinc-50 hover:bg-white/5 transition-colors"
-                          >
-                            <ArchiveBoxIcon className="h-4 w-4 text-zinc-500" />
-                            {objective.archived ? 'Désarchiver' : 'Archiver'}
-                          </button>
-                          <button
-                            onClick={() => handleDelete(objective.id)}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                            Supprimer
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Row 2 — amounts + percentage */}
-                <div className="mt-3 flex items-end justify-between">
-                  <div className="text-sm tabular-nums">
-                    <span className="font-semibold text-zinc-50">{fmt(saved)}</span>
-                    <span className="text-zinc-500"> / {fmt(objective.targetAmount)}</span>
-                  </div>
-                  <span
-                    className="text-base font-bold tabular-nums leading-none"
-                    style={{ color: accent }}
-                  >
-                    {Math.round(percentage)}%
-                  </span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="mt-2 h-1.5 w-full rounded-full bg-white/[0.06] overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(percentage, 100)}%`, backgroundColor: accent }}
-                  />
-                </div>
-
-                {/* Row 3 — remaining (emphasis) + deadline */}
-                <div className="mt-2.5 flex items-center justify-between text-xs">
-                  <span className={isCompleted ? 'text-green-400 font-medium' : 'text-zinc-400'}>
-                    {isCompleted ? 'Objectif atteint 🎉' : `${fmt(remaining)} restant`}
-                  </span>
-                  {deadline && (
-                    <span
-                      className={`tabular-nums ${overdue ? 'text-red-400 font-medium' : 'text-zinc-500'}`}
-                    >
-                      {fmtDeadline(deadline)}
-                    </span>
-                  )}
-                </div>
+          {/* ── Completed objectives (below) ── */}
+          {doneObjectives.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                  Objectifs réalisés
+                </h3>
+                <span className="text-xs font-medium text-zinc-600 tabular-nums">
+                  {doneObjectives.length}
+                </span>
+                <div className="flex-1 border-t border-white/[0.06]" />
               </div>
-            );
-          })}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3">
+                {doneObjectives.map(renderObjectiveCard)}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
