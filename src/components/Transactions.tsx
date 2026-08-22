@@ -69,47 +69,35 @@ const HEADER_CONTROL =
   + 'uppercase tracking-wider text-zinc-400 placeholder:text-zinc-600 transition-colors '
   + 'hover:border-white/15 focus:border-violet-500/60 focus:text-zinc-200 focus:outline-none';
 
-/** Cellule d'en-tête : même gouttière que les cellules du corps. */
-const HEADER_CELL = 'px-3 py-2';
+/**
+ * Cellule d'en-tête, collée en haut du tableau.
+ *
+ * L'adhérence est portée par les cellules et non par le `thead` : c'est le seul
+ * moyen d'y ancrer un calque de flou (voir `HeaderGlass`).
+ */
+const HEADER_CELL = 'sticky top-0 z-10 px-3 py-2';
 
 /**
- * Largeurs des colonnes, partagées par l'en-tête et le corps.
+ * Fond en verre dépoli de l'en-tête.
  *
- * L'en-tête vit dans son propre tableau (voir plus bas) : deux tableaux
- * distincts ne s'alignent que si on leur impose la même grille. Le même
- * `colgroup` posé sur les deux, en `table-fixed`, garantit que les colonnes
- * tombent au même pixel quelle que soit la largeur de la fenêtre.
+ * Le flou est porté par un calque absolu — une boîte de bloc ordinaire — et
+ * non par le `thead` ou le `th` : WebKit applique `backdrop-filter` de façon
+ * fiable sur un bloc, beaucoup moins sur une boîte de tableau. L'ombre porte
+ * au passage le filet de séparation, qui suivrait le `thead` hors de l'écran
+ * s'il y restait attaché.
+ *
+ * Ce calque ne suffit pas à lui seul : tant que la carte englobante portait un
+ * `backdrop-blur`, elle formait une racine d'arrière-plan et ce flou-ci ne
+ * remplaçait plus rien (voir le commentaire sur la carte, plus bas).
  */
-function Columns() {
+function HeaderGlass() {
   return (
-    <colgroup>
-      <col className="w-8" />
-      <col className="w-64" />
-      <col className="w-32" />
-      <col className="w-56" />
-      <col className="w-28" />
-      <col className="w-16" />
-    </colgroup>
+    <span
+      aria-hidden
+      className="pointer-events-none absolute inset-0 -z-10 bg-zinc-950/95 shadow-[0_1px_0_0_rgba(255,255,255,0.08),0_10px_24px_-14px_rgba(0,0,0,0.95)] backdrop-blur-2xl backdrop-saturate-150 supports-[backdrop-filter]:bg-zinc-950/75"
+    />
   );
 }
-
-/**
- * Verre dépoli de l'en-tête.
- *
- * Le flou a d'abord été posé sur le `thead`, sans effet : WebKit n'applique pas
- * `backdrop-filter` aux boîtes de tableau, et il ne restait que le fond
- * translucide. Un calque absolu glissé dans chaque cellule a bien ramené le
- * flou, mais le bandeau de date passait alors net par-dessus l'en-tête — les
- * cellules de tableau collantes se composent mal.
- *
- * L'en-tête est donc sorti du tableau : une boîte de bloc ordinaire, collée en
- * haut du conteneur défilant. C'est la seule forme sur laquelle le flou et
- * l'empilement se comportent sans réserve.
- */
-const HEADER_GLASS =
-  'sticky top-0 z-20 border-b border-white/10 bg-zinc-950/95 '
-  + 'shadow-[0_10px_24px_-14px_rgba(0,0,0,0.95)] backdrop-blur-xl backdrop-saturate-150 '
-  + 'supports-[backdrop-filter]:bg-zinc-950/60';
 
 /**
  * Pastille d'un commerçant.
@@ -1197,26 +1185,25 @@ export default function Transactions({
       </div>
 
       {/* Transactions Table */}
-      {/* La carte ne porte volontairement pas de `backdrop-blur` : un ancêtre
-          filtré devient une racine d'arrière-plan, et le flou de l'en-tête
-          cesse alors de remplacer ce qu'il recouvre — il n'ajoute qu'un halo
-          par-dessus des lignes restées nettes. La carte repose de toute façon
-          sur un fond uni, où le flou ne se voyait pas. */}
+      {/* La carte ne porte volontairement aucun `backdrop-blur` : un ancêtre
+          filtré devient une racine d'arrière-plan, et le `backdrop-filter` de
+          l'en-tête cesse alors de remplacer ce qu'il recouvre — il n'ajoute
+          plus qu'un halo par-dessus des lignes restées nettes. Le fond derrière
+          la carte est uni : le flou n'y produisait rien de toute façon. */}
       <div className="flex-1 min-h-0 rounded-2xl overflow-hidden bg-white/5 border border-white/10 flex flex-col">
         <div
           ref={scrollContainerRef}
           className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
           onScroll={handleScroll}
         >
+          <table className="w-full divide-y divide-zinc-800">
           {/* En-tête en verre dépoli : il reste lisible pendant que les lignes
               défilent dessous, sans les masquer complètement. La saturation
               rattrape la désaturation qu'un flou seul provoque. */}
-          <div className={HEADER_GLASS}>
-          <table className="w-full table-fixed">
-          <Columns />
           <thead>
             <tr>
-              <th className={`${HEADER_CELL} text-left`}>
+              <th className={`${HEADER_CELL} text-left w-8`}>
+                <HeaderGlass />
                 <input
                   type="checkbox"
                   checked={selectAll}
@@ -1226,7 +1213,8 @@ export default function Transactions({
               </th>
               {/* Toutes les cellules d'en-tête partagent la même typographie et
                   la même hauteur : contrôles et intitulés se ressemblent. */}
-              <th className={`${HEADER_CELL} text-left`}>
+              <th className={`${HEADER_CELL} w-64 text-left`}>
+                <HeaderGlass />
                 <input
                   type="text"
                   placeholder="Rechercher…"
@@ -1236,7 +1224,8 @@ export default function Transactions({
                   className={HEADER_CONTROL}
                 />
               </th>
-              <th className={`${HEADER_CELL} text-left`}>
+              <th className={`${HEADER_CELL} w-32 text-left`}>
+                <HeaderGlass />
                 <select
                   value={filters.categoryId}
                   onChange={(e) => applyFilters({ ...filters, categoryId: e.target.value })}
@@ -1249,7 +1238,8 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className={`${HEADER_CELL} text-left`}>
+              <th className={`${HEADER_CELL} w-56 text-left`}>
+                <HeaderGlass />
                 <select
                   value={selectedBank?.id || ''}
                   onChange={(e) => {
@@ -1266,16 +1256,10 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className={`${HEADER_CELL} text-right ${HEADER_LABEL}`}>Montant</th>
-              <th className={`${HEADER_CELL} text-center ${HEADER_LABEL}`}>Actions</th>
+              <th className={`${HEADER_CELL} w-28 text-right ${HEADER_LABEL}`}><HeaderGlass />Montant</th>
+              <th className={`${HEADER_CELL} w-16 text-center ${HEADER_LABEL}`}><HeaderGlass />Actions</th>
             </tr>
           </thead>
-          </table>
-          </div>
-
-          {/* Corps : même grille de colonnes que l'en-tête, au pixel près. */}
-          <table className="w-full table-fixed">
-          <Columns />
           <tbody className="divide-y divide-zinc-800">
             {groupedTransactions.map((group) => (
               <React.Fragment key={group.key}>
@@ -1301,9 +1285,7 @@ export default function Transactions({
                     onClick={(e) => e.stopPropagation()}
                   />
                 </td>
-                {/* La largeur vient du `colgroup` : c'est elle qui borne le
-                    libellé et déclenche la troncature. */}
-                <td className="max-w-0 px-3 py-2 text-xs text-white">
+                <td className="w-64 max-w-[16rem] px-3 py-2 text-xs text-white">
                   {editingId === transaction.id ? (
                     <input
                       type="text"
