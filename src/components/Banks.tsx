@@ -4,7 +4,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { useAppStore } from '../store';
 import type { Bank } from '../types';
 import { assetUrl } from '../lib/url';
-import { cardSurface } from '../lib/cardSurface';
+import { cardSurface, GRAIN_DATA_URI } from '../lib/cardSurface';
 import {
   PlusIcon,
   EllipsisHorizontalIcon,
@@ -80,6 +80,17 @@ async function openAuthenticationUrl(url: string): Promise<void> {
 
   const opened = window.open(target.toString(), '_blank', 'noopener,noreferrer');
   if (!opened) throw new Error('Le navigateur a bloqué l’ouverture du lien bancaire.');
+}
+
+/** Palette du logotype, stockée en JSON par le serveur. */
+function parseBrandColors(raw?: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((c): c is string => typeof c === 'string') : [];
+  } catch {
+    return [];
+  }
 }
 
 /** `spendable` non renseigné : on retombe sur le type de compte. */
@@ -740,7 +751,7 @@ export default function Banks() {
             const typeInfo = getAccountTypeInfo(bank.accountType);
 
             const isCard = bank.accountType === 'CURRENT';
-            const surface = cardSurface(bank.color);
+            const surface = cardSurface(bank.color, parseBrandColors(bank.brandColors));
 
             return (
               <div
@@ -760,11 +771,13 @@ export default function Banks() {
                     `overflow-hidden` sur la racine rognerait le menu déroulant. */}
                 {isCard && (
                   <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
-                    <div className="absolute inset-0 bg-gradient-to-tr from-black/35 via-transparent to-white/10" />
+                    {/* Grain : évite les marches de quantification sur des
+                        dégradés larges en fond sombre, et donne de la matière. */}
                     <div
-                      className="absolute -right-10 -top-14 h-40 w-40 rounded-full opacity-40 blur-2xl"
-                      style={{ background: surface.accent }}
+                      className="absolute inset-0 opacity-[0.12] mix-blend-overlay"
+                      style={{ backgroundImage: GRAIN_DATA_URI }}
                     />
+                    <div className="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/[0.06]" />
                   </div>
                 )}
                 {/* User avatars (bottom right) — only if multiple users */}

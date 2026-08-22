@@ -110,6 +110,10 @@ model Bank {
   /// l'utilisateur. Stocké localement : l'app ne dépend d'aucun serveur tiers
   /// pour s'afficher.
   brandLogo    String?
+  /// Couleurs dominantes du logotype, en JSON (`["#d20073","#1e3581"]`).
+  /// Extraites une fois à la récupération du logo : la carte prend les
+  /// couleurs de la marque au lieu d'une teinte choisie au hasard.
+  brandColors  String?
   archivedAt   DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt

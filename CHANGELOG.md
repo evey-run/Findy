@@ -21,9 +21,14 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
   lieu d'une icône générique. Les comptes déjà liés le récupèrent à la
   prochaine synchronisation. L'image est stockée localement, l'affichage ne
   dépend d'aucun serveur tiers.
-- La couleur de la carte est assombrie jusqu'à garantir la lisibilité du texte
-  blanc, quelle que soit la teinte choisie — un compte en jaune vif reste jaune,
-  mais lisible.
+- **La carte prend les couleurs de son logotype.** Les teintes dominantes sont
+  extraites du logo officiel — Boursorama donne son magenta, son bleu nuit et
+  son cyan, le Crédit Mutuel son bleu et son rouge — et composent des halos
+  larges et adoucis sur fond sombre, avec un grain qui évite les marches de
+  quantification. Un lettrage monochrome comme celui de Revolut ne donne aucune
+  couleur : la carte retombe alors sur celle du compte.
+- Toute couleur est ramenée sous un seuil de luminance avant d'être posée : le
+  texte blanc reste lisible quelle que soit la teinte de la marque.
 - Champ « numéro de carte » sur le compte. Seuls les **quatre derniers
   chiffres** sont enregistrés : coller un numéro complet n'en garde que la fin,
   car le reste ne sert à rien et cette base part dans les sauvegardes.

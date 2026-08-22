@@ -1,11 +1,14 @@
 /**
- * Surface d'une carte bancaire, dérivée de la couleur du compte.
+ * Surface d'une carte bancaire.
  *
- * L'encre ne bascule jamais : le texte reste blanc, et c'est la surface qu'on
- * ramène dans une plage sombre. Un compte en jaune vif garde sa teinte, mais
- * assombrie jusqu'à ce que le blanc repasse largement au-dessus du seuil de
- * lisibilité — et une rangée de cartes ne se retrouve pas avec du texte noir
- * sur l'une et blanc sur l'autre.
+ * Les couleurs viennent du logotype officiel de la banque quand on a pu les en
+ * extraire — Boursorama donne son magenta et son bleu nuit, le Crédit Mutuel
+ * son bleu et son rouge. À défaut (un lettrage entièrement noir n'a aucune
+ * couleur), on retombe sur la couleur du compte.
+ *
+ * Le rendu est volontairement discret : des halos larges et très adoucis en
+ * fond sombre, plutôt qu'un aplat de couleur. L'encre ne bascule jamais — le
+ * texte reste blanc, et c'est la surface qu'on maintient sombre.
  */
 
 /** `#rgb` ou `#rrggbb` → composantes. Bleu de repli si la valeur est illisible. */
@@ -29,26 +32,45 @@ export function relativeLuminance([r, g, b]: [number, number, number]): number {
   return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
 }
 
-/** Au-delà, le blanc ne tient plus le contraste sur la carte. */
-const MAX_LUMINANCE = 0.13;
+/** Fond de la carte : assez sombre pour que le blanc tienne le contraste. */
+const BASE = '#0e0e13';
+
+/**
+ * Grain, en SVG embarqué.
+ *
+ * Une texture de bruit empêche les dégradés larges de montrer les marches de
+ * quantification sur un écran sombre, et donne de la matière à une surface qui
+ * serait sinon parfaitement lisse.
+ */
+export const GRAIN_DATA_URI =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E\")";
+
+/** Position et étalement de chaque halo, du plus large au plus discret. */
+const BLOBS = [
+  { at: '14% 6%', size: '135% 120%', alpha: 0.38, stop: 58 },
+  { at: '92% 22%', size: '110% 110%', alpha: 0.3, stop: 55 },
+  { at: '68% 108%', size: '120% 115%', alpha: 0.24, stop: 60 },
+];
 
 export interface CardSurface {
+  /** Empilement de halos sur fond sombre, prêt pour `backgroundImage`. */
   background: string;
-  /** Teinte d'origine, non assombrie : halo et liseré, pour garder l'éclat. */
-  accent: string;
+  /** Vrai si les couleurs viennent bien du logotype de la banque. */
+  fromLogo: boolean;
+}
+
+function rgba([r, g, b]: [number, number, number], alpha: number): string {
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 /**
- * Facteur d'assombrissement qui amène la couleur juste sous le seuil.
+ * Ramène une couleur dans une plage sombre en conservant sa teinte.
  *
- * On ne peut pas l'obtenir par une formule : la luminance sRGB n'est pas une
- * simple puissance des canaux, à cause de l'offset de la courbe de transfert.
- * Une recherche par dichotomie donne le facteur exact en quelques itérations —
- * la version approchée laissait le blanc à 0,153, au-dessus de la cible.
+ * La luminance sRGB n'est pas une puissance simple des canaux : on cherche le
+ * facteur par dichotomie plutôt que par une formule approchée.
  */
-function scaleToTarget(rgb: [number, number, number], target: number): number {
-  if (relativeLuminance(rgb) <= target) return 1;
-
+function darkenTo(rgb: [number, number, number], target: number): [number, number, number] {
+  if (relativeLuminance(rgb) <= target) return rgb;
   let low = 0;
   let high = 1;
   for (let i = 0; i < 24; i += 1) {
@@ -57,17 +79,25 @@ function scaleToTarget(rgb: [number, number, number], target: number): number {
     if (relativeLuminance(scaled) > target) high = mid;
     else low = mid;
   }
-  return low;
+  return rgb.map((c) => Math.round(c * low)) as [number, number, number];
 }
 
-export function cardSurface(hex?: string | null): CardSurface {
-  const rgb = hexToRgb(hex);
-  const k = scaleToTarget(rgb, MAX_LUMINANCE);
-  const shade = (factor: number) =>
-    `rgb(${rgb.map((c) => Math.round(c * k * factor)).join(', ')})`;
+export function cardSurface(fallbackColor?: string | null, palette?: string[] | null): CardSurface {
+  const fromLogo = Array.isArray(palette) && palette.length > 0;
+  const source = fromLogo ? palette! : [fallbackColor ?? '#3b82f6'];
+
+  // Les halos se superposant, chacun est plafonné bas : trois couches à pleine
+  // intensité redonneraient un aplat clair et illisible.
+  const colors = BLOBS.map((_, index) => darkenTo(hexToRgb(source[index % source.length]), 0.3));
+
+  const layers = BLOBS.map(
+    (blob, index) =>
+      `radial-gradient(${blob.size} at ${blob.at}, ${rgba(colors[index], blob.alpha)} 0%, ` +
+      `${rgba(colors[index], 0)} ${blob.stop}%)`,
+  );
 
   return {
-    background: `linear-gradient(118deg, ${shade(1)} 0%, ${shade(0.6)} 42%, #0b0b0f 100%)`,
-    accent: `rgba(${rgb.join(', ')}, 0.45)`,
+    background: [...layers, `linear-gradient(150deg, #16161d 0%, ${BASE} 100%)`].join(', '),
+    fromLogo,
   };
 }

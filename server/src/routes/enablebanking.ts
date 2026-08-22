@@ -9,6 +9,7 @@ import { SYNC_SETTINGS_PATH, PERSISTENCE_DIR, ensurePersistenceDir } from '../li
 import { ensureTunnel, keepTunnelWarm } from '../lib/tunnel';
 import { consentWarning, normalizeTransaction, planReconciliation } from '../lib/ebTransactions';
 import { fetchBrandLogo } from '../lib/brandLogo';
+import { logoPalette } from '../lib/logoColors';
 
 const router = express.Router();
 const EB_BASE = 'https://api.enablebanking.com';
@@ -116,7 +117,21 @@ async function storeBrandLogo(bankId: string, aspspName: string, country: string
       return aspsps.map((a: any) => ({ name: a.name || a.aspsp_name || '', logo: a.logo || a.logoUrl || '' }));
     },
   });
-  if (logo) await prisma.bank.update({ where: { id: bankId }, data: { brandLogo: logo } });
+  if (!logo) return;
+
+  // Les couleurs de la carte viennent du logotype lui-même. Un lettrage
+  // monochrome (Revolut, N26) n'en donne aucune : la carte retombera alors sur
+  // la couleur du compte, ce qui reste correct.
+  let brandColors: string | null = null;
+  try {
+    const file = path.join(process.env.UPLOADS_DIR || 'public/uploads', path.basename(logo));
+    const palette = logoPalette(fs.readFileSync(file));
+    if (palette.length > 0) brandColors = JSON.stringify(palette);
+  } catch (error) {
+    console.warn('[Brand] Palette illisible:', error);
+  }
+
+  await prisma.bank.update({ where: { id: bankId }, data: { brandLogo: logo, brandColors } });
 }
 
 
@@ -1054,7 +1069,11 @@ router.delete('/banks/:bankId/unlink', async (req, res) => {
  */
 export async function backfillBrandLogos(): Promise<void> {
   const banks = await prisma.bank.findMany({
-    where: { brandLogo: null, ebAspspName: { not: null }, ebAspspCountry: { not: null } },
+    where: {
+      OR: [{ brandLogo: null }, { brandColors: null }],
+      ebAspspName: { not: null },
+      ebAspspCountry: { not: null },
+    },
     select: { id: true, ebAspspName: true, ebAspspCountry: true },
   });
 

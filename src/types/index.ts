@@ -84,6 +84,8 @@ export interface Bank {
   cardLast4?: string | null;
   /** Logotype officiel de la banque, rapatrié depuis Enable Banking. */
   brandLogo?: string | null;
+  /** Couleurs dominantes du logotype, en JSON. */
+  brandColors?: string | null;
 }
 
 export interface Category {
