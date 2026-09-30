@@ -34,4 +34,13 @@ dist-ssr
 # Clés de signature des mises à jour (JAMAIS en git)
 keys/
 data/sync-settings.json
+# Secret de signature des jetons de session, généré au premier démarrage.
+data/auth-secret
+# Préférence d'accès mobile, propre à chaque installation.
+data/mobile-access.json
 !.env.example
+
+# Signature Android — jamais en git
+*.keystore
+*.jks
+.gstack/

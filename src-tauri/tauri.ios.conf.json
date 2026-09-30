@@ -1,0 +1,24 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "build": {
+    "beforeDevCommand": "npm run dev:mobile",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "backgroundColor": "#09090b",
+        "theme": "Dark"
+      }
+    ]
+  },
+  "bundle": {
+    "externalBin": null,
+    "resources": null,
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": null
+  }
+}

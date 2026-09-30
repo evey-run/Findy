@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Trafic en clair autorisé.
+
+  Findy parle à un serveur que l'utilisateur héberge lui-même : le plus souvent
+  son Mac, joignable sur le réseau local en http://192.168.x.y:36321. Android
+  interdit le trafic en clair dans les builds release depuis API 28, ce qui
+  rendrait l'application inutilisable dans son scénario principal — et la liste
+  des adresses possibles n'est connue qu'à l'exécution, donc impossible à
+  déclarer ici en <domain>.
+
+  Cette autorisation ne dégrade rien : une adresse en https:// reste vérifiée
+  normalement contre les autorités de certification du système. Elle ne fait
+  qu'admettre le http:// que l'utilisateur a saisi en toute connaissance de
+  cause dans l'écran de connexion au serveur.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -3,8 +3,10 @@ import { useAppStore } from '../store';
 import { assetUrl } from '../lib/url';
 import { otherBankOwnersSuffix } from '../lib/bankOwners';
 import { merchantColor, merchantInitials, merchantName } from '../lib/merchant';
+import { groupDayRows, type TransactionListRow } from '../lib/groupTransactions';
 import type { Bank } from '../types';
 import { useLocation } from 'react-router-dom';
+import TransactionTraceModal from './TransactionTraceModal';
 
 
 interface EditingTransaction {
@@ -205,13 +207,18 @@ export default function Transactions({
   // Inline editing states
   const [inlineEditCell, setInlineEditCell] = useState<InlineEditCell | null>(null);
   const [inlineEditValue, setInlineEditValue] = useState<string>('');
+  /** L'opération dont on veut voir le trajet de l'argent. */
+  const [traceId, setTraceId] = useState<string | null>(null);
   
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
   const [filters, setFilters] = useState({
     categoryId: '',
     checked: '',
     startDate: '',
     endDate: '',
-    searchText: ''
+    searchText: '',
+    amountSign: ''
   });
 
   // États pour la modification des transactions sélectionnées
@@ -236,27 +243,7 @@ export default function Transactions({
   // Récupérer les paramètres d'URL
   const location = useLocation();
 
-  // Effet pour initialiser les filtres de page depuis le store global
-  useEffect(() => {
-    // Vérifier si des filtres existent déjà pour cette page
-    const pageSpecificFilters = pageFilters?.[pageName];
-    if (pageSpecificFilters) {
-      // Synchroniser les filtres locaux avec les filtres de page stockés
-      setFilters({
-        categoryId: pageSpecificFilters.categoryId || '',
-        checked: pageSpecificFilters.checked || '',
-        startDate: pageSpecificFilters.startDate || '',
-        endDate: pageSpecificFilters.endDate || '',
-        searchText: pageSpecificFilters.searchText || ''
-      });
-      
-      // Mettre à jour l'input de recherche si nécessaire
-      if (pageSpecificFilters.searchText) {
-        setSearchInput(pageSpecificFilters.searchText);
-      }
-    }
-  }, [pageFilters, pageName]);
-
+  // Effet pour initialiser les filtres de page depuis le store global et les paramètres d'URL
   useEffect(() => {
     const initializeData = async () => {
       setLoading(true);
@@ -266,45 +253,60 @@ export default function Transactions({
         setPage(1);
         setHasMore(true);
 
-        // Récupérer le paramètre de recherche depuis l'URL
+        // Récupérer les paramètres d'URL
         const searchParams = new URLSearchParams(location.search);
         const searchFromURL = searchParams.get('search');
-        
+        const startDateFromURL = searchParams.get('startDate');
+        const endDateFromURL = searchParams.get('endDate');
+        const categoryIdFromURL = searchParams.get('categoryId');
+        const typeFromURL = searchParams.get('type');
+
+        // Base filters from pageSpecificFilters (if available) or defaults
+        const pageSpecificFilters = pageFilters?.[pageName];
+        let baseFilters = {
+          categoryId: pageSpecificFilters?.categoryId || '',
+          checked: '',
+          startDate: '',
+          endDate: '',
+          searchText: pageSpecificFilters?.searchText || '',
+          amountSign: pageSpecificFilters?.amountSign || ''
+        };
+        if (pageSpecificFilters?.searchText) {
+          setSearchInput(pageSpecificFilters.searchText);
+        }
+
+        // Override with URL parameters
+        let activeFilters = { ...baseFilters };
+        if (searchFromURL !== null) {
+          activeFilters = { ...activeFilters, searchText: searchFromURL };
+          setSearchInput(searchFromURL);
+        }
+        if (startDateFromURL !== null) {
+          activeFilters = { ...activeFilters, startDate: startDateFromURL };
+        }
+        if (endDateFromURL !== null) {
+          activeFilters = { ...activeFilters, endDate: endDateFromURL };
+        }
+        if (categoryIdFromURL !== null) {
+          activeFilters = { ...activeFilters, categoryId: categoryIdFromURL };
+        }
+        if (typeFromURL !== null) {
+          const amountSign = typeFromURL === 'income' ? 'positive' : typeFromURL === 'expense' ? 'negative' : '';
+          activeFilters = { ...activeFilters, amountSign };
+        }
+
+        // Set the filters state
+        setFilters(activeFilters);
+
         // Load categories and banks first for better UX
         await Promise.all([
           loadCategories(),
           loadBanks()
         ]);
-        
+
         // Load initial transactions with proper pagination info
         console.log('🚀 Initial data load with pagination');
-        
-        // Récupérer les filtres sauvegardés pour cette page
-        const pageSpecificFilters = pageFilters?.[pageName];
-        let activeFilters = { ...filters };
-        
-        if (searchFromURL) {
-          // Mettre à jour l'input de recherche avec la valeur de l'URL
-          setSearchInput(searchFromURL);
-          activeFilters = { ...activeFilters, searchText: searchFromURL };
-        } else if (pageSpecificFilters) {
-          // Utiliser les filtres sauvegardés s'il n'y a pas de recherche dans l'URL
-          // Note: Les dates et checked ne sont pas restaurés pour qu'ils se réinitialisent à chaque visite
-          activeFilters = {
-            categoryId: pageSpecificFilters.categoryId || '',
-            checked: '', // Réinitialisé à chaque visite
-            startDate: '', // Réinitialisé à chaque visite
-            endDate: '', // Réinitialisé à chaque visite
-            searchText: pageSpecificFilters.searchText || ''
-          };
-          if (pageSpecificFilters.searchText) {
-            setSearchInput(pageSpecificFilters.searchText);
-          }
-        }
-        
-        // Mettre à jour les filtres dans l'état local
-        setFilters(activeFilters);
-        
+
         // Use loadTransactions for initial load but with limit for pagination.
         // forceRefresh: true est essentiel — sans cela, revenir sur la page
         // (navigation SPA) réutilise la liste en cache (potentiellement agrandie
@@ -316,17 +318,18 @@ export default function Transactions({
           startDate: activeFilters.startDate || undefined,
           endDate: activeFilters.endDate || undefined,
           checked: activeFilters.checked || undefined,
+          amountSign: activeFilters.amountSign || undefined,
           excludeAccountType: 'INVESTMENT',
           pageName,
           limit: ITEMS_PER_PAGE,
           forceRefresh: true
         });
-        
+
         // Get the current state after loading to check transaction count
         const currentState = useAppStore.getState();
         const loadedCount = currentState.transactions.length;
         console.log('📦 Initial load result:', { transactionsCount: loadedCount, expectedLimit: ITEMS_PER_PAGE });
-        
+
         // Set hasMore based on whether we got a full page of results
         const hasMoreData = loadedCount >= ITEMS_PER_PAGE;
         setHasMore(hasMoreData);
@@ -344,16 +347,20 @@ export default function Transactions({
           checked: false,
           categoryId: categories[0]?.id || '',
           bankId: banks.filter(bank => bank.accountType === 'CURRENT' || bank.accountType === 'SAVINGS')[0]?.id || ''
-        });
-      } catch (error) {
-        console.error('Error initializing data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    initializeData();
-  }, []);
+         });
+       } catch (error) {
+         console.error('Error initializing data:', error);
+       } finally {
+         setLoading(false);
+       }
+     };
+
+     initializeData();
+   }, [location, pageName]);
+
+  // Suppression de l'effet redondant (initializeData avec deps vides) : il réinitialisait
+  // les filtres (startDate/endDate/amountSign) à partir de pageFilters après que l'effet
+  // principal les ait posés depuis l'URL, ce qui annulait la redirection depuis le tableau de bord.
   
   // Removed transaction logging effect to reduce unnecessary updates
 
@@ -513,7 +520,14 @@ export default function Transactions({
     if (selectedBank && String(transaction.bankId) !== String(selectedBank.id)) {
       return false;
     }
-    
+
+    // Filtre par montant (positif/négatif)
+    if (filters.amountSign) {
+      const isPositive = transaction.amount > 0;
+      if (filters.amountSign === 'positive' && !isPositive) return false;
+      if (filters.amountSign === 'negative' && isPositive) return false;
+    }
+
     // Filtre par catégorie
     if (filters.categoryId) {
       if (filters.categoryId === 'undefined') {
@@ -524,25 +538,51 @@ export default function Transactions({
         if (transaction.categoryId !== filters.categoryId) return false;
       }
     }
-    
+
     // Les filtres par dates, statut pointé et recherche de texte sont gérés côté serveur
     // via loadTransactions. Ne pas re-filtrer ici pour permettre la recherche sur toute
     // la base de données et éviter un double filtrage qui donnerait zéro résultat.
-    
+
     return true;
   });
 
   // Les transactions sont rangées sous l'en-tête de leur journée : la colonne
   // date disparaît du tableau, l'information reste.
+  // Au sein de chaque journée, les opérations du même marchand sont regroupées
+  // en une ligne pliable (total + compteur) pour plus de lisibilité.
+  // Le solde cumulatif est calculé du plus ancien au plus récent.
   const groupedTransactions = useMemo(() => {
-    const groups: Array<{ key: string; label: string; items: typeof filteredTransactions }> = [];
+    // D'abord, calculer le solde cumulatif par jour (du plus ancien au plus récent)
+    const sorted = [...filteredTransactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const dayTotals = new Map<string, number>();
+    let cumul = 0;
+    for (const t of sorted) {
+      const key = dayKey(t.date);
+      cumul += t.amount;
+      dayTotals.set(key, cumul);
+    }
+
+    // Ensuite, construire les groupes dans l'ordre d'affichage (du plus récent au plus ancien)
+    const groups: Array<{ key: string; label: string; rows: TransactionListRow[]; runningBalance: number }> = [];
     for (const transaction of filteredTransactions) {
       const key = dayKey(transaction.date);
       const last = groups[groups.length - 1];
-      if (last && last.key === key) last.items.push(transaction);
-      else groups.push({ key, label: dayLabel(transaction.date), items: [transaction] });
+      if (last && last.key === key) {
+        last.rows.push({ kind: 'single', key: `tx:${transaction.id}`, transaction });
+      } else {
+        groups.push({
+          key,
+          label: dayLabel(transaction.date),
+          rows: [{ kind: 'single', key: `tx:${transaction.id}`, transaction }],
+          runningBalance: dayTotals.get(key) || 0,
+        });
+      }
     }
-    return groups;
+    // Regroupement par marchand au sein de chaque journée
+    return groups.map(g => ({
+      ...g,
+      rows: groupDayRows(g.rows.map(r => r.kind === 'single' ? r.transaction : r.items).flat()),
+    }));
   }, [filteredTransactions]);
 
   // Ouvre la fenêtre de modification des transactions sélectionnées
@@ -623,7 +663,7 @@ export default function Transactions({
     if (!initialLoadDoneRef.current || loadingMore || !hasMore) {
       return;
     }
-    
+
     setLoadingMore(true);
     try {
       const nextPage = page + 1;
@@ -634,18 +674,19 @@ export default function Transactions({
         startDate: filters.startDate,
         endDate: filters.endDate,
         checked: filters.checked,
+        amountSign: filters.amountSign,
         excludeAccountType: 'INVESTMENT',
         pageName
       });
-      
+
       console.log('📦 Received result:', { newTransactionsCount: result.newTransactions.length, hasMore: result.hasMore });
-      
+
       if (result.newTransactions.length > 0) {
         appendTransactions(result.newTransactions);
         setPage(nextPage);
         console.log('✅ Page updated to:', nextPage);
       }
-      
+
       setHasMore(result.hasMore);
     } catch (error) {
       console.error('Error loading more transactions:', error);
@@ -829,6 +870,7 @@ export default function Transactions({
         startDate: newFilters.startDate || undefined,
         endDate: newFilters.endDate || undefined,
         checked: newFilters.checked || undefined,
+        amountSign: newFilters.amountSign || undefined,
         excludeAccountType: 'INVESTMENT',
         pageName,
         limit: ITEMS_PER_PAGE,
@@ -963,7 +1005,17 @@ export default function Transactions({
                   ))}
                 </select>
               </th>
-              <th className={`${HEADER_CELL} w-28 text-right ${HEADER_LABEL}`}>Montant</th>
+              <th className={`${HEADER_CELL} w-28 text-center`}>
+                <select
+                  value={filters.amountSign}
+                  onChange={(e) => applyFilters({ ...filters, amountSign: e.target.value })}
+                  className={`${HEADER_CONTROL} appearance-none`}
+                >
+                  <option value="" style={{ backgroundColor: '#18191c' }}>Tous</option>
+                  <option value="positive" style={{ backgroundColor: '#18191c' }}>Positif</option>
+                  <option value="negative" style={{ backgroundColor: '#18191c' }}>Négatif</option>
+                </select>
+              </th>
               <th className={`${HEADER_CELL} w-16 text-center ${HEADER_LABEL}`}>Actions</th>
             </tr>
           </thead>
@@ -971,13 +1023,20 @@ export default function Transactions({
             {groupedTransactions.map((group) => (
               <React.Fragment key={group.key}>
                 <tr>
-                  <td colSpan={6} className="px-3 pt-3 pb-1 text-[10px] font-medium uppercase tracking-wider text-zinc-600">
-                    {group.label}
+                  <td colSpan={6} className="px-3 pt-3 pb-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-zinc-600">
+                        {group.label}
+                      </span>
+                      <span className={`text-[11px] tabular-nums font-medium ${group.runningBalance >= 0 ? 'text-green-500/70' : 'text-red-500/70'}`}>
+                        {group.runningBalance >= 0 ? '+' : ''}{formatAmount(group.runningBalance)}
+                      </span>
+                    </div>
                   </td>
                 </tr>
-                {group.items.map((transaction) => (
+                {group.rows.map((row) => row.kind === 'single' ? (
               <tr
-                key={transaction.id}
+                key={row.key}
                 className="transition-colors cursor-pointer group"
                 style={{ borderLeft: '4px solid transparent' }}
                 onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #7c3aed'}
@@ -986,14 +1045,14 @@ export default function Transactions({
                 <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
                   <input
                     type="checkbox"
-                    checked={selectedTransactions.includes(transaction.id)}
-                    onChange={() => handleToggleSelect(transaction.id)}
+                    checked={selectedTransactions.includes(row.transaction.id)}
+                    onChange={() => handleToggleSelect(row.transaction.id)}
                     className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
                     onClick={(e) => e.stopPropagation()}
                   />
                 </td>
                 <td className="w-64 max-w-[16rem] px-3 py-2 text-xs text-white">
-                  {editingId === transaction.id ? (
+                  {editingId === row.transaction.id ? (
                     <input
                       type="text"
                       value={editingTransaction?.description || ''}
@@ -1001,7 +1060,7 @@ export default function Transactions({
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                     />
-                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'description' ? (
+                  ) : inlineEditCell?.transactionId === row.transaction.id && inlineEditCell?.field === 'description' ? (
                     <input
                       type="text"
                       value={inlineEditValue}
@@ -1014,18 +1073,18 @@ export default function Transactions({
                     />
                   ) : (
                     <span
-                      onClick={() => handleInlineEdit(transaction.id, 'description')}
+                      onClick={() => handleInlineEdit(row.transaction.id, 'description')}
                       className="flex min-w-0 max-w-full cursor-pointer items-center gap-2.5 rounded px-1 py-0.5 editable-cell hover:opacity-80"
                       // Le libellé brut de la banque reste accessible : rien n'est perdu.
-                      title={transaction.description}
+                      title={row.transaction.description}
                     >
-                      <MerchantAvatar description={transaction.description} />
-                      <span className="truncate">{merchantName(transaction.description)}</span>
+                      <MerchantAvatar description={row.transaction.description} />
+                      <span className="truncate">{merchantName(row.transaction.description)}</span>
                     </span>
                   )}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
-                  {editingId === transaction.id ? (
+                  {editingId === row.transaction.id ? (
                     <select
                       value={editingTransaction?.categoryId || ''}
                       onChange={(e) => setEditingTransaction(prev => prev ? {...prev, categoryId: e.target.value} : null)}
@@ -1035,7 +1094,7 @@ export default function Transactions({
                         <option key={category.id} value={category.id} style={{ backgroundColor: '#18191c' }}>{category.name}</option>
                       ))}
                     </select>
-                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'category' ? (
+                  ) : inlineEditCell?.transactionId === row.transaction.id && inlineEditCell?.field === 'category' ? (
                     <select
                       value={inlineEditValue}
                       onChange={(e) => setInlineEditValue(e.target.value)}
@@ -1052,13 +1111,13 @@ export default function Transactions({
                     </select>
                   ) : (
                     <span 
-                      onClick={() => handleInlineEdit(transaction.id, 'category')}
+                      onClick={() => handleInlineEdit(row.transaction.id, 'category')}
                       className="cursor-pointer editable-cell inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
                       style={
-                        transaction.category
+                        row.transaction.category
                           ? {
-                              backgroundColor: transaction.category.color + '20',
-                              color: transaction.category.color
+                              backgroundColor: row.transaction.category.color + '20',
+                              color: row.transaction.category.color
                             }
                           : {
                               backgroundColor: '#2b2f37',
@@ -1067,19 +1126,19 @@ export default function Transactions({
                       }
                       title="Double-cliquez pour éditer"
                     >
-                      {transaction.category ? (
+                      {row.transaction.category ? (
                         <>
-                          {transaction.category.icon && (
-                            <span className="mr-1.5 text-base">{transaction.category.icon}</span>
+                          {row.transaction.category.icon && (
+                            <span className="mr-1.5 text-base">{row.transaction.category.icon}</span>
                           )}
-                          {transaction.category.name}
+                          {row.transaction.category.name}
                         </>
                       ) : 'Non défini'}
                     </span>
                   )}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
-                  {inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'bank' ? (
+                  {inlineEditCell?.transactionId === row.transaction.id && inlineEditCell?.field === 'bank' ? (
                     <select
                       value={inlineEditValue}
                       onChange={(e) => setInlineEditValue(e.target.value)}
@@ -1105,14 +1164,14 @@ export default function Transactions({
                     </select>
                   ) : (
                     <div 
-                      onClick={() => handleInlineEdit(transaction.id, 'bank')}
+                      onClick={() => handleInlineEdit(row.transaction.id, 'bank')}
                       className="cursor-pointer rounded px-1 py-0.5 editable-cell flex items-center hover:opacity-80"
                       title="Double-cliquez pour éditer"
                     >
-                      {transaction.bank.image ? (
+                      {row.transaction.bank.image ? (
                         <img
-                          src={assetUrl(transaction.bank.image)}
-                          alt={transaction.bank.name}
+                          src={assetUrl(row.transaction.bank.image)}
+                          alt={row.transaction.bank.name}
                           className="w-8 h-8 rounded-full object-cover"
                         />
                       ) : (
@@ -1120,17 +1179,17 @@ export default function Transactions({
                         // le cercle restait vide : on retombe sur les initiales.
                         <div
                           className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold text-white"
-                          style={{ backgroundColor: transaction.bank.color || '#3b82f6' }}
+                          style={{ backgroundColor: row.transaction.bank.color || '#3b82f6' }}
                         >
-                          {transaction.bank.shortName || merchantInitials(transaction.bank.name)}
+                          {row.transaction.bank.shortName || merchantInitials(row.transaction.bank.name)}
                         </div>
                       )}
                       <div className="ml-2">
                         <div className="font-medium text-white text-xs">
-                          {transaction.bank.name}
-                          {otherBankOwnersSuffix(transaction.bank.users, authUser?.id) && (
+                          {row.transaction.bank.name}
+                          {otherBankOwnersSuffix(row.transaction.bank.users, authUser?.id) && (
                             <span className="text-xs text-zinc-400 ml-2">
-                              {otherBankOwnersSuffix(transaction.bank.users, authUser?.id)}
+                              {otherBankOwnersSuffix(row.transaction.bank.users, authUser?.id)}
                             </span>
                           )}
                         </div>
@@ -1139,7 +1198,7 @@ export default function Transactions({
                   )}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-right text-xs tabular-nums text-white">
-                  {editingId === transaction.id ? (
+                  {editingId === row.transaction.id ? (
                     <input
                       type="number"
                       step="1"
@@ -1148,7 +1207,7 @@ export default function Transactions({
                       className="w-full rounded-md shadow-sm text-white border-none focus:ring-0 bg-transparent text-xs"
                       style={{ backgroundColor: '#18191c' }}
                     />
-                  ) : inlineEditCell?.transactionId === transaction.id && inlineEditCell?.field === 'amount' ? (
+                  ) : inlineEditCell?.transactionId === row.transaction.id && inlineEditCell?.field === 'amount' ? (
                     <input
                       type="number"
                       step="1"
@@ -1162,16 +1221,16 @@ export default function Transactions({
                     />
                   ) : (
                     <span 
-                      onClick={() => handleInlineEdit(transaction.id, 'amount')}
-                      className={`cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80 ${transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}
+                      onClick={() => handleInlineEdit(row.transaction.id, 'amount')}
+                      className={`cursor-pointer rounded px-1 py-0.5 editable-cell hover:opacity-80 ${row.transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}
                       title="Double-cliquez pour éditer"
                     >
-                      {formatAmount(transaction.amount)}
+                      {formatAmount(row.transaction.amount)}
                     </span>
                   )}
                 </td>
                 <td className="px-3 py-1.5 whitespace-nowrap text-xs font-medium">
-                  {editingId === transaction.id ? (
+                  {editingId === row.transaction.id ? (
                     <div className="flex space-x-2">
                       <button
                         onClick={handleSave}
@@ -1197,9 +1256,21 @@ export default function Transactions({
                       </button>
                     </div>
                   ) : (
-                    <div className="flex justify-center">
+                    <div className="flex items-center justify-center gap-3">
                       <button
-                        onClick={() => handleDelete(transaction.id)}
+                        onClick={() => setTraceId(row.transaction.id)}
+                        title="Trajet de l'argent"
+                        className="transition-colors"
+                        style={{ color: '#616875' }}
+                        onMouseEnter={(e) => e.currentTarget.style.color = '#7c3aed'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 8h3l2 4 3-6 3 7 2-2h1" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={() => handleDelete(row.transaction.id)}
                         className="transition-colors"
                         style={{ color: '#616875' }}
                         onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
@@ -1213,6 +1284,154 @@ export default function Transactions({
                   )}
                 </td>
               </tr>
+              ) : (
+                <React.Fragment key={row.key}>
+                    <tr
+                      className="transition-colors cursor-pointer group"
+                      style={{ borderLeft: '4px solid transparent' }}
+                      onMouseEnter={e => e.currentTarget.style.borderLeft = '4px solid #7c3aed'}
+                      onMouseLeave={e => e.currentTarget.style.borderLeft = '4px solid transparent'}
+                      onClick={() => setExpandedGroups(prev => {
+                        const next = new Set(prev);
+                        if (next.has(row.key)) next.delete(row.key);
+                        else next.add(row.key);
+                        return next;
+                      })}
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
+                        <input
+                          type="checkbox"
+                          checked={row.items.every(t => selectedTransactions.includes(t.id))}
+                          onChange={() => {
+                            const allSelected = row.items.every(t => selectedTransactions.includes(t.id));
+                            if (allSelected) {
+                              setSelectedTransactions(prev => prev.filter(id => !row.items.some(t => t.id === id)));
+                            } else {
+                              setSelectedTransactions(prev => [...new Set([...prev, ...row.items.map(t => t.id)])]);
+                            }
+                          }}
+                          className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </td>
+                      <td className="w-64 max-w-[16rem] px-3 py-2 text-xs text-white">
+                        <div className="flex min-w-0 max-w-full items-center gap-2.5">
+                          <MerchantAvatar description={row.items[0].description} />
+                          <span className="truncate font-medium">{row.merchant}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium" style={{ backgroundColor: '#2b2f37', color: '#a1a1aa' }}>
+                          {row.items.length} opérations
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
+                        <div className="flex items-center">
+                          {row.items[0].bank.image ? (
+                            <img
+                              src={assetUrl(row.items[0].bank.image)}
+                              alt={row.items[0].bank.name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                              style={{ backgroundColor: row.items[0].bank.color || '#3b82f6' }}
+                            >
+                              {row.items[0].bank.shortName || merchantInitials(row.items[0].bank.name)}
+                            </div>
+                          )}
+                          <div className="ml-2">
+                            <div className="font-medium text-white text-xs">{row.items[0].bank.name}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-right text-xs tabular-nums text-white">
+                        <span className={row.total >= 0 ? 'text-green-400' : 'text-red-400'}>
+                          {formatAmount(row.total)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-1.5 whitespace-nowrap text-xs font-medium">
+                        <div className="flex items-center justify-center">
+                          <svg
+                            className={`h-4 w-4 text-zinc-500 transition-transform duration-200 ${expandedGroups.has(row.key) ? 'rotate-180' : ''}`}
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </td>
+                    </tr>
+                    {expandedGroups.has(row.key) && row.items.map((transaction) => (
+                      <tr
+                        key={transaction.id}
+                        className="transition-colors"
+                        style={{ borderLeft: '4px solid transparent' }}
+                      >
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-white pl-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedTransactions.includes(transaction.id)}
+                            onChange={() => handleToggleSelect(transaction.id)}
+                            className="h-4 w-4 text-violet-500 focus:ring-violet-500 border-zinc-700 rounded bg-zinc-900"
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </td>
+                        <td className="w-64 max-w-[16rem] px-3 py-2 text-xs text-white">
+                          <span className="flex min-w-0 max-w-full items-center gap-2.5 rounded px-1 py-0.5">
+                            <span className="truncate text-zinc-400">{transaction.description}</span>
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-white">
+                          <span
+                            className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium"
+                            style={
+                              transaction.category
+                                ? { backgroundColor: transaction.category.color + '20', color: transaction.category.color }
+                                : { backgroundColor: '#2b2f37', color: '#a1a1aa' }
+                            }
+                          >
+                            {transaction.category ? transaction.category.name : 'Non défini'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-xs text-white" />
+                        <td className="px-3 py-2 whitespace-nowrap text-right text-xs tabular-nums text-white">
+                          <span className={transaction.amount >= 0 ? 'text-green-400' : 'text-red-400'}>
+                            {formatAmount(transaction.amount)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-1.5 whitespace-nowrap text-xs font-medium">
+                          <div className="flex items-center justify-center gap-3">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setTraceId(transaction.id); }}
+                              title="Trajet de l'argent"
+                              className="transition-colors"
+                              style={{ color: '#616875' }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = '#7c3aed'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 8h3l2 4 3-6 3 7 2-2h1" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDelete(transaction.id); }}
+                              className="transition-colors"
+                              style={{ color: '#616875' }}
+                              onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = '#616875'}
+                            >
+                              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                             </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))}
               </React.Fragment>
             ))}
@@ -1452,6 +1671,8 @@ export default function Transactions({
           </div>
         </div>
       )}
+
+      <TransactionTraceModal transactionId={traceId} onClose={() => setTraceId(null)} />
     </div>
   );
 }

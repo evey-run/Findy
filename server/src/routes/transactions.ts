@@ -1,6 +1,8 @@
 import express from 'express';
 import prisma from '../prisma';
 import { resolveScope } from '../lib/scope';
+import { getInternalTransferIds } from '../lib/transferDetection';
+import { buildTrace, buildTransferLinks, TRACE_WINDOW_MS } from '../lib/transferTrace';
 
 const router = express.Router();
 
@@ -26,8 +28,17 @@ function withBankMembers(transaction: any) {
 // GET /api/transactions - Récupérer toutes les transactions
 router.get('/', async (req, res) => {
   try {
-    const { bankId, categoryId, startDate, endDate, limit, offset, search, accountType, excludeAccountType, checked, userId } = req.query;
+    const { bankId, categoryId, startDate, endDate, limit, offset, search, accountType, excludeAccountType, checked, userId, amountSign } = req.query;
     const where: any = {};
+
+    // Filtre par signe du montant : positif = revenus, négatif = dépenses.
+    // Fait côté serveur pour que la pagination reste cohérente (sinon un
+    // filtrage client peut vider une page entière et bloquer le scroll infini).
+    if (amountSign === 'positive' || amountSign === 'income') {
+      where.amount = { gt: 0 };
+    } else if (amountSign === 'negative' || amountSign === 'expense') {
+      where.amount = { lt: 0 };
+    }
 
     // Filtre par ID de banque
     if (bankId) where.bankId = bankId;
@@ -157,23 +168,34 @@ router.get('/stats/summary', async (req, res) => {
       if (startDate) where.date.gte = new Date(startDate as string);
       if (endDate) where.date.lte = new Date(endDate as string);
     }
-    
+
+    // Get internal transfer IDs to exclude from income/expense calculations
+    const transferIds = await getInternalTransferIds(
+      req.authUserId,
+      startDate ? new Date(startDate as string) : undefined,
+      endDate ? new Date(endDate as string) : undefined
+    );
+    const hasTransfers = transferIds.size > 0;
+    const transferWhere = hasTransfers
+      ? { ...where, id: { notIn: Array.from(transferIds) } }
+      : where;
+
     const [incomeSum, expenseSum, transactionCount] = await Promise.all([
       prisma.transaction.aggregate({
-        where: { ...where, amount: { gt: 0 } },
+        where: { ...transferWhere, amount: { gt: 0 } },
         _sum: { amount: true }
       }),
       prisma.transaction.aggregate({
-        where: { ...where, amount: { lt: 0 } },
+        where: { ...transferWhere, amount: { lt: 0 } },
         _sum: { amount: true }
       }),
-      prisma.transaction.count({ where })
+      prisma.transaction.count({ where }) // Keep original count for transparency
     ]);
-    
+
     const totalIncome = incomeSum._sum.amount || 0;
     const totalExpenses = Math.abs(expenseSum._sum.amount || 0);
     const balance = totalIncome - totalExpenses;
-    
+
     res.json({
       totalIncome,
       totalExpenses,
@@ -183,6 +205,83 @@ router.get('/stats/summary', async (req, res) => {
   } catch (error) {
     console.error('Error fetching transaction summary:', error);
     res.status(500).json({ error: 'Failed to fetch transaction summary' });
+  }
+});
+
+// GET /api/transactions/:id/trace — le trajet de l'argent d'une opération.
+router.get('/:id/trace', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const focus = await prisma.transaction.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        amount: true,
+        date: true,
+        description: true,
+        bankId: true,
+        categoryId: true,
+        checked: true,
+        bank: { select: { spaceId: true } },
+      },
+    });
+    if (!focus) return res.status(404).json({ error: 'Transaction not found' });
+
+    const scope = await resolveScope(req.query as any, req.authUserId);
+    if (!scope.includes(focus.bank.spaceId)) {
+      return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const windowStart = new Date(focus.date.getTime() - TRACE_WINDOW_MS);
+    const windowEnd = new Date(focus.date.getTime() + TRACE_WINDOW_MS);
+
+    const allTxns = await prisma.transaction.findMany({
+      where: {
+        bank: { spaceId: { in: scope } },
+        date: { gte: windowStart, lte: windowEnd },
+      },
+      select: {
+        id: true,
+        amount: true,
+        date: true,
+        description: true,
+        bankId: true,
+        categoryId: true,
+        checked: true,
+      },
+    });
+
+    const links = buildTransferLinks(allTxns);
+    const trace = buildTrace(id, allTxns, links);
+
+    // Collecter les IDs uniques de comptes et catégories mentionnés par le trajet.
+    const mentionedBankIds = new Set<string>();
+    const mentionedCategoryIds = new Set<string>();
+    for (const node of trace.nodes) {
+      mentionedBankIds.add(node.bankId);
+      if (node.categoryId) mentionedCategoryIds.add(node.categoryId);
+    }
+
+    const [banks, categories] = await Promise.all([
+      mentionedBankIds.size > 0
+        ? prisma.bank.findMany({
+            where: { id: { in: [...mentionedBankIds] } },
+            select: { id: true, name: true, shortName: true, color: true, image: true },
+          })
+        : [],
+      mentionedCategoryIds.size > 0
+        ? prisma.category.findMany({
+            where: { id: { in: [...mentionedCategoryIds] } },
+            select: { id: true, name: true, icon: true, color: true },
+          })
+        : [],
+    ]);
+
+    res.json({ ...trace, banks, categories });
+  } catch (error) {
+    console.error('Error fetching transaction trace:', error);
+    res.status(500).json({ error: 'Failed to fetch transaction trace' });
   }
 });
 

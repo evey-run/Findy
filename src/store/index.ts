@@ -68,8 +68,8 @@ interface AppState {
   addTransaction: (transaction: Transaction) => void;
   updateTransaction: (id: string, transaction: Partial<Transaction>) => void;
   removeTransaction: (id: string) => void;
-  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => Promise<void>;
-  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
+  loadTransactions: (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string; amountSign?: string }) => Promise<void>;
+  loadMoreTransactions: (page: number, itemsPerPage: number, options?: { accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string; amountSign?: string }) => Promise<{ hasMore: boolean; newTransactions: Transaction[] }>;
   loadAllTransactions: (options?: { accountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; pageName?: string }) => Promise<void>;
   appendTransactions: (newTransactions: Transaction[]) => void;
   
@@ -122,9 +122,10 @@ interface AppState {
       categoryId?: string;
       searchText?: string;
       checked?: string;
+      amountSign?: string;
     };
   };
-  setPageFilter: (pageName: string, filter: { startDate?: string; endDate?: string; categoryId?: string; searchText?: string; checked?: string }) => void;
+  setPageFilter: (pageName: string, filter: { startDate?: string; endDate?: string; categoryId?: string; searchText?: string; checked?: string; amountSign?: string }) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -315,7 +316,7 @@ export const useAppStore = create<AppState>()(
 
       // Filtres spécifiques par page
       pageFilters: {},
-      setPageFilter: (pageName: string, filter: { startDate?: string; endDate?: string; categoryId?: string; searchText?: string }) => {
+      setPageFilter: (pageName: string, filter: { startDate?: string; endDate?: string; categoryId?: string; searchText?: string; amountSign?: string }) => {
         set((state) => ({
           pageFilters: {
             ...state.pageFilters,
@@ -533,7 +534,7 @@ export const useAppStore = create<AppState>()(
           transactions: state.transactions.filter((t) => t.id !== id),
         })),
       
-      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string }) => {
+      loadTransactions: async (options?: { searchText?: string; forceLoadAll?: boolean; accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; ignoreDateRange?: boolean; categoryId?: string; pageName?: string; forceRefresh?: boolean; limit?: number; startDate?: string; endDate?: string; checked?: string; amountSign?: string }) => {
         // Create a unique key for this request based on the options
         const requestKey = JSON.stringify({
           categoryId: options?.categoryId || null,
@@ -544,6 +545,7 @@ export const useAppStore = create<AppState>()(
           startDate: options?.startDate || null,
           endDate: options?.endDate || null,
           checked: options?.checked || null,
+          amountSign: options?.amountSign || null,
           pageName: options?.pageName || null,
           limit: options?.limit || null
         });
@@ -606,7 +608,12 @@ export const useAppStore = create<AppState>()(
           if (options?.checked && options.checked !== '') {
             params.append('checked', options.checked);
           }
-          
+
+          // Ajouter le filtre de signe (revenus/dépenses) si fourni
+          if (options?.amountSign && options.amountSign !== '') {
+            params.append('amountSign', options.amountSign);
+          }
+
           // Add pagination limit to reduce initial data load
           // Default to 50 items if not specified
           const limit = options?.limit || 50;
@@ -638,7 +645,7 @@ export const useAppStore = create<AppState>()(
         }
       },
        
-      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string }) => {
+      loadMoreTransactions: async (page: number, itemsPerPage: number, options?: { accountType?: string; excludeAccountType?: string; forceIgnoreSelectedBank?: boolean; searchText?: string; categoryId?: string; pageName?: string; startDate?: string; endDate?: string; checked?: string; amountSign?: string }) => {
         try {
           const state = get();
           const params = new URLSearchParams({
@@ -664,6 +671,10 @@ export const useAppStore = create<AppState>()(
           // Ajouter le filtre checked si fourni
           if (options?.checked && options.checked !== '') {
             params.append('checked', options.checked);
+          }
+          // Filtre de signe (revenus/dépenses) : cohérence avec le chargement initial
+          if (options?.amountSign && options.amountSign !== '') {
+            params.append('amountSign', options.amountSign);
           }
           // Ajouter le filtre de banque si une banque est sélectionnée
           // et si on ne force pas l'ignorance de ce filtre

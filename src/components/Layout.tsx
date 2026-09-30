@@ -31,15 +31,6 @@ const navigation = [
   { name: 'Portefeuille',    href: '/banks', icon: WalletIcon },
 ];
 
-// Mobile bottom nav — 5 items most-used
-const mobileNav = [
-  { name: 'Accueil',      href: '/dashboard',      icon: HomeIcon },
-  { name: 'Transactions', href: '/transactions',    icon: CreditCardIcon },
-  { name: 'Objectifs',    href: '/budgets',         icon: FlagIcon },
-  { name: 'Portefeuille', href: '/banks',           icon: WalletIcon },
-  { name: 'Paramètres',   href: '/settings',        icon: Cog6ToothIcon },
-];
-
 function cx(...classes: (string | false | undefined)[]) {
   return classes.filter(Boolean).join(' ');
 }
@@ -267,32 +258,11 @@ export default function Layout({ children }: LayoutProps) {
         {/* Drag region for overlay titlebar */}
         <div className="h-8 w-full flex-shrink-0" data-tauri-drag-region />
         <main className="flex-1 min-h-0 flex flex-col overflow-hidden">
-          {/* pb-20 on mobile for bottom nav clearance */}
-          <div className="flex-1 min-h-0 flex flex-col w-full px-6 md:px-10 pt-6 md:pt-8 pb-20 md:pb-6">
+          <div className="flex-1 min-h-0 flex flex-col w-full px-6 md:px-10 pt-6 md:pt-8 pb-6">
             {children}
           </div>
         </main>
       </div>
-
-      {/* ── Mobile bottom nav ── */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-white/[0.08] flex items-center justify-around px-1 py-1.5">
-        {mobileNav.map((item) => {
-          const isActive = location.pathname === item.href;
-          return (
-            <Link
-              key={item.name}
-              to={item.href}
-              className={cx(
-                'flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-colors',
-                isActive ? 'text-violet-400' : 'text-zinc-500 hover:text-zinc-300'
-              )}
-            >
-              <item.icon className="h-5 w-5" aria-hidden="true" />
-              <span className="text-[10px] font-medium">{item.name}</span>
-            </Link>
-          );
-        })}
-      </nav>
     </div>
   );
 }

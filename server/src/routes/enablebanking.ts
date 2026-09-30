@@ -1132,6 +1132,12 @@ export async function syncAllBanks(): Promise<Array<{ bankId: string; bankName: 
     }
   }
 
+  // Catégorisation IA automatique après le sync
+  try {
+    const { categorizeUncategorized } = await import('../lib/aiCategorize');
+    await categorizeUncategorized();
+  } catch {}
+
   return results;
 }
 

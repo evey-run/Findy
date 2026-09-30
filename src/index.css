@@ -29,15 +29,23 @@ body {
   background-color: rgba(124, 58, 237, 0.3);
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar       { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+/* Custom scrollbar — seulement là où un curseur peut la saisir. Sur un écran
+   tactile elle ne sert à rien et sa gouttière décale les listes pleine largeur. */
+@media (pointer: fine) {
+  ::-webkit-scrollbar       { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
 
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #3f3f46 transparent;
+  }
+}
+
+@media (pointer: coarse) {
+  * { scrollbar-width: none; }
+  *::-webkit-scrollbar { display: none; }
 }
 
 /* Date inputs.
@@ -70,3 +78,113 @@ input[type="date"]::-moz-focus-inner { border: 0; }
 }
 
 .avatar-container:hover .avatar-tooltip { opacity: 1; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Mobile (iOS / Android)
+
+   Ces règles ne concernent que l'interface tactile. Elles sont regroupées ici
+   plutôt que dispersées dans les composants parce qu'elles corrigent des
+   comportements du moteur de rendu, pas des choix de mise en page.
+   ───────────────────────────────────────────────────────────────────────── */
+
+:root {
+  /* Retombées à zéro : `env()` n'existe pas hors WebKit/Blink récents, et une
+     variable vide casserait un `calc()`. */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left, 0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
+  /* Hauteur de la barre d'onglets flottante, encoche comprise. Le contenu des
+     écrans s'en sert pour ne pas glisser dessous. */
+  --tabbar-height: calc(62px + var(--safe-bottom));
+}
+
+/* `100vh` sur iOS vaut la hauteur *sans* la barre d'adresse : un écran calé
+   dessus dépasse toujours d'une centaine de pixels. `100dvh` suit la hauteur
+   réellement visible. */
+@supports (height: 100dvh) {
+  body, #root { min-height: 100dvh; }
+}
+
+/* Dans l'application native, l'interface doit se comporter comme une
+   application et non comme une page : pas de rebond élastique du document, pas
+   de loupe de sélection sur un appui long, pas de flash bleu au tap. */
+html.native-app,
+html.native-app body {
+  overscroll-behavior-y: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Les montants et libellés restent copiables : c'est le geste attendu sur une
+   ligne de transaction, et le seul moyen de récupérer un IBAN. */
+html.native-app input,
+html.native-app textarea,
+html.native-app [data-selectable] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Safari zoome dès qu'un champ passe sous 16px à la mise au point, et ne
+   dézoome jamais ensuite. La taille visuelle reste pilotée par les classes
+   utilitaires sur desktop ; seule l'interface tactile est forcée. */
+@media (max-width: 767px) {
+  /* `!important` est nécessaire : un sélecteur d'élément perd contre la moindre
+     classe utilitaire, et les écrans desktop portent tous un `text-sm` ou un
+     `text-xs` sur leurs champs. Sans lui, la règle ne s'applique nulle part. */
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Barre de défilement masquée : sur mobile elle n'est jamais utile et son
+   réservoir de 6px décale les listes pleine largeur. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Défilement inertiel dans les panneaux internes (feuilles, carrousels). */
+.momentum-scroll { -webkit-overflow-scrolling: touch; }
+
+/* Un conteneur qui défile ne doit pas entraîner la page derrière lui une fois
+   arrivé en butée — sinon une feuille modale referme l'écran sous elle. */
+.scroll-contained { overscroll-behavior: contain; }
+
+/* Défilement horizontal aimanté, pour les carrousels de cartes. */
+.snap-row {
+  scroll-snap-type: x mandatory;
+  scroll-padding-left: 20px;
+}
+.snap-row > * { scroll-snap-align: start; }
+
+/* Feuilles modales : entrée depuis le bas, sortie symétrique. Les durées
+   suivent les conventions natives (≈ 280 ms), assez courtes pour ne pas
+   retarder l'interaction. */
+@keyframes sheet-in  { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes sheet-out { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes fade-in-backdrop  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fade-out-backdrop { from { opacity: 1; } to { opacity: 0; } }
+
+.animate-sheet-in     { animation: sheet-in 280ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.animate-sheet-out    { animation: sheet-out 220ms cubic-bezier(0.32, 0.72, 0, 1) both; }
+.animate-backdrop-in  { animation: fade-in-backdrop 220ms ease-out both; }
+.animate-backdrop-out { animation: fade-out-backdrop 200ms ease-in both; }
+
+/* Bascule d'écran : un fondu montant très court, qui donne la direction sans
+   faire attendre. */
+@keyframes screen-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-screen-in { animation: screen-in 220ms ease-out both; }
+
+/* Réaction au toucher : l'enfoncement remplace le survol, qui n'existe pas. */
+.tappable { transition: transform 120ms ease, opacity 120ms ease; }
+.tappable:active { transform: scale(0.97); opacity: 0.85; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-in, .animate-sheet-out,
+  .animate-backdrop-in, .animate-backdrop-out,
+  .animate-screen-in { animation-duration: 1ms; }
+  .tappable:active { transform: none; }
+}

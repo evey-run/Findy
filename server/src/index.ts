@@ -10,7 +10,9 @@ import { prisma } from './prisma';
 import { getPublicBaseUrl } from './publicUrl';
 import { runPendingMigrations } from './lib/migrate';
 import { isCurrentPublicCallbackOrigin } from './lib/publicOrigin';
-import { shouldBlockRequest } from './lib/publicSurface';
+import { isLanAccessEnabled, isPrivateNetworkHost, shouldBlockRequest } from './lib/publicSurface';
+import { lanAddresses } from './lib/lanAddress';
+import { readMobileAccessPreference, writeMobileAccessPreference } from './lib/mobileAccess';
 import { attachAuth, requireAuth } from './middleware/auth';
 import { closeTunnel, initTunnel, restartTunnel, tunnelStatus } from './lib/tunnel';
 
@@ -47,9 +49,23 @@ process.env.UPLOADS_DIR = UPLOADS_DIR;
 const app = express();
 const PORT = process.env.PORT || 36321;
 
-// CORS : Tauri utilise `tauri://localhost` en application packagée mais, en
-// `tauri dev`, charge Vite depuis localhost:51737. Les deux doivent rester
-// autorisés : le sidecar est toujours local et le port peut être un fallback.
+// Accès mobile : quand il est activé, le serveur écoute sur toutes les
+// interfaces et accepte les requêtes venues du réseau local. Sans lui, le
+// sidecar reste ce qu'il a toujours été — un service de la boucle locale,
+// invisible du reste du réseau. Le téléphone joint alors le Mac directement,
+// sans tunnel ni cloud, et l'authentification par jeton s'applique comme
+// ailleurs.
+//
+// Deux voies : la variable d'environnement (développement, `npm run dev:mobile`)
+// et la préférence enregistrée depuis les réglages — la seule utilisable dans
+// l'application installée, où l'environnement du sidecar est figé par Rust.
+const LAN_ACCESS = isLanAccessEnabled() || readMobileAccessPreference();
+const HOST = process.env.HOST || (LAN_ACCESS ? '0.0.0.0' : '127.0.0.1');
+
+// CORS : Tauri utilise `tauri://localhost` en application packagée — et
+// `http://tauri.localhost` sur Android — mais, en `tauri dev`, charge Vite
+// depuis localhost:51737. Tous doivent rester autorisés : le sidecar est
+// toujours local et le port peut être un fallback.
 const allowedOrigins = new Set([
   'http://localhost:51737',
   'http://127.0.0.1:51737',
@@ -58,10 +74,23 @@ const allowedOrigins = new Set([
   ...(process.env.FRONTEND_URL ? [process.env.FRONTEND_URL] : []),
 ]);
 
+// En développement mobile, le téléphone charge Vite depuis l'adresse LAN du
+// Mac. Celle-ci change de réseau en réseau : on l'autorise par sa forme plutôt
+// qu'en dur. `changeOrigin` du proxy Vite réécrit `Host`, pas `Origin` —
+// l'origine LAN arrive donc bien jusqu'ici.
+function isLanOrigin(origin: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(origin);
+    return protocol === 'http:' && isPrivateNetworkHost(hostname);
+  } catch {
+    return false;
+  }
+}
+
 // Première barrière : le tunnel HTTPS ne doit publier que le retour bancaire.
 // Tout le reste de l'API n'existe pas pour un appelant venu d'Internet.
 app.use((req, res, next) => {
-  if (shouldBlockRequest(req.headers as Record<string, unknown>, req.originalUrl)) {
+  if (shouldBlockRequest(req.headers as Record<string, unknown>, req.originalUrl, { allowLan: LAN_ACCESS })) {
     console.warn(`[Sécurité] Requête publique refusée: ${req.method} ${req.path}`);
     return res.status(404).json({ error: 'Route not found' });
   }
@@ -70,7 +99,12 @@ app.use((req, res, next) => {
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.has(origin) || isCurrentPublicCallbackOrigin(origin, getPublicBaseUrl())) callback(null, true);
+    if (
+      !origin ||
+      allowedOrigins.has(origin) ||
+      (LAN_ACCESS && isLanOrigin(origin)) ||
+      isCurrentPublicCallbackOrigin(origin, getPublicBaseUrl())
+    ) callback(null, true);
     else callback(new Error(`CORS: origin non autorisée: ${origin}`));
   },
   credentials: true
@@ -108,6 +142,52 @@ app.use('/api/settings', settingsRoutes);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Finance Tracker API is running!' });
+});
+
+// Appairage mobile : l'application iOS/Android a besoin d'une adresse à
+// saisir, et l'utilisateur n'a pas à aller la chercher dans les réglages
+// réseau de son Mac. La route reste derrière `requireAuth` — elle décrit le
+// réseau local de la machine, ce n'est pas une information à publier.
+app.get('/api/mobile-access', (_req, res) => {
+  const preference = isLanAccessEnabled() || readMobileAccessPreference();
+  res.json({
+    // `enabled` décrit ce qui est vrai maintenant, `preference` ce qui le sera
+    // au prochain démarrage : sans cette distinction, l'interface annoncerait
+    // un accès ouvert alors que le port écoute encore sur la boucle locale.
+    enabled: LAN_ACCESS,
+    preference,
+    restartRequired: preference !== LAN_ACCESS,
+    /** Forcé par l'environnement : le réglage ne peut alors rien y changer. */
+    locked: isLanAccessEnabled(),
+    port: Number(PORT),
+    addresses: lanAddresses().map(({ address }) => `http://${address}:${PORT}`),
+  });
+});
+
+app.put('/api/mobile-access', (req, res) => {
+  const enabled = req.body?.enabled === true;
+
+  if (isLanAccessEnabled()) {
+    return res.status(409).json({
+      error: 'L’accès mobile est imposé par la variable FINDY_LAN_ACCESS.',
+    });
+  }
+
+  try {
+    writeMobileAccessPreference(enabled);
+  } catch (error) {
+    console.error('[Accès mobile] Enregistrement impossible:', error);
+    return res.status(500).json({ error: 'Enregistrement impossible.' });
+  }
+
+  res.json({
+    enabled: LAN_ACCESS,
+    preference: enabled,
+    restartRequired: enabled !== LAN_ACCESS,
+    locked: false,
+    port: Number(PORT),
+    addresses: lanAddresses().map(({ address }) => `http://${address}:${PORT}`),
+  });
 });
 
 // Tunnel status
@@ -242,11 +322,17 @@ async function startServer() {
     return;
   }
 
-  // Écoute sur la boucle locale uniquement : le serveur est un sidecar de
+  // Écoute sur la boucle locale par défaut : le serveur est un sidecar de
   // l'application, pas un service réseau. L'agent ngrok tourne dans ce même
-  // processus et atteint donc 127.0.0.1 sans difficulté.
-  httpServer = app.listen(Number(PORT), '127.0.0.1', async () => {
-  console.log(`🚀 Server running on 127.0.0.1:${PORT}`);
+  // processus et atteint donc 127.0.0.1 sans difficulté. L'accès mobile
+  // (FINDY_LAN_ACCESS=1) est le seul cas où il s'ouvre au réseau local.
+  httpServer = app.listen(Number(PORT), HOST, async () => {
+  console.log(`🚀 Server running on ${HOST}:${PORT}`);
+  if (LAN_ACCESS) {
+    for (const { address } of lanAddresses()) {
+      console.log(`📱 Accessible depuis vos appareils : http://${address}:${PORT}`);
+    }
+  }
   console.log(`📊 Finance Tracker API ready!`);
 
   // Tunnel PSD2 : ouvert immédiatement seulement si son URL n'est pas stable.
@@ -263,7 +349,7 @@ async function startServer() {
   });
 
   httpServer.once('error', async (err) => {
-    console.error(`[Server] Impossible d'écouter le port ${PORT}:`, err.message);
+    console.error(`[Server] Impossible d'écouter ${HOST}:${PORT}:`, err.message);
     await shutdown('Server error');
     process.exit(1);
   });

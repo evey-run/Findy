@@ -13,6 +13,7 @@ const configuredDataDir = process.env.FINDY_DATA_DIR?.trim();
 export const PERSISTENCE_DIR = configuredDataDir || path.resolve(process.cwd(), 'data');
 
 export const SYNC_SETTINGS_PATH = path.join(PERSISTENCE_DIR, 'sync-settings.json');
+export const AI_SETTINGS_PATH = path.join(PERSISTENCE_DIR, 'ai-settings.json');
 
 export function ensurePersistenceDir(): void {
   fs.mkdirSync(PERSISTENCE_DIR, { recursive: true });

@@ -18,10 +18,20 @@
     "db:seed": "tsx prisma/seed.ts",
     "tauri": "tauri",
     "tauri:dev": "tauri dev --no-watch",
+    "tauri:ios": "bash scripts/ios-dev.sh",
+    "tauri:ios:device": "bash scripts/ios-dev.sh --host",
+    "tauri:ios:init": "tauri ios init",
+    "tauri:android": "bash scripts/android-dev.sh",
+    "tauri:android:device": "bash scripts/android-env.sh npx tauri android dev --host",
+    "tauri:android:init": "bash scripts/android-env.sh npx tauri android init",
+    "dev:mobile": "FINDY_LAN_ACCESS=1 npm run dev",
     "build:server": "bash scripts/build-server.sh",
     "build:mac": "bash scripts/build-mac.sh",
     "migrations:bundle": "node scripts/generate-migrations-bundle.mjs",
-    "test": "tsx --test \"server/src/**/*.test.ts\" \"src/lib/**/*.test.ts\""
+    "test": "tsx --test \"server/src/**/*.test.ts\" \"src/lib/**/*.test.ts\"",
+    "tauri:android:build": "bash scripts/android-env.sh npx tauri android build --apk",
+    "tauri:android:apk": "npm run tauri:android:build && bash scripts/android-env.sh bash scripts/android-sign-apk.sh",
+    "tauri:ios:build": "tauri ios build"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

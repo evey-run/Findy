@@ -2,3 +2,48 @@
 
 [scripts]
 setup = "npm install && npx prisma generate"
+
+# Le serveur Express (36321) et Vite (51737) sont sur des ports fixes — le
+# `devUrl` figé dans les binaires Tauri l'impose, et `strictPort` empêche Vite
+# de glisser ailleurs. Deux espaces de travail lancés en même temps se
+# battraient pour ces ports.
+run_mode = "nonconcurrent"
+
+# ── Web + serveur ───────────────────────────────────────────────────────────
+[scripts.run.dev]
+command = "npm run dev"
+default = true
+icon = "globe"
+
+# ── Application de bureau ───────────────────────────────────────────────────
+[scripts.run.desktop]
+available_in = [ "local" ]
+command = "npm run tauri:dev"
+icon = "monitor"
+
+# ── iOS ─────────────────────────────────────────────────────────────────────
+# Xcode et CocoaPods ne vivent que sur le Mac de l'utilisateur : inutile de
+# proposer ce script dans un espace de travail cloud, où il échouerait.
+# Le simulateur partage la pile réseau du Mac, donc `localhost` suffit ;
+# pour un iPhone branché, préférer `npm run tauri:ios:device` (option --host).
+[scripts.run.ios]
+available_in = [ "local" ]
+command = "npm run tauri:ios"
+icon = "smartphone"
+
+# ── Android ─────────────────────────────────────────────────────────────────
+# Le script résout lui-même JAVA_HOME, ANDROID_HOME et NDK_HOME : les scripts
+# Conductor tournent dans un shell non interactif, qui ne lit pas ~/.zshrc.
+# Le CLI fait un `adb reverse` vers l'émulateur, donc `localhost` suffit aussi.
+[scripts.run.android]
+available_in = [ "local" ]
+command = "npm run tauri:android"
+icon = "tablet-smartphone"
+
+# ── Serveur ouvert au réseau local ──────────────────────────────────────────
+# Pour tester l'application mobile installée, qui joint le Mac par son adresse
+# LAN au lieu de passer par le proxy Vite.
+[scripts.run.mobile-server]
+available_in = [ "local" ]
+command = "npm run dev:mobile"
+icon = "wifi"

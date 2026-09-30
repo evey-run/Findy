@@ -131,6 +131,7 @@ export interface Transaction {
     users?: User[];
   };
   categoryId?: string;
+  aiCategorized?: boolean;
   category?: {
     id: string;
     name: string;
@@ -277,4 +278,51 @@ export interface CreateRecurrenceData {
   active?: boolean;
   bankId?: string;
   categoryId: string;
+}
+
+// ── Trajet de l'argent ────────────────────────────────────────────────────────
+
+export interface TraceNode {
+  id: string;
+  amount: number;
+  date: string;
+  description: string;
+  bankId: string;
+  categoryId?: string | null;
+  checked: boolean;
+}
+
+export type TraceStep =
+  | { kind: 'entry'; txnId: string }
+  | { kind: 'exit'; txnId: string }
+  | { kind: 'focus'; txnId: string }
+  | { kind: 'leg'; outId: string; inId: string }
+  | { kind: 'carry'; bankId: string }
+  | { kind: 'unexplained'; bankId: string }
+  | { kind: 'remain'; bankId: string };
+
+export interface TraceBank {
+  id: string;
+  name: string;
+  shortName?: string | null;
+  color: string;
+  image?: string | null;
+}
+
+export interface TraceCategory {
+  id: string;
+  name: string;
+  icon?: string | null;
+  color: string;
+}
+
+export interface TransactionTrace {
+  focusId: string;
+  nodes: TraceNode[];
+  steps: TraceStep[];
+  sources: string[];
+  sinks: string[];
+  accounted: boolean;
+  banks: TraceBank[];
+  categories: TraceCategory[];
 }

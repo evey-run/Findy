@@ -3,6 +3,7 @@ import prisma from '../prisma';
 import { resolveScope } from '../lib/scope';
 import { computeBalance } from '../lib/balance';
 import { computeForecast, type ForecastRecurrence, type ForecastTransaction } from '../lib/forecast';
+import { getInternalTransferIds } from '../lib/transferDetection';
 
 const router = express.Router();
 
@@ -47,33 +48,43 @@ router.get('/overview', async (req, res) => {
     
     // Déterminer la période à utiliser (soit celle fournie dans les paramètres, soit le mois actuel)
     let periodStart, periodEnd;
-    
+
     if (Object.keys(dateFilter).length > 0) {
       // Utiliser la période fournie dans les paramètres
-      periodStart = dateFilter.gte || new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      periodStart = dateFilter.gte || new Date(new Date().getFullYear(), newDate().getMonth(), 1);
       periodEnd = dateFilter.lte || new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
     } else {
       // Utiliser le mois actuel par défaut
       periodStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       periodEnd = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
     }
-    
-    
+
+    // Get internal transfer IDs to exclude from income/expense calculations
+    const transferIds = await getInternalTransferIds(
+      req.authUserId,
+      periodStart,
+      periodEnd
+    );
+    const hasTransfers = transferIds.size > 0;
+    const transferWhere = hasTransfers
+      ? { ...transactionWhere, id: { notIn: Array.from(transferIds) } }
+      : transactionWhere;
+
     // Revenus vs Dépenses par type de compte
     const [incomeSum, expenseSum, currentAccountIncome, currentAccountExpense, savingsAccountIncome, investmentAccountExpense] = await Promise.all([
       // Total income
       prisma.transaction.aggregate({
-        where: { ...transactionWhere, amount: { gt: 0 } },
+        where: { ...transferWhere, amount: { gt: 0 } },
         _sum: { amount: true }
       }),
       // Total expense
       prisma.transaction.aggregate({
-        where: { ...transactionWhere, amount: { lt: 0 } },
+        where: { ...transferWhere, amount: { lt: 0 } },
         _sum: { amount: true }
       }),
       // Current account income (for the selected period)
       prisma.transaction.aggregate({
-        where: { 
+        where: {
           amount: { gt: 0 },
           bank: { accountType: 'CURRENT', ...(userFilter.bank || {}) },
           date: {
@@ -85,7 +96,7 @@ router.get('/overview', async (req, res) => {
       }),
       // Current account expense (for the selected period)
       prisma.transaction.aggregate({
-        where: { 
+        where: {
           amount: { lt: 0 },
           bank: { accountType: 'CURRENT', ...(userFilter.bank || {}) },
           date: {
@@ -97,7 +108,7 @@ router.get('/overview', async (req, res) => {
       }),
       // Savings account income (for the selected period)
       prisma.transaction.aggregate({
-        where: { 
+        where: {
           amount: { gt: 0 },
           bank: { accountType: 'SAVINGS', ...(userFilter.bank || {}) },
           date: {
@@ -109,7 +120,7 @@ router.get('/overview', async (req, res) => {
       }),
       // Investment account expense (for the selected period)
       prisma.transaction.aggregate({
-        where: { 
+        where: {
           amount: { lt: 0 },
           bank: { accountType: 'INVESTMENT', ...(userFilter.bank || {}) },
           date: {
@@ -134,7 +145,7 @@ router.get('/overview', async (req, res) => {
     // Dépenses par catégorie
     const expensesByCategory = await prisma.transaction.groupBy({
       by: ['categoryId'],
-      where: { ...transactionWhere, amount: { lt: 0 } },
+      where: { ...transferWhere, amount: { lt: 0 } },
       _sum: { amount: true },
       orderBy: { _sum: { amount: 'asc' } }
     });
@@ -211,10 +222,19 @@ router.get('/monthly-trends', async (req, res) => {
     // la portée est désormais une simple colonne `banks.spaceId`.
     const scope = await resolveScope(req.query as any, req.authUserId);
 
+    // Get internal transfer IDs to exclude from income/expense calculations
+    const transferIds = await getInternalTransferIds(
+      req.authUserId,
+      startDate,
+      new Date()
+    );
+    const hasTransfers = transferIds.size > 0;
+
     const rows = await prisma.transaction.findMany({
       where: {
         date: { gte: startDate },
-        ...(scope ? { bank: { spaceId: { in: scope } } } : {})
+        ...(scope ? { bank: { spaceId: { in: scope } } } : {}),
+        ...(hasTransfers ? { id: { notIn: Array.from(transferIds) } } : {})
       },
       select: { date: true, amount: true }
     });
