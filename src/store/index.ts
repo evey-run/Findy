@@ -300,7 +300,7 @@ export const useAppStore = create<AppState>()(
         await get().loadSpaces();
       },
 
-      scopeParams: () => {
+      scopeParams: (): Record<string, string> => {
         const { currentSpace, authUser } = get();
         // On regarde toujours un espace précis. Le repli sur `userId` ne sert
         // que le court instant entre la connexion et le chargement des espaces.
