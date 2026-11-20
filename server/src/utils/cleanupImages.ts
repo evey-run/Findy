@@ -30,8 +30,8 @@ export async function cleanupUnusedImages() {
     });
     
     const banks = await prisma.bank.findMany({
-      select: { image: true },
-      where: { image: { not: null } }
+      select: { image: true, brandLogo: true },
+      where: { OR: [{ image: { not: null } }, { brandLogo: { not: null } }] }
     });
     
     // Extraire les noms de fichiers des chemins stockés dans la base de données
@@ -60,6 +60,10 @@ export async function cleanupUnusedImages() {
     banks.forEach(bank => {
       if (bank.image) {
         const filename = extractFilename(bank.image);
+        usedImages.add(filename);
+      }
+      if (bank.brandLogo) {
+        const filename = extractFilename(bank.brandLogo);
         usedImages.add(filename);
       }
     });

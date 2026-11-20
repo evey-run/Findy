@@ -4,6 +4,97 @@ Toutes les évolutions notables de Findy. Le format suit
 [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/), et le projet respecte
 le [versionnage sémantique](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+
+- **Findy sur iPhone et Android.** L'application est désormais compilée pour
+  iOS et Android via Tauri 2, à partir de la même base de code. Le téléphone
+  n'est pas une deuxième installation : c'est une deuxième fenêtre sur les
+  mêmes données, celles qui vivent déjà dans le SQLite de votre ordinateur.
+  Rien n'est copié ailleurs, il n'y a toujours pas de compte à créer.
+- **Interface tactile complète**, et non une mise en page rétrécie. Le tableau
+  de bord de bureau est un cockpit : quatre indicateurs de même poids, deux
+  graphiques et trois listes tenus dans une fenêtre de 1280 points. Transposé
+  tel quel sur 390 points, il ne reste que dix petits chiffres illisibles, dont
+  la moitié hors de l'écran. Chaque écran a donc été repensé pour le doigt :
+  un solde en très grand, ce qu'il reste à vivre juste dessous, puis les
+  dernières opérations.
+  - une **barre d'onglets flottante** — Accueil, Transactions, Analyse,
+    Portefeuille, Plus — dont l'onglet actif s'ouvre pour montrer son libellé ;
+  - les fenêtres modales deviennent des **feuilles montantes** : elles se
+    referment d'un glissement vers le bas, et le bouton retour d'Android les
+    ferme au lieu de quitter l'écran ;
+  - le tableau à six colonnes des transactions devient une **liste groupée par
+    jour**, avec recherche, pastilles de filtre et défilement infini ;
+  - les menus « … » qui n'apparaissaient qu'au survol — un geste qui n'existe
+    pas au doigt — deviennent des feuilles d'actions, et la ligne entière
+    devient la cible ;
+  - toutes les cibles font au moins 44 points, les champs 16 pixels (en
+    dessous, Safari zoome à la saisie et ne dézoome jamais), et les encoches
+    haute et basse sont respectées.
+- **Connexion au serveur** au premier lancement : l'application demande
+  l'adresse de votre ordinateur, la vérifie avant d'aller plus loin, et la
+  retient. Une adresse fautive le dit tout de suite, au lieu d'un écran de
+  connexion qui échoue sans raison visible.
+- **Accès mobile** dans les réglages de l'application de bureau : un
+  interrupteur ouvre le serveur à vos appareils, et la carte affiche ensuite
+  les adresses à saisir sur le téléphone, copiables d'un appui. Tant qu'on ne
+  le demande pas, le serveur reste ce qu'il a toujours été — un service de la
+  boucle locale, invisible du reste du réseau. Le garde-fou du tunnel HTTPS
+  reste entier : une requête portant un en-tête de proxy est refusée quoi
+  qu'il arrive, et chaque route exige toujours le jeton de session.
+- L'application web s'installe depuis Safari et Chrome (manifeste, icônes,
+  thème sombre, plein écran).
+
+### Modifié
+
+- Le sidecar Express n'est plus compilé pour les cibles mobiles : sur un
+  téléphone il n'y a ni Node, ni Prisma, ni droit de lancer un processus. Sans
+  cette séparation, l'application se serait fermée au lancement.
+- L'écran de connexion passe à des cibles tactiles et à l'autocomplétion des
+  mots de passe du système.
+- La boîte de confirmation devient une feuille montante sur mobile, et passe
+  au-dessus des autres feuilles — une confirmation demandée depuis un
+  formulaire s'affichait jusqu'ici derrière lui.
+
+- **Scripts de lancement iOS et Android** dans Conductor, à côté du web et du
+  bureau. Ils démarrent le serveur avec l'accès réseau local activé, de sorte
+  qu'un lancement mobile suffit à lui seul — il n'y a pas de second script à
+  penser à lancer en parallèle. Ils démarrent le simulateur ou l'émulateur s'il n'y en a pas,
+  attendent qu'il accepte réellement une installation, et résolvent eux-mêmes
+  `JAVA_HOME`, `ANDROID_HOME` et `NDK_HOME` : un panneau de lancement tourne
+  dans un shell non interactif, qui ne lit pas `~/.zshrc` et n'a personne pour
+  répondre à « choisissez un simulateur ».
+
+### Corrigé
+
+- Le script Tailwind chargé depuis un CDN dans `index.html` était superflu — la
+  feuille de style est compilée localement — et bloquait le premier rendu de
+  400 Ko. Il aurait purement et simplement échoué dans une application mobile
+  hors connexion.
+- Le défilement de la fenêtre suit maintenant la hauteur réellement visible
+  (`dvh`) : sur iOS, `100vh` vaut la hauteur *sans* la barre d'adresse, et tout
+  écran calé dessus dépassait d'une centaine de pixels.
+- La bibliothèque native Android est alignée sur des pages de 16 Ko. Sans cela,
+  Android 15 lance l'application en mode de compatibilité, affiche un
+  avertissement système à chaque ouverture, et le Play Store refuse la mise en
+  ligne. Ses symboles de débogage sont retirés au moment de l'édition de
+  liens : l'APK de développement passe de 263 à 135 Mo, taille au-delà de
+  laquelle un émulateur un peu chargé refuse simplement de l'installer.
+- **Connexion impossible sur iOS** (« Load failed » sur l'écran de choix de
+  profil, alors que les profils s'affichaient). Le serveur de développement
+  Vite n'autorise par défaut que les origines `http(s)` en `localhost` : la
+  webview iOS, servie depuis `tauri://localhost`, voyait sa requête de contrôle
+  préalable refusée, donc tout envoi de formulaire. Android y échappait, son
+  origine `http://tauri.localhost` correspondant au motif — la panne semblait
+  propre à iOS sans l'être vraiment.
+- **Les appels d'API partent d'une adresse absolue sur mobile.** L'application
+  est servie depuis le protocole d'assets de Tauri, dont l'interception Android
+  n'expose pas le corps des requêtes : un formulaire pourtant rempli arrivait
+  vide au serveur, qui répondait « champ manquant ». Seules les lectures
+  fonctionnaient — le symptôme le plus déroutant possible.
+
 ## [0.6.0] — 2026-08-23
 
 ### Ajouté

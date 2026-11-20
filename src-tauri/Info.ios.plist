@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <!-- Fusionné par le CLI dans le Info.plist généré à chaque `tauri ios dev` /
+       `build`. Éditer directement gen/apple/Findy_iOS/Info.plist serait perdu :
+       XcodeGen le regénère depuis project.yml. -->
+
+  <!-- Findy peut viser un serveur auto-hébergé sur le réseau local ; iOS 14+
+       exige cette justification avant d'autoriser la connexion. -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>Findy se connecte au serveur Findy hébergé sur votre réseau local.</string>
+
+  <!-- ATS ne régit pas les chargements WKWebView, mais couvre tout appel
+       NSURLSession côté natif. NSAllowsLocalNetworking lève la contrainte pour
+       les seules adresses privées, sans ouvrir l'Internet en clair. -->
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key>
+    <true/>
+  </dict>
+
+  <!-- L'interface est sombre en permanence : suivre le thème du système
+       donnerait une barre de statut noire sur fond noir en thème clair. -->
+  <key>UIUserInterfaceStyle</key>
+  <string>Dark</string>
+
+  <!-- La mise en page mobile est pensée en portrait ; le paysage n'apporterait
+       qu'une carte de solde étirée et une barre d'onglets à mi-hauteur. -->
+  <key>UISupportedInterfaceOrientations</key>
+  <array>
+    <string>UIInterfaceOrientationPortrait</string>
+  </array>
+</dict>
+</plist>

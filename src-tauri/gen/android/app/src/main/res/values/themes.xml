@@ -1,0 +1,13 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      L'interface de Findy est sombre en permanence. Sans `Theme…DayNight` figé
+      en nuit, le fond système reste blanc : il apparaît en un éclair au
+      lancement, derrière le clavier, et pendant les transitions.
+    -->
+    <style name="Theme.app" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowBackground">@color/findy_background</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

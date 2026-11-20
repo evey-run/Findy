@@ -51,7 +51,14 @@
       "minimumSystemVersion": "11.0",
       "exceptionDomain": "localhost"
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "iOS": {
+      "minimumSystemVersion": "14.0"
+    },
+    "android": {
+      "minSdkVersion": 24,
+      "debugApplicationIdSuffix": ".debug"
+    }
   },
   "plugins": {
     "updater": {

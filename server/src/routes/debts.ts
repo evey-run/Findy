@@ -1,6 +1,7 @@
 import express from 'express';
 import prisma from '../prisma';
 import { netBalance } from '../lib/debtBalance';
+import { looksLikeTransfer, FIVE_DAYS } from '../lib/transferUtils';
 
 const router = express.Router();
 
@@ -110,12 +111,9 @@ router.get('/transfers', async (req, res) => {
       otherByAmount.get(k)!.push(t);
     }
 
-    const FIVE_DAYS = 5 * 24 * 60 * 60 * 1000;
     // Un vrai virement de compte à compte porte presque toujours un libellé de
     // virement. On l'exige pour éviter les faux positifs (montants opposés
     // identiques par pur hasard).
-    const looksLikeTransfer = (desc: string) =>
-      /vir(?:ement)?|transfer|transfert|\bvers\b/i.test(desc || '');
     // Un même identifiant de transaction ne peut appartenir qu'à un seul virement
     // apparié — évite les doublons quand un compte est copartagé (il figure alors
     // dans les deux ensembles et le virement serait détecté dans les deux sens).

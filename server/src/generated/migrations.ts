@@ -1,5 +1,5 @@
 // Généré par scripts/generate-migrations-bundle.mjs — ne pas éditer à la main.
-// Régénéré à chaque build du serveur ; 32 migration(s).
+// Régénéré à chaque build du serveur ; 33 migration(s).
 
 export interface EmbeddedMigration {
   name: string;
@@ -167,5 +167,10 @@ export const MIGRATIONS: EmbeddedMigration[] = [
     "name": "20260822233000_add_bank_brand_logo_light",
     "checksum": "b056f2adccb794be94f9bbf0cc120b37cd7ee766adeff45766ed8c0bbe2bfc65",
     "sql": "-- Le logotype est-il clair ? Sinon, la carte le pose sur une plaque blanche.\nALTER TABLE \"banks\" ADD COLUMN \"brandLogoLight\" BOOLEAN;\n"
+  },
+  {
+    "name": "20260916213640_add_ai_categorized",
+    "checksum": "d3751155fd144174c97884eade3dee88551e50eef2a0f6f5146ec84e6b8c52c3",
+    "sql": "-- RedefineTables\nPRAGMA defer_foreign_keys=ON;\nPRAGMA foreign_keys=OFF;\nCREATE TABLE \"new_transactions\" (\n    \"id\" TEXT NOT NULL PRIMARY KEY,\n    \"amount\" REAL NOT NULL,\n    \"description\" TEXT NOT NULL,\n    \"date\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"checked\" BOOLEAN NOT NULL DEFAULT false,\n    \"unitPrice\" REAL,\n    \"quantity\" REAL,\n    \"ticker\" TEXT,\n    \"assetType\" TEXT,\n    \"externalId\" TEXT,\n    \"currency\" TEXT,\n    \"balanceAfterTransaction\" REAL,\n    \"status\" TEXT NOT NULL DEFAULT 'BOOK',\n    \"aiCategorized\" BOOLEAN NOT NULL DEFAULT false,\n    \"createdAt\" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" DATETIME NOT NULL,\n    \"bankId\" TEXT NOT NULL,\n    \"categoryId\" TEXT,\n    CONSTRAINT \"transactions_categoryId_fkey\" FOREIGN KEY (\"categoryId\") REFERENCES \"categories\" (\"id\") ON DELETE SET NULL ON UPDATE CASCADE,\n    CONSTRAINT \"transactions_bankId_fkey\" FOREIGN KEY (\"bankId\") REFERENCES \"banks\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE\n);\nINSERT INTO \"new_transactions\" (\"amount\", \"assetType\", \"balanceAfterTransaction\", \"bankId\", \"categoryId\", \"checked\", \"createdAt\", \"currency\", \"date\", \"description\", \"externalId\", \"id\", \"quantity\", \"status\", \"ticker\", \"unitPrice\", \"updatedAt\") SELECT \"amount\", \"assetType\", \"balanceAfterTransaction\", \"bankId\", \"categoryId\", \"checked\", \"createdAt\", \"currency\", \"date\", \"description\", \"externalId\", \"id\", \"quantity\", \"status\", \"ticker\", \"unitPrice\", \"updatedAt\" FROM \"transactions\";\nDROP TABLE \"transactions\";\nALTER TABLE \"new_transactions\" RENAME TO \"transactions\";\nPRAGMA foreign_keys=ON;\nPRAGMA defer_foreign_keys=OFF;\n"
   }
 ];

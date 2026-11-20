@@ -1,16 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "Permissions communes à toutes les plateformes",
   "windows": [
     "main"
   ],
   "permissions": [
     "core:default",
     "allow-api-base",
-    "core:window:allow-start-dragging",
-    "updater:default",
-    "process:default",
     "opener:default"
   ]
 }

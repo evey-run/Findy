@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { Transaction } from '../types';
+import { isDemoMode } from '../lib/demo/mode';
 
 const COINGECKO_IDS: Record<string, string> = {
   BTC: 'bitcoin',
@@ -100,6 +101,19 @@ export function useCryptoPrices(tickers: string[]): CryptoPrices {
     const ids = uniqueTickers.map(t => COINGECKO_IDS[t]).join(',');
     setLoading(true);
     setError(null);
+
+    // Mode démo : cours fixes, cohérents avec les achats fictifs. CoinGecko
+    // n'est pas appelé — rien ne doit quitter l'appareil pendant la démo.
+    if (isDemoMode()) {
+      try {
+        const { demoCryptoPrices } = await import('../lib/demo/market');
+        setPrices(demoCryptoPrices(uniqueTickers));
+        setLastUpdated(new Date());
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       const res = await fetch(

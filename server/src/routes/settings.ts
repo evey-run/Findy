@@ -4,7 +4,7 @@ import path from 'path';
 import multer from 'multer';
 import { fileURLToPath } from 'url';
 import prisma from '../prisma';
-import { ensurePersistenceDir, SYNC_SETTINGS_PATH } from '../lib/persistence';
+import { ensurePersistenceDir, SYNC_SETTINGS_PATH, AI_SETTINGS_PATH } from '../lib/persistence';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -508,6 +508,65 @@ router.delete('/sync/:provider', (req, res) => {
   } catch (error) {
     console.error('Error deleting sync settings:', error);
     res.status(500).json({ error: 'Failed to delete sync settings' });
+  }
+});
+
+// ── AI settings ────────────────────────────────────────────────────────
+
+export function readAiSettings(): Record<string, any> {
+  ensureDir();
+  if (!fs.existsSync(AI_SETTINGS_PATH)) return {};
+  return JSON.parse(fs.readFileSync(AI_SETTINGS_PATH, 'utf-8'));
+}
+
+function writeAiSettings(data: Record<string, any>) {
+  ensureDir();
+  fs.writeFileSync(AI_SETTINGS_PATH, JSON.stringify(data, null, 2), { mode: 0o600 });
+}
+
+// GET /api/settings/ai
+router.get('/ai', (_req, res) => {
+  try {
+    const settings = readAiSettings();
+    const masked = { ...settings };
+    if (masked.apiKey && typeof masked.apiKey === 'string') {
+      const k = masked.apiKey as string;
+      masked.apiKey = k.length > 8 ? `${k.slice(0, 4)}…${k.slice(-4)}` : '••••••••';
+    }
+    res.json(masked);
+  } catch (error) {
+    console.error('Error reading AI settings:', error);
+    res.status(500).json({ error: 'Failed to read AI settings' });
+  }
+});
+
+// PUT /api/settings/ai
+router.put('/ai', (req, res) => {
+  try {
+    const { endpoint, apiKey, model, enabled } = req.body;
+    const settings = readAiSettings();
+    if (endpoint !== undefined) settings.endpoint = endpoint || '';
+    if (apiKey !== undefined) settings.apiKey = apiKey || '';
+    if (model !== undefined) settings.model = model || '';
+    if (enabled !== undefined) settings.enabled = !!enabled;
+    settings.updatedAt = new Date().toISOString();
+    writeAiSettings(settings);
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('Error saving AI settings:', error);
+    res.status(500).json({ error: "Impossible d'enregistrer la configuration IA." });
+  }
+});
+
+// POST /api/settings/ai/categorize — déclenche la catégorisation IA
+router.post('/ai/categorize', async (_req, res) => {
+  try {
+    const { categorizeUncategorized } = await import('../lib/aiCategorize');
+    const result = await categorizeUncategorized();
+    res.json(result);
+  } catch (error: any) {
+    console.error('[AI] Erreur de catégorisation:', error);
+    res.status(500).json({ error: error.message || 'Erreur IA' });
   }
 });
 

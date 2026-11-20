@@ -173,6 +173,7 @@ model Transaction {
   currency    String?   // ISO 4217 currency code (e.g. "EUR", "USD")
   balanceAfterTransaction Float? // Real account balance after this transaction (from EB API)
   status      String    @default("BOOK") // BOOK (comptabilisée) ou PENDING (en attente)
+  aiCategorized Boolean @default(false) // true si la catégorie vient de l'IA
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   bankId      String

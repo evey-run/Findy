@@ -5,9 +5,26 @@
     <!-- favicon dédié en 256px : servir findy-logo.png (800px, 500 Ko) coûtait
          un demi-mégaoctet à chaque chargement pour une icône de 16px. -->
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- `viewport-fit=cover` fait passer la webview sous l'encoche et sous la
+         barre d'accueil ; les zones sûres sont ensuite rendues par les
+         variables `env(safe-area-inset-*)` (cf. index.css).
+         `interactive-widget=resizes-content` : à l'ouverture du clavier
+         Android, la mise en page est réduite au lieu d'être poussée hors écran,
+         sinon la barre d'onglets flotte au-dessus du champ saisi. -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#09090b" />
+    <meta name="color-scheme" content="dark" />
+    <!-- Installation depuis Safari iOS : plein écran, statut clair sur fond noir. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Findy" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Findy</title>
-    <script src="https://cdn.tailwindcss.com"></script>
   </head>
   <body>
     <div id="root"></div>

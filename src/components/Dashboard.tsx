@@ -99,6 +99,9 @@ type FluxPoint = {
   cumulativeIncome: number;
   cumulativeExpense: number;
   cumulativeBalance: number;
+  /** Bornes exactes de la période, en instants ISO — servent aux liens des barres. */
+  start: string;
+  end: string;
 };
 
 function signedAmount(amount: number) {
@@ -120,7 +123,7 @@ function MonthlyFlux({
   data,
   cumulative = false,
 }: {
-  data: { label: string; income: number; expense: number }[];
+  data: { label: string; income: number; expense: number; start: string; end: string }[];
   cumulative?: boolean;
 }) {
   const [hoveredValue, setHoveredValue] = useState<{ index: number; kind: 'income' | 'expense' | 'balance' } | null>(null);
@@ -270,10 +273,11 @@ function MonthlyFlux({
                     <FluxValueTooltip amount={point.income} tone="positive" />
                   </div>
                 )}
-                <div
+                <Link
+                  to={`/transactions?startDate=${encodeURIComponent(point.start)}&endDate=${encodeURIComponent(point.end)}&type=income`}
                   {...hoverHandlers(index, 'income')}
                   tabIndex={0}
-                  className="absolute bottom-0 left-0 w-full cursor-default rounded-t bg-green-500/80 outline-none transition-all duration-500 focus-visible:ring-1 focus-visible:ring-violet-400/70"
+                  className="absolute bottom-0 left-0 w-full cursor-pointer rounded-t bg-green-500/80 outline-none transition-all duration-500 focus-visible:ring-1 focus-visible:ring-violet-400/70"
                   style={{ height: incomeHeight }}
                   aria-label={`${point.label} : revenus ${signedAmount(point.income)}`}
                 />
@@ -284,10 +288,11 @@ function MonthlyFlux({
                     <FluxValueTooltip amount={-point.expense} tone="negative" />
                   </div>
                 )}
-                <div
+                <Link
+                  to={`/transactions?startDate=${encodeURIComponent(point.start)}&endDate=${encodeURIComponent(point.end)}&type=expense`}
                   {...hoverHandlers(index, 'expense')}
                   tabIndex={0}
-                  className="absolute bottom-0 left-0 w-full cursor-default rounded-t bg-red-500/70 outline-none transition-all duration-500 focus-visible:ring-1 focus-visible:ring-violet-400/70"
+                  className="absolute bottom-0 left-0 w-full cursor-pointer rounded-t bg-red-500/70 outline-none transition-all duration-500 focus-visible:ring-1 focus-visible:ring-violet-400/70"
                   style={{ height: expenseHeight }}
                   aria-label={`${point.label} : dépenses ${signedAmount(-point.expense)}`}
                 />
@@ -417,7 +422,7 @@ export default function Dashboard() {
   const [periodType, setPeriodType] = useState<PeriodType>('month');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [previousData, setPreviousData] = useState({ income: 0, expense: 0, savings: 0, investment: 0 });
-  const [fluxData, setFluxData] = useState<{ label: string; income: number; expense: number }[]>([]);
+  const [fluxData, setFluxData] = useState<{ label: string; income: number; expense: number; start: string; end: string }[]>([]);
   const [fluxCumulative, setFluxCumulative] = useState(false);
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [forecastLoading, setForecastLoading] = useState(true);
@@ -460,19 +465,21 @@ export default function Dashboard() {
       start = new Date(selectedDate);
       const dow = start.getDay() || 7;
       start.setDate(start.getDate() - dow + 1);
+      start.setHours(0, 0, 0, 0);
       end = new Date(start); end.setDate(end.getDate() + 6);
+      end.setHours(23, 59, 59, 999);
       ps = new Date(start); ps.setDate(ps.getDate() - 7);
       pe = new Date(end);   pe.setDate(pe.getDate() - 7);
     } else if (periodType === 'month') {
       start = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-      end   = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+      end   = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0, 23, 59, 59, 999);
       ps    = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
-      pe    = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0);
+      pe    = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0, 23, 59, 59, 999);
     } else {
       start = new Date(selectedDate.getFullYear(), 0, 1);
-      end   = new Date(selectedDate.getFullYear(), 11, 31);
+      end   = new Date(selectedDate.getFullYear(), 11, 31, 23, 59, 59, 999);
       ps    = new Date(selectedDate.getFullYear() - 1, 0, 1);
-      pe    = new Date(selectedDate.getFullYear() - 1, 11, 31);
+      pe    = new Date(selectedDate.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
     }
     return { startDate: start.toISOString(), endDate: end.toISOString(), prevStart: ps.toISOString(), prevEnd: pe.toISOString() };
   }, [periodType, selectedDate]);
@@ -529,6 +536,7 @@ export default function Dashboard() {
       buckets = Array.from({ length: 6 }, (_, i) => {
         const s = new Date(curStart); s.setDate(s.getDate() - (5 - i) * 7);
         const e = new Date(s); e.setDate(e.getDate() + 6);
+        e.setHours(23, 59, 59, 999);
         return {
           key: `${s.getFullYear()}-W${s.getTime()}`,
           label: s.toLocaleString('fr-FR', { day: 'numeric', month: 'short' }),
@@ -539,14 +547,15 @@ export default function Dashboard() {
       const y = ref.getFullYear();
       buckets = Array.from({ length: 6 }, (_, i) => {
         const yr = y - (5 - i);
-        const s = new Date(yr, 0, 1); const e = new Date(yr, 11, 31);
+        const s = new Date(yr, 0, 1);
+        const e = new Date(yr, 11, 31, 23, 59, 59, 999);
         return { key: `${yr}`, label: `${yr}`, start: s, end: e, income: 0, expense: 0 };
       });
     } else {
       buckets = Array.from({ length: 6 }, (_, i) => {
         const d = new Date(ref.getFullYear(), ref.getMonth() - (5 - i), 1);
         const s = new Date(d.getFullYear(), d.getMonth(), 1);
-        const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        const e = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
         return { key: `${d.getFullYear()}-${d.getMonth()}`, label: d.toLocaleString('fr-FR', { month: 'short' }), start: s, end: e, income: 0, expense: 0 };
       });
     }
@@ -570,7 +579,7 @@ export default function Dashboard() {
             else b.expense += Math.abs(t.amount);
           }
         });
-        setFluxData(buckets.map(({ label, income, expense }) => ({ label, income, expense })));
+        setFluxData(buckets.map(({ label, income, expense, start, end }) => ({ label, income, expense, start: start.toISOString(), end: end.toISOString() })));
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -712,13 +721,15 @@ export default function Dashboard() {
       {/* ── Stat cards ── */}
       <div className="flex-shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard
-          label="Revenus" to="/transactions"
+          label="Revenus"
+          to={`/transactions?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&type=income`}
           value={isLoading ? '' : fmtCompact(income)}
           trend={calcTrend(income, previousData.income)}
           loading={isLoading}
         />
         <StatCard
-          label="Dépenses" to="/transactions"
+          label="Dépenses"
+          to={`/transactions?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&type=expense`}
           value={isLoading ? '' : fmtCompact(expense)}
           trend={calcTrend(expense, previousData.expense)}
           invertTrend loading={isLoading}

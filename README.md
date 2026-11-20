@@ -47,6 +47,7 @@ Findy tourne sur votre Mac. Tout est stocké localement. Vous contrôlez tout.
 | 👥 | **Tricount** — Dépenses partagées en couple, dettes et soldes clairs. |
 | 🌐 | **Open Banking** — Sync bancaire PSD2 optionnelle. |
 | 🌙 | **Dark mode** — Interface sombre, fluide, pensée pour les yeux. |
+| 📱 | **iOS & Android** — L'app mobile se connecte à votre Mac. Mêmes données, aucune copie dans le cloud. |
 
 </div>
 
@@ -57,6 +58,10 @@ Findy tourne sur votre Mac. Tout est stocké localement. Vous contrôlez tout.
 **1.** Téléchargez l'app (macOS)  
 **2.** Ajoutez vos comptes et vos transactions  
 **3.** C'est tout. Pas de compte à créer, pas de cloud.
+
+Sur téléphone, l'application iOS/Android ouvre une seconde fenêtre sur ces
+mêmes données : elle se connecte au serveur de votre Mac sur votre réseau
+Wi-Fi. Rien n'est copié ailleurs. Voir [Docs/MOBILE.md](Docs/MOBILE.md).
 
 ---
 

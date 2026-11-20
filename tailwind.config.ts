@@ -1,15 +1,30 @@
 import type { Config } from 'tailwindcss'
 
 export default {
-  content: ['./src/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
+      // `xs` couvre les iPhone SE / mini (320–374 px), où deux colonnes de
+      // tuiles ne tiennent plus sans rogner les montants.
+      screens: {
+        xs: '375px',
+      },
       colors: {
         brand: {
           DEFAULT: '#7c3aed',
           light:   '#a78bfa',
           dark:    '#5b21b6',
         },
+      },
+      // Zones sûres iOS/Android exposées comme espacements : `pt-safe-top`,
+      // `pb-safe-bottom`, `pb-tabbar`. Les variables sont définies dans
+      // index.css avec un repli à 0 pour les navigateurs sans encoche.
+      spacing: {
+        'safe-top':    'var(--safe-top)',
+        'safe-bottom': 'var(--safe-bottom)',
+        'safe-left':   'var(--safe-left)',
+        'safe-right':  'var(--safe-right)',
+        tabbar:        'var(--tabbar-height)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

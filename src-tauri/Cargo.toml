@@ -21,9 +21,16 @@ tauri-build = { version = "2.5.1", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-libc = "0.2"
 tauri = { version = "2", features = [] }
-tauri-plugin-log = "2.0.0-rc"
+tauri-plugin-log = "2"
+tauri-plugin-opener = "2.5.4"
+
+# Le sidecar Express (signaux POSIX, groupes de processus), l'updater et le
+# redémarrage ne concernent que le desktop. Sur Android, `native-tls` tirerait
+# `openssl-sys`, qui exige un OpenSSL cross-compilé : la compilation échoue sans
+# cette exclusion. Les alias `desktop`/`mobile` de Tauri ne sont pas utilisables
+# ici — ce sont des `--cfg` émis par build.rs, invisibles à la résolution Cargo.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+libc = "0.2"
 tauri-plugin-updater = { version = "2", features = ["native-tls"] }
 tauri-plugin-process = "2"
-tauri-plugin-opener = "2.5.4"

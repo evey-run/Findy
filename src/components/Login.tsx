@@ -101,7 +101,10 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] flex items-center justify-center px-6 py-12">
+    // `dvh` plutôt que `vh` : sur iOS, `100vh` vaut la hauteur SANS la barre
+    // d'adresse, et l'écran de connexion déborde alors d'une centaine de pixels.
+    // Les zones sûres évitent que le logo ne passe sous l'encoche.
+    <div className="flex min-h-dvh items-center justify-center bg-[#09090b] px-6 pb-[max(3rem,var(--safe-bottom))] pt-[max(3rem,var(--safe-top))]">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3 mb-10">
@@ -130,20 +133,22 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mot de passe"
-                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-50 placeholder-zinc-600 focus:outline-none focus:border-violet-500/50"
+                autoComplete="current-password"
+                enterKeyHint="go"
+                className="h-12 w-full rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm text-zinc-50 placeholder-zinc-600 focus:border-violet-500/50 focus:outline-none"
               />
               {error && <p className="text-red-400 text-xs text-center">{error}</p>}
               <button
                 type="submit"
                 disabled={submitting || !password}
-                className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl px-4 py-2.5 transition-colors"
+                className="tappable h-12 w-full rounded-xl bg-violet-600 px-4 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {submitting ? 'Connexion…' : 'Se connecter'}
               </button>
               <button
                 type="button"
                 onClick={() => { setPending(null); resetForms(); }}
-                className="w-full flex items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-xs transition-colors"
+                className="flex min-h-[44px] w-full items-center justify-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-zinc-300"
               >
                 <ArrowLeftIcon className="h-3.5 w-3.5" /> Changer de profil
               </button>
@@ -160,7 +165,10 @@ export default function Login() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Ton prénom"
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-50 placeholder-zinc-600 focus:outline-none focus:border-violet-500/50"
+                  autoComplete="given-name"
+                  autoCapitalize="words"
+                  enterKeyHint="next"
+                  className="h-12 w-full rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm text-zinc-50 placeholder-zinc-600 focus:border-violet-500/50 focus:outline-none"
                 />
               </div>
               <div>
@@ -172,7 +180,9 @@ export default function Login() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Laisser vide pour un profil ouvert"
-                  className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-zinc-50 placeholder-zinc-600 focus:outline-none focus:border-violet-500/50"
+                  autoComplete="new-password"
+                  enterKeyHint="done"
+                  className="h-12 w-full rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm text-zinc-50 placeholder-zinc-600 focus:border-violet-500/50 focus:outline-none"
                 />
                 <p className="text-zinc-600 text-[11px] mt-1.5">
                   Sans mot de passe, le profil sert juste à séparer les données. Tu pourras en
@@ -183,7 +193,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={submitting || !newName.trim()}
-                className="w-full bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-xl px-4 py-2.5 transition-colors"
+                className="tappable h-12 w-full rounded-xl bg-violet-600 px-4 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {submitting ? 'Création…' : 'Créer et continuer'}
               </button>
@@ -191,7 +201,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => { setCreating(false); resetForms(); }}
-                  className="w-full flex items-center justify-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-xs transition-colors"
+                  className="flex min-h-[44px] w-full items-center justify-center gap-1.5 text-sm text-zinc-400 transition-colors hover:text-zinc-300"
                 >
                   <ArrowLeftIcon className="h-3.5 w-3.5" /> Retour aux profils
                 </button>
@@ -206,7 +216,7 @@ export default function Login() {
                   key={profile.id}
                   onClick={() => handleSelect(profile)}
                   disabled={submitting}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 disabled:opacity-50 transition-colors text-left"
+                  className="tappable flex min-h-[60px] w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-white/5 disabled:opacity-50"
                 >
                   {renderAvatar(profile, 'h-11 w-11')}
                   <span className="text-zinc-50 text-sm font-medium truncate">{profile.name}</span>
@@ -217,7 +227,7 @@ export default function Login() {
               ))}
               <button
                 onClick={() => { setCreating(true); resetForms(); }}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-dashed border-white/10 hover:border-violet-500/40 hover:bg-white/[0.03] transition-colors text-left mt-3"
+                className="tappable mt-3 flex min-h-[60px] w-full items-center gap-3 rounded-xl border border-dashed border-white/10 px-3 py-2.5 text-left transition-colors hover:border-violet-500/40 hover:bg-white/[0.03]"
               >
                 <div className="h-11 w-11 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
                   <PlusIcon className="h-5 w-5 text-zinc-400" />
