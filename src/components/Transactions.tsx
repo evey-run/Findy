@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { assetUrl } from '../lib/url';
 import { otherBankOwnersSuffix } from '../lib/bankOwners';
+import { showHeaderGlass, headerCellBackground } from '../lib/headerGlass';
 import { merchantColor, merchantInitials, merchantName } from '../lib/merchant';
 import { groupDayRows, type TransactionListRow } from '../lib/groupTransactions';
 import type { Bank } from '../types';
@@ -948,12 +949,12 @@ export default function Transactions({
           className="flex-1 min-h-0 overflow-y-auto custom-scrollbar"
           onScroll={handleScroll}
         >
-          <HeaderGlass />
+          {showHeaderGlass(filteredTransactions.length) && <HeaderGlass />}
           <table className="w-full divide-y divide-zinc-800">
           {/* En-tête en verre dépoli : il reste lisible pendant que les lignes
               défilent dessous, sans les masquer complètement. La saturation
               rattrape la désaturation qu'un flou seul provoque. */}
-          <thead>
+          <thead className={headerCellBackground(filteredTransactions.length)}>
             <tr>
               <th className={`${HEADER_CELL} text-left w-8`}>
                 <input
