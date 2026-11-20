@@ -1,5 +1,30 @@
-import { defineConfig } from 'vite'
+import { rmSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+
+/**
+ * Retire `uploads/` du build.
+ *
+ * En développement, sans `UPLOADS_DIR`, le serveur range les images envoyées
+ * (avatars, logos de banque) dans `public/uploads` — des fichiers personnels,
+ * que Vite recopierait tels quels dans `dist/` et donc dans les applications
+ * Mac et Android. Les versions packagées servent `/uploads` depuis leur propre
+ * dossier de données : le build n'en a jamais besoin.
+ */
+function dropDevUploads(): Plugin {
+  let outDir = 'dist'
+  return {
+    name: 'findy-drop-dev-uploads',
+    apply: 'build',
+    configResolved(config) {
+      outDir = resolve(config.root, config.build.outDir)
+    },
+    closeBundle() {
+      rmSync(resolve(outDir, 'uploads'), { recursive: true, force: true })
+    },
+  }
+}
 
 // Renseignée par `tauri ios dev --host` / `tauri android dev --host` : c'est
 // l'adresse LAN du Mac, celle que le téléphone doit joindre. Absente en
@@ -23,7 +48,7 @@ const DEV_PORT = 51737
 const devServerUrl = `http://${tauriDevHost ?? 'localhost'}:${DEV_PORT}`
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), dropDevUploads()],
   define: {
     'import.meta.env.VITE_DEV_SERVER_URL': JSON.stringify(devServerUrl),
   },

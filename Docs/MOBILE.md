@@ -175,6 +175,39 @@ premier lancement. Avec lui, elle démarre directement sur l'écran de connexion
 Android exige un magasin de clés pour signer une version publiable ; il ne doit
 jamais être versionné (`*.keystore`, `*.jks` sont ignorés par git).
 
+### Google Play
+
+- **Paquet `run.evey.findy`.** C'est celui de la fiche Play, définitif. Il
+  n'existe que sur Android : `tauri.android.conf.json` remplace l'`identifier`,
+  et `gen/android` (namespace, `applicationId`, dossier de `MainActivity.kt`)
+  le suit. Le bureau garde `com.evey.finance`, qui nomme le dossier de données
+  du Mac : le changer là-bas ferait perdre leur base aux utilisateurs.
+- **Signature.** Play App Signing, avec une clé générée et gardée par Google.
+  On signe l'AAB avec la clé d'envoi, que Gradle lit dans
+  `src-tauri/gen/android/keystore.properties` (non versionné) :
+
+  ```properties
+  storeFile=/chemin/vers/play-upload.jks
+  storePassword=…
+  keyAlias=findy-upload
+  keyPassword=…
+  ```
+
+  Sans ce fichier, la release sort non signée, comme avant, et
+  `scripts/android-sign-apk.sh` signe l'APK de test.
+- **Construire l'AAB** : `npm run tauri:android:aab`, puis
+  `src-tauri/gen/android/app/build/outputs/bundle/universalRelease/app-universal-release.aab`.
+  Le `versionCode` vient de la version de `tauri.conf.json` (0.6.0 → 6000) :
+  Play refuse deux envois du même code, il faut donc changer de version entre
+  deux builds envoyés.
+- **Pas d'Android TV.** Le manifeste n'a plus `leanback` ni de lanceur TV :
+  l'interface ne se pilote pas à la télécommande, et Play l'aurait soumise aux
+  règles de qualité TV.
+- **Icônes de lancement** : icône adaptative (fond, premier plan,
+  monochrome pour les icônes à thème d'Android 13) dans `res/mipmap-*`,
+  générées par `tauri icon` à partir d'un manifeste ; le bureau garde ses
+  propres icônes dans `src-tauri/icons/`.
+
 ---
 
 ## 6. Détails de configuration à connaître
@@ -285,3 +318,31 @@ contourner :
   Safari zoome à la mise au point et ne dézoome jamais) ;
 - les zones sûres passent par les variables `--safe-*` et l'espacement
   `pb-tabbar`, définis dans `src/index.css` et `tailwind.config.ts`.
+
+---
+
+## 8. Le mode démo
+
+Sans serveur, l'application s'arrête à « Connecter votre serveur ». Le bouton
+**« Essayer avec des données de démo »** de cet écran ouvre l'application sur
+des comptes fictifs (Camille et Léo, un foyer, un an
+d'opérations) : c'est ce que découvre quelqu'un qui n'a pas encore Findy sur
+son Mac, et le chemin donné à l'équipe de revue de Google Play.
+
+- **Rien ne quitte l'appareil.** `src/lib/apiBase.ts` aiguille chaque requête
+  `/api/*` vers `src/lib/demo/server.ts`, chargé à la demande. Les calculs
+  (soldes, reste à vivre, trajets de l'argent, tricount) sont les fonctions
+  pures de `server/src/lib`, importées telles quelles : la démo ne peut pas
+  raconter autre chose que la vraie application.
+- **Les données sont générées** à partir de la date du jour
+  (`src/lib/demo/dataset.ts`, aléa à graine fixe) : elles restent actuelles, et
+  identiques d'une capture à l'autre le même jour.
+- **On peut écrire** : opérations, catégories, budgets, objectifs, dépenses
+  partagées vivent en mémoire jusqu'à la sortie. Liaison bancaire,
+  import/export, IA, mot de passe et photos répondent « Indisponible en mode
+  démo ».
+- **Sortir** : Plus › Quitter la démo, qui efface tout ce que la démo a écrit
+  sur l'appareil et revient à l'écran de connexion.
+- **Dans un navigateur**, `?mobile=1&demo=1` ouvre directement la démo (et
+  `?demo=0` la referme) : c'est ainsi que sont faites les captures du Play
+  Store. Une pastille « Démo » accompagne le titre de chaque écran.

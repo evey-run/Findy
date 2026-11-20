@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronLeftIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
+import { isDemoMode } from '../../lib/demo/mode';
 import { cx, GUTTER, radii, text } from '../theme';
 
 /**
@@ -77,13 +78,38 @@ export function ScreenHeader({ title, back, backTo, action, children, above }: S
           </button>
         )}
 
-        <h1 className={cx(text.screenTitle, 'min-w-0 flex-1 truncate')}>{title}</h1>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <h1 className={cx(text.screenTitle, 'min-w-0 truncate')}>{title}</h1>
+          {isDemoMode() && <DemoBadge />}
+        </div>
 
         {action && <div className="flex shrink-0 items-center gap-1.5">{action}</div>}
       </div>
 
       {children}
     </header>
+  );
+}
+
+/**
+ * Pastille « Démo », accolée au titre de chaque écran.
+ *
+ * Les chiffres affichés sont fictifs : il faut que cela se sache sur toute
+ * capture, sans pour autant qu'un bandeau ampute l'écran ou crie plus fort que
+ * le contenu. Une étiquette de la teinte d'accent, du corps d'un libellé,
+ * suffit — elle se lit en passant, comme un badge « Bêta ».
+ */
+function DemoBadge() {
+  return (
+    <span
+      className={cx(
+        'shrink-0 select-none border border-violet-400/25 bg-violet-500/[0.14] px-2 py-[3px]',
+        'text-[10px] font-semibold uppercase leading-none tracking-[0.14em] text-violet-200',
+        radii.pill,
+      )}
+    >
+      Démo
+    </span>
   );
 }
 

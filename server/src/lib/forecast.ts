@@ -317,7 +317,6 @@ export function computeForecast(input: ForecastInput): ForecastResult {
 
   const monthLength = daysInMonth(today.year, today.month);
   const currentDay = Math.min(today.day, monthLength);
-  const monthStart = new Date(utc(today.year, today.month, 1));
   const monthEnd = new Date(utc(today.year, today.month + 1, 1));
   // Aujourd'hui appartient au passé : le solde inclut déjà les dépenses du jour.
   const cutoff = new Date(utc(today.year, today.month, currentDay + 1));

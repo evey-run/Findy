@@ -21,6 +21,7 @@
 
 import { isNativeMobile, isTauri } from './platform';
 import { normalizeServerUrl } from './serverUrl';
+import { DEMO_TOKEN, enableDemoMode, isDemoMode } from './demo/mode';
 
 // Réexportée : les écrans mobiles la prennent au même endroit que le reste de
 // la configuration serveur, sans avoir à connaître le découpage interne.
@@ -147,6 +148,8 @@ export let API_BASE = detectApiBase();
  * dans le navigateur du téléphone — où les URLs relatives suffisent.
  */
 export function needsServerSetup(): boolean {
+  // La démo répond elle-même à l'API : aucune adresse à demander.
+  if (isDemoMode()) return false;
   return isNativeMobile() && !API_BASE && isInterceptedOrigin();
 }
 
@@ -165,8 +168,11 @@ function needsRewrite(url: string): boolean {
 
 const TOKEN_STORAGE_KEY = 'findy-auth-token';
 
-let authToken: string | null =
-  typeof localStorage === 'undefined' ? null : localStorage.getItem(TOKEN_STORAGE_KEY);
+let authToken: string | null = isDemoMode()
+  ? DEMO_TOKEN
+  : typeof localStorage === 'undefined'
+    ? null
+    : localStorage.getItem(TOKEN_STORAGE_KEY);
 
 export function getAuthToken(): string | null {
   return authToken;
@@ -174,9 +180,23 @@ export function getAuthToken(): string | null {
 
 export function setAuthToken(token: string | null): void {
   authToken = token;
+  // En démo, le jeton ne quitte pas la mémoire : une vraie session enregistrée
+  // sur l'appareil doit se retrouver intacte en sortant de la démo.
+  if (isDemoMode()) return;
   if (typeof localStorage === 'undefined') return;
   if (token) localStorage.setItem(TOKEN_STORAGE_KEY, token);
   else localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+/**
+ * Bascule l'application en mode démo, sans rechargement.
+ *
+ * Le jeton factice suffit à ce que la restauration de session qui suit ouvre
+ * directement le profil de démo : pas d'écran de connexion, pas de mot de passe.
+ */
+export function enterDemoMode(): void {
+  enableDemoMode();
+  authToken = DEMO_TOKEN;
 }
 
 /**
@@ -224,6 +244,32 @@ async function watchExpiry(path: string, pending: Promise<Response>): Promise<Re
 const nativeFetch: typeof fetch =
   typeof window === 'undefined' ? (globalThis.fetch as typeof fetch) : window.fetch.bind(window);
 
+/** Chemin backend visé par une requête, quelle que soit sa forme. */
+function backendPath(input: RequestInfo | URL): string | null {
+  const path =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.pathname
+        : input instanceof Request
+          ? new URL(input.url).pathname
+          : '';
+  return needsRewrite(path) ? path : null;
+}
+
+/**
+ * Serveur de démo, chargé à la première requête seulement.
+ *
+ * L'import dynamique le place dans un fichier à part : hors démo, la base
+ * fictive et les calculs qu'elle embarque ne sont jamais téléchargés.
+ */
+let demoModule: Promise<typeof import('./demo/server')> | null = null;
+
+function demoFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  demoModule ??= import('./demo/server');
+  return demoModule.then((module) => module.demoFetch(input, init));
+}
+
 /**
  * Réécrit globalement les appels backend vers `API_BASE`.
  *
@@ -261,6 +307,11 @@ export async function installApiBase(): Promise<void> {
   if (typeof window === 'undefined') return;
 
   window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+    // Mode démo : toute requête backend est servie en mémoire, sur l'appareil.
+    // Le contrôle est fait à chaque appel — la démo s'ouvre depuis l'écran de
+    // connexion au serveur, après l'installation de cette réécriture.
+    if (isDemoMode() && backendPath(input) !== null) return demoFetch(input, init);
+
     if (typeof input === 'string' && needsRewrite(input)) {
       return watchExpiry(input, nativeFetch(API_BASE + input, withAuth(undefined, init)));
     }
@@ -276,5 +327,6 @@ export async function installApiBase(): Promise<void> {
     return nativeFetch(input, init);
   };
 
-  if (API_BASE) console.log(`[API] Appels backend redirigés vers ${API_BASE}`);
+  if (isDemoMode()) console.log('[API] Mode démo : les appels backend sont servis en mémoire.');
+  else if (API_BASE) console.log(`[API] Appels backend redirigés vers ${API_BASE}`);
 }

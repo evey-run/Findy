@@ -472,7 +472,9 @@ export default function InvestmentsScreen() {
                 />
               )}
 
-              {refreshedAt && (
+              {/* Sans actif coté, la fraîcheur des prix ne décrit rien : elle
+                  pouvait rester affichée au-dessus d'un portefeuille vide. */}
+              {refreshedAt && hasQuotes && (
                 <p className={cx(text.caption, 'flex items-center gap-2')}>
                   <span
                     className={cx(

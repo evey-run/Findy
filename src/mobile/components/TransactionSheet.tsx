@@ -50,6 +50,7 @@ export default function TransactionSheet({
     removeTransaction,
     requestConfirm,
     loadDashboardOverview,
+    loadBanks,
   } = useAppStore();
 
   const editing = Boolean(transaction);
@@ -155,8 +156,10 @@ export default function TransactionSheet({
       if (transaction) updateTransaction(transaction.id, saved);
       else addTransaction(saved);
 
-      // Le solde et les totaux du tableau de bord dépendent de cette écriture.
+      // Le solde et les totaux du tableau de bord dépendent de cette écriture :
+      // les comptes aussi, sans quoi la carte de solde garde l'ancien montant.
       void loadDashboardOverview();
+      void loadBanks();
 
       toast.success(transaction ? 'Opération modifiée' : 'Opération ajoutée');
       onClose();
@@ -184,6 +187,7 @@ export default function TransactionSheet({
 
       removeTransaction(transaction.id);
       void loadDashboardOverview();
+      void loadBanks();
       toast.success('Opération supprimée');
       onClose();
     } catch (caught) {

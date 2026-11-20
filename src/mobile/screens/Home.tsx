@@ -27,6 +27,7 @@ import Amount from '../components/Amount';
 import Avatar from '../components/Avatar';
 import { EmptyState, SkeletonHero, SkeletonList } from '../components/Feedback';
 import { useForecast } from '../hooks/useForecast';
+import { useSheetHandover } from '../hooks/useSheetHandover';
 import { cx, radii, surfaces, text } from '../theme';
 
 /**
@@ -59,6 +60,7 @@ export default function Home() {
   const [tracing, setTracing] = useState<Transaction | null>(null);
   const [spaceOpen, setSpaceOpen] = useState(false);
   const forecast = useForecast();
+  const afterSheetCloses = useSheetHandover();
 
   useEffect(() => {
     void loadBanks();
@@ -282,8 +284,11 @@ export default function Home() {
         transaction={tracing}
         onClose={() => setTracing(null)}
         onEdit={() => {
-          setEditing(tracing);
+          const target = tracing;
           setTracing(null);
+          // Le formulaire attend que le trajet soit refermé : ouvert dans le
+          // même rendu, il recevait le retour d'historique de ce dernier.
+          afterSheetCloses(() => setEditing(target));
         }}
       />
       <SpaceSheet open={spaceOpen} onClose={() => setSpaceOpen(false)} />

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   ArrowRightOnRectangleIcon,
+  ArrowTopRightOnSquareIcon,
   ChartBarIcon,
   ChevronUpDownIcon,
   Cog6ToothIcon,
   FlagIcon,
   ServerStackIcon,
+  ShieldCheckIcon,
   TagIcon,
 } from '@heroicons/react/24/outline';
 import { ChevronRightIcon } from '@heroicons/react/20/solid';
@@ -14,6 +17,8 @@ import { useAppStore } from '../../store';
 import { assetUrl } from '../../lib/url';
 import { getServerUrl } from '../../lib/apiBase';
 import { isNativeMobile } from '../../lib/platform';
+import { isDemoMode, leaveDemoMode } from '../../lib/demo/mode';
+import { openExternalUrl, PRIVACY_POLICY_URL } from '../../lib/externalLink';
 import { ScreenBody, ScreenHeader, SectionHeader } from '../components/Screen';
 import { ListCard, ListRow } from '../components/ListRow';
 import { SettingRow } from '../components/Field';
@@ -88,12 +93,31 @@ export default function MoreScreen() {
   // pousse la partie utile hors du cadre sur une ligne de réglage.
   const serverHost = getServerUrl().replace(/^https?:\/\//, '');
 
+  // En démo, « Déconnexion » mènerait à un écran de connexion factice d'où
+  // l'on ne pourrait plus sortir : la seule sortie est de quitter la démo.
+  const demo = isDemoMode();
+
   const disconnect = async () => {
     const confirmed = await requestConfirm(
       'Vos données restent sur le serveur. Il faudra ressaisir votre mot de passe pour revenir.',
       { title: 'Se déconnecter ?', confirmLabel: 'Déconnexion', danger: true },
     );
     if (confirmed) logout();
+  };
+
+  const quitDemo = async () => {
+    const confirmed = await requestConfirm(
+      'Les comptes fictifs et ce que vous y avez modifié seront effacés de l’appareil.',
+      { title: 'Quitter la démo ?', confirmLabel: 'Quitter la démo' },
+    );
+    if (confirmed) leaveDemoMode();
+  };
+
+  const openPrivacyPolicy = () => {
+    openExternalUrl(PRIVACY_POLICY_URL).catch((caught) => {
+      console.error('Ouverture de la politique de confidentialité impossible', caught);
+      toast.error('Impossible d’ouvrir la page.');
+    });
   };
 
   return (
@@ -202,26 +226,45 @@ export default function MoreScreen() {
                 onClick={() => navigate('/settings')}
               />
               {/* Sur le web, l'API est servie par l'origine de la page : il n'y
-                  a aucune adresse à choisir. */}
-              {isNativeMobile() && (
+                  a aucune adresse à choisir — sauf en démo, où l'écran dit
+                  d'où viennent les chiffres et comment en sortir. */}
+              {(isNativeMobile() || demo) && (
                 <SettingRow
                   icon={<ServerStackIcon className="h-5 w-5" />}
                   title="Serveur"
-                  subtitle={serverHost || 'Aucune adresse enregistrée'}
+                  subtitle={demo ? 'Mode démo · données fictives' : serverHost || 'Aucune adresse enregistrée'}
                   trailing={<Chevron />}
                   onClick={() => navigate('/server')}
                 />
               )}
+              <SettingRow
+                icon={<ShieldCheckIcon className="h-5 w-5" />}
+                title="Confidentialité"
+                subtitle="Politique de confidentialité"
+                trailing={
+                  <ArrowTopRightOnSquareIcon className="h-5 w-5 shrink-0 text-zinc-600" aria-hidden="true" />
+                }
+                onClick={openPrivacyPolicy}
+              />
             </ListCard>
           </section>
 
           <ListCard>
-            <SettingRow
-              icon={<ArrowRightOnRectangleIcon className="h-5 w-5" />}
-              title="Déconnexion"
-              danger
-              onClick={disconnect}
-            />
+            {demo ? (
+              <SettingRow
+                icon={<ArrowRightOnRectangleIcon className="h-5 w-5" />}
+                title="Quitter la démo"
+                danger
+                onClick={quitDemo}
+              />
+            ) : (
+              <SettingRow
+                icon={<ArrowRightOnRectangleIcon className="h-5 w-5" />}
+                title="Déconnexion"
+                danger
+                onClick={disconnect}
+              />
+            )}
           </ListCard>
 
           {version && <p className="pt-1 text-center text-[12px] text-zinc-600">Findy v{version}</p>}

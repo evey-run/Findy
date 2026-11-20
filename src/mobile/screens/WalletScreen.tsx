@@ -12,6 +12,8 @@ import BalanceCard from '../components/BalanceCard';
 import BankCard from '../components/BankCard';
 import BankSheet, { BankFormSheet, BankLinkSheet } from '../components/BankSheet';
 import { ACCOUNT_TYPE_LABEL, formatSyncDate, spendableForBank } from '../bank';
+import { blockedInDemo } from '../demo';
+import { useSheetHandover } from '../hooks/useSheetHandover';
 import SpaceSheet from '../components/SpaceSheet';
 import Avatar from '../components/Avatar';
 import { Fab, IconButton, LightPill, PrimaryButton } from '../components/Controls';
@@ -80,6 +82,9 @@ export default function WalletScreen() {
   // Synchronisations automatiques en cours, pour l'indicateur des cartes.
   const [syncing, setSyncing] = useState<Set<string>>(new Set());
   const autoSynced = useRef<Set<string>>(new Set());
+
+  // La feuille d'actions se referme avant que la suivante ne s'ouvre.
+  const afterSheetCloses = useSheetHandover();
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +211,9 @@ export default function WalletScreen() {
   }, []);
 
   const openLink = useCallback((bank: Bank | null) => {
+    // La liaison passe par une banque réelle et un navigateur externe : la
+    // démo n'a ni l'une ni l'autre à proposer.
+    if (blockedInDemo()) return;
     setLinkBank(bank);
     setLinkOpen(true);
   }, []);
@@ -336,11 +344,13 @@ export default function WalletScreen() {
         bank={actionBank}
         open={actionOpen}
         onClose={() => setActionOpen(false)}
-        onEdit={(bank) => {
-          setFormBank(bank);
-          setFormOpen(true);
-        }}
-        onLink={openLink}
+        onEdit={(bank) =>
+          afterSheetCloses(() => {
+            setFormBank(bank);
+            setFormOpen(true);
+          })
+        }
+        onLink={(bank) => afterSheetCloses(() => openLink(bank))}
       />
 
       <BankFormSheet open={formOpen} onClose={() => setFormOpen(false)} bank={formBank} />
@@ -388,7 +398,9 @@ function AccountRow({ bank, onPress, onMenu }: { bank: Bank; onPress: (bank: Ban
       <button
         type="button"
         onClick={() => onPress(bank)}
-        className="tappable flex min-h-[60px] flex-1 py-3 text-left"
+        // En colonne : la courbe passe sous le solde, sur toute la largeur.
+        // En ligne, elle se logeait à côté du montant et chevauchait le « … ».
+        className="tappable flex min-h-[60px] min-w-0 flex-1 flex-col py-3 text-left"
       >
         <span className="flex items-center gap-3">
           <BankBadge bank={bank} />

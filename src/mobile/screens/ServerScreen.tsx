@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { ArrowPathIcon, SignalIcon } from '@heroicons/react/24/outline';
+import { ArrowPathIcon, DevicePhoneMobileIcon, SignalIcon, SparklesIcon } from '@heroicons/react/24/outline';
 import {
   getServerUrl,
   normalizeServerUrl,
@@ -9,6 +9,7 @@ import {
   setServerUrl,
 } from '../../lib/apiBase';
 import { isNativeMobile } from '../../lib/platform';
+import { isDemoMode, leaveDemoMode } from '../../lib/demo/mode';
 import { useAppStore } from '../../store';
 import { ScreenBody, ScreenHeader } from '../components/Screen';
 import { DangerButton, PrimaryButton } from '../components/Controls';
@@ -30,7 +31,71 @@ import { cx, radii, surfaces, text } from '../theme';
 
 type Status = 'checking' | 'online' | 'offline';
 
+/**
+ * En démo, il n'y a pas de serveur à décrire ni à sonder — et aucune requête
+ * ne doit partir. L'écran dit d'où viennent les chiffres et comment en sortir.
+ * Le choix est fait une fois pour toutes : la démo ne s'ouvre ni ne se ferme
+ * sans rechargement complet de l'application.
+ */
 export default function ServerScreen() {
+  return isDemoMode() ? <DemoServerScreen /> : <ConnectedServerScreen />;
+}
+
+function DemoServerScreen() {
+  const requestConfirm = useAppStore((state) => state.requestConfirm);
+  const native = isNativeMobile();
+
+  const quit = async () => {
+    const confirmed = await requestConfirm(
+      'Les comptes fictifs et ce que vous y avez modifié seront effacés de l’appareil.',
+      { title: 'Quitter la démo ?', confirmLabel: 'Quitter la démo' },
+    );
+    if (confirmed) leaveDemoMode();
+  };
+
+  return (
+    <>
+      <ScreenHeader title="Serveur" back backTo="/more" />
+
+      <ScreenBody>
+        <div className="space-y-5">
+          <div className={cx(radii.tile, surfaces.card, 'px-4 py-4')}>
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-violet-500/30 bg-violet-600/20">
+                <SparklesIcon className="h-5 w-5 text-violet-300" aria-hidden="true" />
+              </span>
+              <div className="min-w-0">
+                <p className={text.rowTitle}>Mode démo</p>
+                <p className={cx(text.rowSubtitle, 'mt-0.5')}>Aucun serveur connecté</p>
+              </div>
+            </div>
+
+            <p className={cx(text.body, 'mt-3.5 border-t border-white/[0.06] pt-3')}>
+              Camille, Léo et leurs comptes sont fictifs. Les chiffres sont générés sur
+              l’appareil : rien n’est envoyé sur le réseau, et vos modifications
+              disparaissent en quittant la démo.
+            </p>
+          </div>
+
+          <div className={cx(radii.tile, surfaces.card, 'flex gap-3 p-4')}>
+            <DevicePhoneMobileIcon className="h-5 w-5 shrink-0 text-violet-400" aria-hidden="true" />
+            <p className="text-[13px] leading-relaxed text-zinc-400">
+              {native
+                ? 'Pour retrouver vos propres comptes, quittez la démo puis saisissez l’adresse de votre serveur Findy.'
+                : 'Quittez la démo pour retrouver les comptes servis par cette adresse.'}
+            </p>
+          </div>
+
+          <PrimaryButton onClick={quit}>
+            {native ? 'Quitter la démo et connecter mon serveur' : 'Quitter la démo'}
+          </PrimaryButton>
+        </div>
+      </ScreenBody>
+    </>
+  );
+}
+
+function ConnectedServerScreen() {
   const requestConfirm = useAppStore((state) => state.requestConfirm);
 
   // L'adresse enregistrée ne bouge qu'au rechargement : la retenir au montage
@@ -164,7 +229,7 @@ export default function ServerScreen() {
             <Field
               label="Adresse du serveur"
               error={error ?? undefined}
-              hint="Elle est affichée dans Findy → Réglages → Accès mobile, sur l’ordinateur."
+              hint="Elle est affichée dans Findy → Paramètres → Compte → Accès mobile, sur l’ordinateur."
             >
               <TextInput
                 value={url}

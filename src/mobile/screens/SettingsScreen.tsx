@@ -8,6 +8,7 @@ import {
   EyeSlashIcon,
   KeyIcon,
   PlusIcon,
+  TrashIcon,
   UserIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline';
@@ -16,6 +17,7 @@ import { useAppStore } from '../../store';
 import type { Space } from '../../types';
 import { assetUrl } from '../../lib/url';
 import { toISODate } from '../../lib/format';
+import { isDemoMode, leaveDemoMode } from '../../lib/demo/mode';
 import { ScreenBody, ScreenHeader } from '../components/Screen';
 import { ListCard } from '../components/ListRow';
 import { Field, SettingRow, TextInput } from '../components/Field';
@@ -23,7 +25,8 @@ import { Chip, DangerButton, PrimaryButton, Toggle } from '../components/Control
 import { SkeletonList } from '../components/Feedback';
 import Sheet from '../components/Sheet';
 import Avatar from '../components/Avatar';
-import { cx, radii, surfaces } from '../theme';
+import { blockedInDemo } from '../demo';
+import { cx, radii, surfaces, text } from '../theme';
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 const HIDDEN_STORAGE_KEY = 'findy-balance-hidden';
@@ -69,7 +72,9 @@ export default function SettingsScreen() {
         ))}
       </div>
 
-      <ScreenBody>
+      {/* L'espace du haut détache la première carte de la barre d'onglets :
+          collée à sa bordure, elle semblait coupée. */}
+      <ScreenBody className="pt-4">
         {tab === 'compte' && <CompteTab />}
         {tab === 'espaces' && <EspacesTab ready={ready} />}
         {tab === 'affichage' && <AffichageTab />}
@@ -83,7 +88,7 @@ export default function SettingsScreen() {
 // ─── Compte ───────────────────────────────────────────────────────────────
 
 function CompteTab() {
-  const { authUser, loadUsers, restoreSession, setPassword } = useAppStore();
+  const { authUser, loadUsers, restoreSession, setPassword, logout } = useAppStore();
   const [uploading, setUploading] = useState(false);
   const [nameOpen, setNameOpen] = useState(false);
   const [nameValue, setNameValue] = useState('');
@@ -93,6 +98,8 @@ function CompteTab() {
   const [newPwd, setNewPwd] = useState('');
   const [savingPwd, setSavingPwd] = useState(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const saveProfile = async (body: FormData): Promise<void> => {
     if (!authUser) return;
@@ -154,11 +161,48 @@ function CompteTab() {
     }
   };
 
+  /**
+   * Suppression du profil connecté.
+   *
+   * Exigée par Google Play dès qu'une application permet de créer un compte.
+   * Le refus éventuel du serveur est affiché tel quel. En cas de succès, on
+   * sort comme « Déconnexion » : le jeton n'a plus de profil derrière lui, et
+   * l'écran de connexion liste les profils restants.
+   *
+   * En démo, le profil supprimé est celui de Camille : la démo n'a plus
+   * personne à montrer, elle se referme.
+   */
+  const deleteProfile = async () => {
+    if (!authUser) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/users/${authUser.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || 'Suppression impossible.');
+
+      setDeleting(false);
+      setDeleteOpen(false);
+      if (isDemoMode()) {
+        leaveDemoMode();
+        return;
+      }
+      toast.success('Profil supprimé');
+      logout();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Suppression impossible.');
+      setDeleting(false);
+    }
+  };
+
   return (
     <>
       <ListCard>
         <label
           htmlFor="findy-avatar"
+          // Le sélecteur de photo s'ouvre avant tout appel : en démo, on
+          // prévient avant plutôt que de laisser choisir une image pour rien.
+          onClick={(event) => {
+            if (blockedInDemo()) event.preventDefault();
+          }}
           className={cx('tappable flex min-h-[52px] w-full cursor-pointer items-center gap-3 py-2', uploading && 'opacity-50')}
         >
           <span className="relative shrink-0">
@@ -188,9 +232,54 @@ function CompteTab() {
           icon={<KeyIcon className="h-5 w-5" />}
           title="Mot de passe"
           trailing={<Disclosure value={authUser?.hasPassword ? 'Défini' : 'Aucun'} />}
-          onClick={() => { setCurrentPwd(''); setNewPwd(''); setPwdError(null); setPasswordOpen(true); }}
+          onClick={() => {
+            if (blockedInDemo()) return;
+            setCurrentPwd(''); setNewPwd(''); setPwdError(null); setPasswordOpen(true);
+          }}
         />
       </ListCard>
+
+      <ListCard className="mt-5">
+        <SettingRow
+          icon={<TrashIcon className="h-5 w-5" />}
+          title="Supprimer mon profil"
+          subtitle="Profil, photo et dépenses partagées"
+          danger
+          onClick={() => setDeleteOpen(true)}
+        />
+      </ListCard>
+
+      {/* Feuille : suppression du profil. Le détail reprend exactement les
+          cascades du schéma (prisma/schema.prisma) et de DELETE /api/users/:id :
+          appartenances aux espaces et dettes supprimées, photo effacée ; les
+          espaces et leurs comptes ne sont pas touchés. */}
+      <Sheet
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="Supprimer mon profil"
+        subtitle={authUser?.name}
+        footer={
+          <DangerButton onClick={() => void deleteProfile()} disabled={deleting}>
+            {deleting ? 'Suppression…' : 'Supprimer définitivement'}
+          </DangerButton>
+        }
+      >
+        <div className="space-y-3 pt-1">
+          <p className={text.body}>Cette action est définitive. Elle supprime du serveur :</p>
+          <ul className="list-disc space-y-1.5 pl-5 text-[15px] leading-relaxed text-zinc-300 marker:text-zinc-600">
+            <li>votre profil, son mot de passe et sa photo&nbsp;;</li>
+            <li>les dépenses partagées (tricount) où vous figurez — elles disparaissent aussi pour l’autre personne&nbsp;;</li>
+            <li>votre appartenance à tous les espaces.</li>
+          </ul>
+          <p className={cx(text.caption, 'leading-relaxed')}>
+            Les comptes, leurs opérations, les budgets et les objectifs appartiennent aux espaces,
+            pas aux profils : ceux d’un groupe restent visibles pour ses autres membres&nbsp;; ceux de
+            votre espace personnel restent enregistrés sur le serveur, sans plus être rattachés à
+            aucun profil. Pour effacer aussi vos comptes personnels et leurs opérations,
+            supprimez-les d’abord depuis Portefeuille.
+          </p>
+        </div>
+      </Sheet>
 
       {/* Feuille : nom */}
       <Sheet open={nameOpen} onClose={() => setNameOpen(false)} title="Nom"
@@ -358,6 +447,9 @@ function DonneesTab() {
   const importRef = useRef<HTMLInputElement>(null);
 
   const exportData = async () => {
+    // Sans ce garde-fou, le refus du serveur de démo deviendrait un
+    // « Export impossible » qui ressemble à une panne.
+    if (blockedInDemo()) return;
     setExporting(true);
     try {
       const res = await fetch('/api/settings/export');
@@ -416,7 +508,10 @@ function DonneesTab() {
           title="Importer"
           subtitle={importing ? 'Import…' : undefined}
           trailing={<Disclosure />}
-          onClick={() => importRef.current?.click()}
+          onClick={() => {
+            if (blockedInDemo()) return;
+            importRef.current?.click();
+          }}
         />
       </ListCard>
       <input ref={importRef} type="file" accept="application/json,.json" className="sr-only" onChange={handleImport} />
@@ -448,7 +543,10 @@ function IaTab() {
       .finally(() => setLoading(false));
   }, []);
 
+  // En démo, la configuration IA n'a ni serveur où s'enregistrer ni
+  // opérations réelles à classer : chaque action le dit plutôt que d'échouer.
   const save = useCallback(async () => {
+    if (blockedInDemo()) return;
     setSaving(true);
     try {
       const res = await fetch('/api/settings/ai', {
@@ -466,6 +564,7 @@ function IaTab() {
   }, [endpoint, apiKey, model, enabled]);
 
   const toggle = useCallback(async (next: boolean) => {
+    if (blockedInDemo()) return;
     setEnabled(next);
     try {
       await fetch('/api/settings/ai', {
@@ -477,6 +576,7 @@ function IaTab() {
   }, []);
 
   const runCategorize = useCallback(async () => {
+    if (blockedInDemo()) return;
     setCategorizing(true);
     try {
       const r = await fetch('/api/settings/ai/categorize', { method: 'POST' });

@@ -23,6 +23,7 @@ import TransactionSheet from '../components/TransactionSheet';
 import TransactionTraceSheet from '../components/TransactionTraceSheet';
 import TransactionGroupRow from '../components/TransactionGroupRow';
 import { groupDayRows } from '../../lib/groupTransactions';
+import { useSheetHandover } from '../hooks/useSheetHandover';
 import Amount from '../components/Amount';
 import { EmptyState, ErrorNotice, SkeletonList } from '../components/Feedback';
 import { cx, GUTTER, radii, surfaces, TAP_TARGET, text } from '../theme';
@@ -104,6 +105,7 @@ export default function TransactionsScreen() {
   const [editing, setEditing] = useState<Transaction | null>(null);
   /** L'opération dont on regarde le trajet de l'argent. */
   const [tracing, setTracing] = useState<Transaction | null>(null);
+  const afterSheetCloses = useSheetHandover();
 
   const spaceId = currentSpace?.id;
   const bankId = selectedBank?.id ?? '';
@@ -722,8 +724,11 @@ export default function TransactionsScreen() {
         transaction={tracing}
         onClose={() => setTracing(null)}
         onEdit={() => {
-          setEditing(tracing);
+          const target = tracing;
           setTracing(null);
+          // Le formulaire attend que le trajet soit refermé : ouvert dans le
+          // même rendu, il recevait le retour d'historique de ce dernier.
+          afterSheetCloses(() => setEditing(target));
         }}
       />
     </>

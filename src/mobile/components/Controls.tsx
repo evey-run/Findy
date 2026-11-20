@@ -225,19 +225,24 @@ export function Fab({
   icon?: ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      className={cx(
-        'tappable fixed right-5 z-40 flex h-14 items-center gap-2 rounded-full bg-violet-600 pl-4 pr-5 text-[15px] font-semibold text-white',
-        'shadow-[0_10px_30px_-8px_rgba(124,58,237,0.9)]',
-      )}
-      style={{ bottom: 'calc(var(--tabbar-height) + 12px)' }}
-    >
-      {icon ?? <PlusIcon className="h-6 w-6" />}
-      <span>{label}</span>
-    </button>
+    <>
+      {/* Le bouton flotte au-dessus de la fin de page : sans cette cale, la
+          dernière ligne d'une liste reste à jamais sous lui, montant compris. */}
+      <div aria-hidden="true" className="h-14" />
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        className={cx(
+          'tappable fixed right-5 z-40 flex h-14 items-center gap-2 rounded-full bg-violet-600 pl-4 pr-5 text-[15px] font-semibold text-white',
+          'shadow-[0_10px_30px_-8px_rgba(124,58,237,0.9)]',
+        )}
+        style={{ bottom: 'calc(var(--tabbar-height) + 12px)' }}
+      >
+        {icon ?? <PlusIcon className="h-6 w-6" />}
+        <span>{label}</span>
+      </button>
+    </>
   );
 }
 

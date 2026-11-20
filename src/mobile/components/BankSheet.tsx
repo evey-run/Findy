@@ -24,6 +24,7 @@ import { parseAmount } from '../../lib/amount';
 import { GhostButton, PrimaryButton, SegmentedControl, Toggle } from './Controls';
 import { EmptyState, SkeletonRow } from './Feedback';
 import { ACCOUNT_TYPE_LABEL, formatSyncDate, spendableForBank } from '../bank';
+import { blockedInDemo } from '../demo';
 import { cx, radii, surfaces, text } from '../theme';
 
 /**
@@ -440,7 +441,14 @@ export function BankFormSheet({ open, onClose, bank }: BankFormSheetProps) {
       <div className="space-y-4 pt-1">
         {/* ── Logo ── */}
         <div className="flex items-center gap-3">
-          <label className={cx('tappable flex flex-1 items-center gap-3', radii.row, surfaces.card, 'p-3')}>
+          <label
+            // En démo, un logo n'aurait nulle part où être enregistré : on le
+            // dit avant que le sélecteur de fichier ne s'ouvre.
+            onClick={(event) => {
+              if (blockedInDemo()) event.preventDefault();
+            }}
+            className={cx('tappable flex flex-1 items-center gap-3', radii.row, surfaces.card, 'p-3')}
+          >
             {imagePreview ? (
               <img
                 src={imagePreview}
