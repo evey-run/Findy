@@ -34,7 +34,9 @@ chmod +x "$TARGET_DEBUG_DIR/finance-server-x86_64-apple-darwin"
 
 echo "==> Copie des engines Prisma..."
 
-PRISMA_CLIENT="$REPO_ROOT/node_modules/.prisma/client"
+# Compatible npm (node_modules/.prisma) et pnpm (store .pnpm/.../.prisma) :
+# on part du vrai chemin de @prisma/client, le client généré est son voisin.
+PRISMA_CLIENT="$(cd "$REPO_ROOT" && node -e "const path=require('path');console.log(path.join(path.dirname(require.resolve('@prisma/client/package.json')),'..','..','.prisma','client'))")"
 
 cp "$PRISMA_CLIENT/libquery_engine-darwin-arm64.dylib.node" \
    "$BINARIES_DIR/libquery_engine-darwin-arm64.dylib.node"
