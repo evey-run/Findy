@@ -31,6 +31,7 @@
     "test": "tsx --test \"server/src/**/*.test.ts\" \"src/lib/**/*.test.ts\"",
     "tauri:android:build": "bash scripts/android-env.sh npx tauri android build --apk",
     "tauri:android:apk": "npm run tauri:android:build && bash scripts/android-env.sh bash scripts/android-sign-apk.sh",
+    "tauri:android:aab": "bash scripts/android-env.sh npx tauri android build --aab --target aarch64 --target armv7 --target x86_64",
     "tauri:ios:build": "tauri ios build"
   },
   "dependencies": {

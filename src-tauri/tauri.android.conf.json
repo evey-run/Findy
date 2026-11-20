@@ -1,5 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "identifier": "run.evey.findy",
   "build": {
     "beforeDevCommand": "npm run dev:mobile",
     "beforeBuildCommand": "npm run build"

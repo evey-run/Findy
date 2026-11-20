@@ -13,16 +13,38 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Clé d'envoi Google Play. `keystore.properties` (storeFile, storePassword,
+// keyAlias, keyPassword) n'est jamais versionné : sans lui, la release reste
+// non signée, comme avant, et `scripts/android-sign-apk.sh` signe l'APK.
+val keystoreProperties = Properties().apply {
+    val propFile = rootProject.file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+
 android {
     compileSdk = 36
-    namespace = "com.evey.finance"
+    // Le paquet de la fiche Google Play. Le bureau garde `com.evey.finance`
+    // (tauri.conf.json) : c'est le nom du dossier de données sur le Mac.
+    namespace = "run.evey.findy"
     defaultConfig {
         manifestPlaceholders["usesCleartextTraffic"] = "false"
-        applicationId = "com.evey.finance"
+        applicationId = "run.evey.findy"
         minSdk = 24
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    signingConfigs {
+        if (keystoreProperties.containsKey("storeFile")) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -38,6 +60,7 @@ android {
             }
         }
         getByName("release") {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
             isMinifyEnabled = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
