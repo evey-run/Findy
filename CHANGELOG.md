@@ -8,6 +8,9 @@ le [versionnage sémantique](https://semver.org/lang/fr/).
 
 ### Ajouté
 
+- **Bouton « Synchroniser tout » sur la page Transactions.** Une seule action
+  synchronise toutes les banques connectées, l'une après l'autre ; une banque en
+  erreur, en attente de délai ou au consentement expiré n'arrête pas les autres.
 - **Findy sur iPhone et Android.** L'application est désormais compilée pour
   iOS et Android via Tauri 2, à partir de la même base de code. Le téléphone
   n'est pas une deuxième installation : c'est une deuxième fenêtre sur les
