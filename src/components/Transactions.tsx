@@ -6,6 +6,8 @@ import { showHeaderGlass, headerCellBackground } from '../lib/headerGlass';
 import { merchantColor, merchantInitials, merchantName } from '../lib/merchant';
 import { groupDayRows, type TransactionListRow } from '../lib/groupTransactions';
 import type { Bank } from '../types';
+import toast from 'react-hot-toast';
+import { syncAllBanks, eligibleBanks } from '../lib/syncAllBanks';
 import { useLocation } from 'react-router-dom';
 import TransactionTraceModal from './TransactionTraceModal';
 
@@ -185,6 +187,9 @@ export default function Transactions({
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [isSyncingAll, setIsSyncingAll] = useState(false);
+  const syncingAllRef = useRef(false);
+  const hasEligibleBank = eligibleBanks(banks).length > 0;
   const ITEMS_PER_PAGE = 25; // Reduced for better initial performance
   // Références pour un scroll infini robuste (IntersectionObserver + auto-remplissage)
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -895,6 +900,48 @@ export default function Transactions({
     applyFilters(newFilters);
   };
 
+  const handleSyncAll = async () => {
+    if (syncingAllRef.current) return;
+    syncingAllRef.current = true;
+    setIsSyncingAll(true);
+    try {
+      const sum = await syncAllBanks(banks, fetch);
+      if (sum.synced > 0) {
+        toast.success(`Sync OK : +${sum.imported} nouvelles, ${sum.pendingReconciled} réconciliées sur ${sum.synced} banque(s)`);
+      }
+      if (sum.skippedCooldown > 0) {
+        toast(`${sum.skippedCooldown} banque(s) déjà à jour récemment`);
+      }
+      if (sum.expired > 0) {
+        toast.error(`${sum.expired} banque(s) à réauthentifier (consentement expiré)`, { duration: 6000 });
+      }
+      for (const f of sum.failed) {
+        toast.error(`${f.name} : ${f.message}`);
+      }
+      // Rechargement depuis la page 1 pour ne pas désynchroniser l'offset du scroll infini.
+      await loadBanks();
+      await loadTransactions({
+        searchText: filters.searchText || undefined,
+        categoryId: filters.categoryId || undefined,
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        checked: filters.checked || undefined,
+        amountSign: filters.amountSign || undefined,
+        excludeAccountType: 'INVESTMENT',
+        pageName,
+        limit: ITEMS_PER_PAGE,
+        forceRefresh: true,
+      });
+      setPage(1);
+      setHasMore(useAppStore.getState().transactions.length >= ITEMS_PER_PAGE);
+    } catch (err: any) {
+      toast.error(err?.message || 'Erreur de synchronisation');
+    } finally {
+      syncingAllRef.current = false;
+      setIsSyncingAll(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 gap-4">
       {/* Header */}
@@ -908,6 +955,17 @@ export default function Transactions({
           </p>
         </div>
         <div className="flex gap-3 md:mt-0">
+          <button
+            onClick={handleSyncAll}
+            disabled={isSyncingAll || !hasEligibleBank}
+            title={hasEligibleBank ? 'Synchroniser toutes les banques connectées' : 'Aucune banque connectée à synchroniser'}
+            className="inline-flex items-center px-3 py-1.5 border border-white/10 rounded-md shadow-sm text-sm font-medium text-zinc-200 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg className={`mr-2 h-4 w-4 ${isSyncingAll ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {isSyncingAll ? 'Synchronisation…' : 'Synchroniser tout'}
+          </button>
           {selectedTransactions.length > 0 && (
             <>
               <button
