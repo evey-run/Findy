@@ -1,3 +1,4 @@
+import { parseRangeEnd } from '../lib/dateRange';
 import express from 'express';
 import prisma from '../prisma';
 import { resolveScope } from '../lib/scope';
@@ -76,7 +77,7 @@ router.get('/', async (req, res) => {
     if (startDate || endDate) {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate as string);
-      if (endDate) where.date.lte = new Date(endDate as string);
+      { const end = parseRangeEnd(endDate); if (end) where.date.lte = end; }
     }
     // Ajout du filtre de recherche par mot-clé
     if (search && typeof search === 'string' && search.trim() !== '') {
@@ -166,14 +167,14 @@ router.get('/stats/summary', async (req, res) => {
     if (startDate || endDate) {
       where.date = {};
       if (startDate) where.date.gte = new Date(startDate as string);
-      if (endDate) where.date.lte = new Date(endDate as string);
+      { const end = parseRangeEnd(endDate); if (end) where.date.lte = end; }
     }
 
     // Get internal transfer IDs to exclude from income/expense calculations
     const transferIds = await getInternalTransferIds(
       req.authUserId,
       startDate ? new Date(startDate as string) : undefined,
-      endDate ? new Date(endDate as string) : undefined
+      parseRangeEnd(endDate)
     );
     const hasTransfers = transferIds.size > 0;
     const transferWhere = hasTransfers
@@ -547,8 +548,8 @@ router.post('/bulk-update', async (req, res) => {
         }
       }
       if (endDate) {
-        const ed = new Date(endDate);
-        if (!isNaN(ed.getTime())) {
+        const ed = parseRangeEnd(endDate);
+        if (ed) {
           where.date.lte = ed;
         }
       }
@@ -683,8 +684,8 @@ router.post('/search', async (req, res) => {
         if (!isNaN(sd.getTime())) where.date.gte = sd;
       }
       if (endDate) {
-        const ed = new Date(endDate);
-        if (!isNaN(ed.getTime())) where.date.lte = ed;
+        const ed = parseRangeEnd(endDate);
+        if (ed) where.date.lte = ed;
       }
       if (Object.keys(where.date).length === 0) delete where.date;
     }

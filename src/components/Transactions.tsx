@@ -9,6 +9,7 @@ import type { Bank } from '../types';
 import toast from 'react-hot-toast';
 import { syncAllBanks, eligibleBanks } from '../lib/syncAllBanks';
 import { useLocation } from 'react-router-dom';
+import { toDateInputValue } from '../lib/dateFilter';
 import TransactionTraceModal from './TransactionTraceModal';
 
 
@@ -955,6 +956,43 @@ export default function Transactions({
           </p>
         </div>
         <div className="flex gap-3 md:mt-0">
+          {/* Filtre de dates : pas de <form>, aucune navigation ; on ne relance le
+              chargement que sur une date complète valide ou vide. */}
+          <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <label className="flex items-center gap-1.5">
+              Du
+              <input
+                type="date"
+                aria-label="Date de début"
+                value={toDateInputValue(filters.startDate)}
+                max={toDateInputValue(filters.endDate) || undefined}
+                onChange={(e) => applyFilters({ ...filters, startDate: e.target.value })}
+                className={`${HEADER_CONTROL} w-32`}
+                style={{ colorScheme: 'dark' }}
+              />
+            </label>
+            <label className="flex items-center gap-1.5">
+              Au
+              <input
+                type="date"
+                aria-label="Date de fin"
+                value={toDateInputValue(filters.endDate)}
+                min={toDateInputValue(filters.startDate) || undefined}
+                onChange={(e) => applyFilters({ ...filters, endDate: e.target.value })}
+                className={`${HEADER_CONTROL} w-32`}
+                style={{ colorScheme: 'dark' }}
+              />
+            </label>
+            {(filters.startDate || filters.endDate) && (
+              <button
+                type="button"
+                onClick={() => applyFilters({ ...filters, startDate: '', endDate: '' })}
+                className="text-violet-400 hover:text-violet-300"
+              >
+                Effacer
+              </button>
+            )}
+          </div>
           <button
             onClick={handleSyncAll}
             disabled={isSyncingAll || !hasEligibleBank}
